@@ -1,0 +1,35 @@
+{
+  "name": "@liqd-js/mongodb-model",
+  "description": "Mongo model class",
+  "version": "0.0.10",
+  "author": "radixxko",
+  "license": "MIT",
+  "main": "dist/model.js",
+  "types": "dist/model.d.ts",
+  "files": ["dist/**/*"],
+  "homepage": "https://liqd-js.com/lib/mongo-model",
+  "scripts": {
+    "test": "nyc mocha",
+    "coverage": "nyc report --reporter=text-lcov | coveralls",
+    "build": "rm -rf ./dist/* && tsc",
+    "version": "rm -rf ./dist/* && tsc && npm publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/liqd-js/mongodb-model.git"
+  },
+  "keywords": [
+    "mongo",
+    "model",
+    "liqd-js",
+    "liqd"
+  ],
+  "devDependencies": {
+    "mongodb": "^5.0.1",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "@liqd-js/aggregator": "^1.0.0",
+    "@liqd-js/flow": "^1.5.0"
+  }
+}
