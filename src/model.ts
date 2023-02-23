@@ -4,9 +4,11 @@ import { flowStart } from './helpers';
 export * from './helpers';
 export { flowStart as _ };
 
+type MongoRootDocument = Document & { _id: any };
+
 export type ListOptions<DBE extends Document> = FindOptions<DBE> & { filter? : Filter<DBE> };
 
-export type AbstractConverter<DBE extends Document> = ( dbe: WithId<DBE> ) => unknown | Promise<unknown>;
+export type AbstractConverter<DBE extends Document> = ( dbe: DBE ) => unknown | Promise<unknown>;
 
 export type AbstractConverters<DBE extends Document> = 
 {
@@ -22,7 +24,7 @@ export type AbstractConverters<DBE extends Document> =
     }
 }
 
-export abstract class AbstractModel<DBE extends Document, DTO extends Document, Converters extends AbstractConverters<DBE>>
+export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
 {
     protected constructor( public collection: Collection<DBE>, public converters: Converters )
     {
@@ -30,15 +32,14 @@ export abstract class AbstractModel<DBE extends Document, DTO extends Document, 
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
-    public dbeID( dtoID: DTO['id'] ): WithId<DBE>['_id']{ return dtoID as WithId<DBE>['_id']; }
-    public dtoID( dbeID: WithId<DBE>['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
+    public dbeID( dtoID: DTO['id'] ): DBE['_id']{ return dtoID as DBE['_id']; }
+    public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    //public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'] ): Promise<DTO['id']>
-    public async create( dbe: OptionalUnlessRequiredId<DBE>, id?: DTO['id'] ): Promise<DTO['id']> // TODO: fix this
+    public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'] ): Promise<DTO['id']>
     {
         const _id: DTO['id'] = id ?? await this.id();
 
-        await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) });
+        await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
 
         return _id;
     }
@@ -49,7 +50,7 @@ export abstract class AbstractModel<DBE extends Document, DTO extends Document, 
 
         const dbe = await this.collection.findOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, { projection }); // TODO aggregate
 
-        return dbe ? converter( dbe ) as ReturnType<Converters[K]['converter']> : null;
+        return dbe ? converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> : null;
     }
 
     public async find<K extends keyof Converters>( filter: Filter<DBE>, conversion: K = 'dto' as K ): Promise<ReturnType<Converters[K]['converter']> | null>
@@ -58,7 +59,7 @@ export abstract class AbstractModel<DBE extends Document, DTO extends Document, 
 
         const dbe = await this.collection.findOne( filter, { projection });
 
-        return dbe ? converter( dbe ) as ReturnType<Converters[K]['converter']> : null;
+        return dbe ? converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> : null;
     }
 
     public async list<K extends keyof Converters>( list: ListOptions<DBE>, conversion: K = 'dto' as K ): Promise<Array<ReturnType<Converters[K]['converter']>>>
@@ -68,7 +69,7 @@ export abstract class AbstractModel<DBE extends Document, DTO extends Document, 
         
         let entries = await this.collection.find( filter, { projection, ...options }).toArray();
 
-        return Promise.all( entries.map( dbe => converter( dbe ) as ReturnType<Converters[K]['converter']> ));
+        return Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
     }
 
     public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
