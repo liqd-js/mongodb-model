@@ -25,6 +25,11 @@ export type PropertyListOptions<RootDBE extends Document, DBE extends Document> 
     projection? : FindOptions<DBE>['projection'] & { $root?: FindOptions<RootDBE>['projection'] }
 };
 
+export type AggregateOptions<DBE extends Document> =
+{
+    filter? : Filter<DBE>
+    projection? : FindOptions<DBE>['projection']
+};
 export type PropertyAggregateOptions<RootDBE extends Document, DBE extends Document> =
 {
     filter? : PropertyFilter<RootDBE, DBE>
@@ -62,6 +67,20 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
             return Promise.all( ids.map( id => index.get( id ) ?? null ));
         });
+    }
+
+    private pipeline( options: AggregateOptions<DBE> ): Document[]
+    {
+        const { filter, projection } = options;
+
+        let pipeline: Document[] = [];
+
+        isSet( filter ) && pipeline.push({ $match: filter });
+        isSet( filter ) && pipeline.push({ $project: projectionToProject( filter )});
+
+        flowGet( 'log' ) && LOG( pipeline );
+
+        return pipeline;
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
@@ -114,9 +133,9 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
     }
 
-    public async aggregate<T>( pipeline: Document[] ): Promise<T[]>
+    public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE>  ): Promise<T[]>
     {
-        return this.collection.aggregate( pipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
     }
 
     public async count( pipeline: Document[] ): Promise<number>

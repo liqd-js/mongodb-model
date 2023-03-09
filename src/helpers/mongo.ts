@@ -21,7 +21,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
 {
     if( Array.isArray( filter ))
     {
-        return filter.map(( item ) => addPrefixToValue( item, prefix ));
+        return filter.map(( item ) => addPrefixToValue( item, prefix, prefixKeys ));
     }
 
     const newFilter: Filter = {};
@@ -32,11 +32,11 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         {
             if( !prefixKeys || key.startsWith('$') )
             {
-                newFilter[key] = addPrefixToValue( filter[key], prefix );
+                newFilter[key] = addPrefixToValue( filter[key], prefix, prefixKeys );
             }
             else
             {
-                newFilter[`${prefix}.${key}`] = addPrefixToValue( filter[key], prefix );
+                newFilter[`${prefix}.${key}`] = addPrefixToValue( filter[key], prefix, prefixKeys );
             }
         }
     }
