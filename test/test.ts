@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { AbstractModels, AbstractModel, AbstractConverter } from '../src/model';
+import { AbstractModels, AbstractModel, AbstractPropertyModel, AbstractConverter } from '../src/model';
 
 //class TestConverter extends AbstractConverter<TestModels>
 
@@ -20,6 +20,16 @@ type FooBasicDTO =
     id     : string
 }
 
+type BarDBE =
+{
+    id: string
+}
+
+type BarDTO =
+{
+    id: string
+}
+
 function fooToDTO( foo: FooDBE ): FooDTO
 {
     return { id: foo._id.toString(), name: foo.name };  
@@ -32,27 +42,14 @@ function fooToBasicDTO( foo: FooDBE ): FooBasicDTO
 
 const fooConverter =
 {
-    dto: { convertor: fooToDTO },
-    basicDTO: { convertor: fooToBasicDTO }
+    dto: { converter: fooToDTO },
+    basicDTO: { converter: fooToBasicDTO }
 }
 
-/*class FooConverter extends AbstractConverter<TestModels>
+const barConverter =
 {
-    constructor( models: TestModels )
-    {
-        super( models );
-    }
-
-    public toDTO( foo: FooDBE ): FooDTO
-    {
-        return { id: foo._id.toString(), name: foo.name };
-    }
-
-    public toBasicDTO( foo: FooDBE ): FooBasicDTO
-    {
-        return { id: foo._id.toString() };
-    }
-}*/
+    dto: { converter: ( bar: BarDBE ): BarDTO => ({ id: bar.id }) }
+}
 
 class FooModel extends AbstractModel<FooDBE, FooDTO, typeof fooConverter>
 {
@@ -62,11 +59,25 @@ class FooModel extends AbstractModel<FooDBE, FooDTO, typeof fooConverter>
     }
 }
 
-const x = new FooModel( null );
+class BarModel extends AbstractPropertyModel<FooDBE, BarDBE, BarDTO, typeof barConverter>
+{
+    constructor( collection: any )
+    {
+        super( collection, 'foo.bar', barConverter );
+    }
+}
 
-let y = x.get( '1', 'dto' );
-let z = x.get( '1', 'basicDTO' );
+const a = new FooModel( null );
+const b = new BarModel( null );
 
+async function test()
+{
+    let x = await a.get( '1' );
+    let y = await a.get( [ '1', '2' ], 'basicDTO', true );
+    let z = await a.get( [ '1', '2' ], 'basicDTO', false );
+}
+
+/*
 class TestModels extends AbstractModels
 {
     public foo: FooModel;
@@ -87,4 +98,4 @@ class TestModels extends AbstractModels
     {
         
     }
-}
+}*/
