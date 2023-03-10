@@ -77,7 +77,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         let pipeline: Document[] = [];
 
         isSet( filter ) && pipeline.push({ $match: filter });
-        isSet( filter ) && pipeline.push({ $project: projectionToProject( filter )});
+        isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
 
         flowGet( 'log' ) && LOG( pipeline );
 
@@ -165,8 +165,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             const { converter, projection } = this.converters[conversion];
 
-            const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids }}, projection })).toArray();
-            const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e._id ?? e.id ), converter( e as DBE )), i ), new Map());
+            const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
+            const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e.id ?? e._id ), converter( e as DBE )), i ), new Map());
 
             return Promise.all( ids.map( id => index.get( id ) ?? null ));
         });
