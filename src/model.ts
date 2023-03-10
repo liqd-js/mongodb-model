@@ -11,6 +11,7 @@ const omitRoot = ( value: Record<string, unknown> ): Record<string, unknown> =>
     return rest;
 }
 
+export * from 'mongodb';
 export * from './helpers';
 export { flowStart as _ };
 
