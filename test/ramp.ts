@@ -48,18 +48,19 @@ class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, App
 {
     constructor( collection: any )
     {
-        super( collection, 'engagements[].applications[]', applicationConverter );
+        super( collection, 'engagements[].applications', applicationConverter );
     }
 }
 
 import { MongoClient } from 'mongodb';
 
-const client = new MongoClient( '' ); 
+const client = new MongoClient( 'mongodb://ramp-read:A7E723tv367ALCNA@138.201.188.68/' ); 
 client.connect();
 
 const model = new ApplicationModel( client.db('ramp').collection('jobs') );
 
-model.list({ limit: 1, projection: { recruiterID: 1, $root: { programmeID: 1 }}}).then( console.log );
+//model.list({ limit: 1, projection: { recruiterID: 1, $root: { programmeID: 1 }}}).then( console.log );
+model.update( 1231, { $set: { 'events.created': new Date() }});
 /*model.get( 4562 ).then( console.log );
 model.get([ 4563, 4564 ]).then( console.log );
 

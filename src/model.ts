@@ -1,4 +1,4 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions } from 'mongodb';
 import { flowStart, flowGet, LOG } from './helpers';
 import { addPrefixToFilter, projectionToProject } from './helpers/mongo';
 const Aggregator = require('@liqd-js/aggregator');
@@ -97,6 +97,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return _id;
     }
 
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
+    {
+        await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, update );
+    }
+
     public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
     public async get<K extends keyof Converters>( id: DTO['id'], conversion: K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
     public async get( id: DTO['id'][] ): Promise<Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>>;
@@ -134,19 +139,14 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
     }
 
-    public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE>  ): Promise<T[]>
+    public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<T[]>
     {
         return this.collection.aggregate( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
     }
 
-    public async count( pipeline: Document[] ): Promise<number>
+    public async count( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<number>
     {
-        return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }]).then( r => r[0]?.count ?? 0 );
-    }
-
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
-    {
-        await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, update );
+        return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
 }
 
@@ -217,6 +217,41 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
     public dbeID( dtoID: DTO['id'] ): DBE['id']{ return dtoID as DBE['id']; }
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
+
+    /*public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'] ): Promise<DTO['id']>
+    {
+        const _id: DTO['id'] = id ?? await this.id();
+
+        await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
+
+        return _id;
+    }*/
+
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
+    {
+        let path = this.paths.map( p => p.path ).join('.') + '.id';
+        let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
+        let options: UpdateOptions = {};
+
+        if( this.paths.length === 1 && !this.paths[0].array )
+        {
+            operations = addPrefixToFilter( update, this.paths[0].path );
+        }
+        if( this.paths[this.paths.length - 1].array )
+        {
+            operations = addPrefixToFilter( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
+            options = { arrayFilters: [{ 'entry.id': id }]};
+        }
+        else
+        {
+            operations = addPrefixToFilter( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
+            options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: id }]};
+        }
+
+        flowGet( 'log' ) && LOG({ match: {[ path ]: id }, operations, options });
+
+        await this.collection.updateOne({[ path ]: id } as Filter<RootDBE>, operations, options );
+    }
 
     public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
     public async get<K extends keyof Converters>( id: DTO['id'], conversion: K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
