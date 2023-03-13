@@ -218,14 +218,16 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public dbeID( dtoID: DTO['id'] ): DBE['id']{ return dtoID as DBE['id']; }
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    /*public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'] ): Promise<DTO['id']>
+    public async create( dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
     {
         const _id: DTO['id'] = id ?? await this.id();
 
-        await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
+        
+
+        //await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
 
         return _id;
-    }*/
+    }
 
     public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
     {
@@ -240,17 +242,19 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         if( this.paths[this.paths.length - 1].array )
         {
             operations = addPrefixToFilter( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
-            options = { arrayFilters: [{ 'entry.id': id }]};
+            options = { arrayFilters: [{ 'entry.id': this.dbeID( id )}]};
         }
         else
         {
             operations = addPrefixToFilter( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
-            options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: id }]};
+            options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id ) }]};
         }
 
         flowGet( 'log' ) && LOG({ match: {[ path ]: id }, operations, options });
 
-        await this.collection.updateOne({[ path ]: id } as Filter<RootDBE>, operations, options );
+        let status = await this.collection.updateOne({[ path ]: id } as Filter<RootDBE>, operations, options );
+
+        flowGet( 'log' ) && LOG({ status });
     }
 
     public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
