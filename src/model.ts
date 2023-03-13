@@ -1,6 +1,6 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions } from 'mongodb';
 import { flowStart, flowGet, LOG } from './helpers';
-import { addPrefixToFilter, projectionToProject } from './helpers/mongo';
+import { addPrefixToFilter, projectionToProject, isUpdateOperator } from './helpers/mongo';
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
@@ -99,7 +99,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
     {
-        await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, update );
+        await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
     }
 
     public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
@@ -252,7 +252,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options });
 
-        let status = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, operations, options );
+        let status = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
 
         flowGet( 'log' ) && LOG({ status });
     }

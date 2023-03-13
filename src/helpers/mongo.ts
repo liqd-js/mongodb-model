@@ -71,3 +71,8 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
 
     return project;
 }
+
+export function isUpdateOperator( update: object ): boolean
+{
+    return ( typeof update === 'object' && update !== null && Object.keys( update ).every( key => key.startsWith('$')));
+}
