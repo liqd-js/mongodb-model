@@ -218,7 +218,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public dbeID( dtoID: DTO['id'] ): DBE['id']{ return dtoID as DBE['id']; }
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    public async create( dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
+    /*public async create(  parentID<> dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
     {
         const _id: DTO['id'] = id ?? await this.id();
 
@@ -227,7 +227,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         //await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
 
         return _id;
-    }
+    }*/
 
     public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
     {
@@ -247,12 +247,12 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         else
         {
             operations = addPrefixToFilter( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
-            options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id ) }]};
+            options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id )}]};
         }
 
-        flowGet( 'log' ) && LOG({ match: {[ path ]: id }, operations, options });
+        flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options });
 
-        let status = await this.collection.updateOne({[ path ]: id } as Filter<RootDBE>, operations, options );
+        let status = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, operations, options );
 
         flowGet( 'log' ) && LOG({ status });
     }
