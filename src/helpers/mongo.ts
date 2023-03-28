@@ -1,4 +1,4 @@
-import { Document, ObjectId, FindOptions } from 'mongodb';
+import { Document, ObjectId, FindOptions, UpdateFilter } from 'mongodb';
 type Filter = Record<string, any>;
 
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
@@ -42,6 +42,25 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
     }
 
     return newFilter;
+}
+
+export function addPrefixToUpdate<RootDBE,DBE>( update: Partial<DBE> | UpdateFilter<DBE>, prefix: string ): Partial<RootDBE> | UpdateFilter<RootDBE>
+{
+    const newUpdate: Record<string, any> = {};
+
+    for( const[ key, value ] of Object.entries( update ))
+    {
+        if( key.startsWith('$') )
+        {
+            newUpdate[key] = addPrefixToUpdate( value, prefix );
+        }
+        else
+        {
+            newUpdate[`${prefix}.${key}`] = value; // TODO test when update is not a primitive
+        }
+    }
+
+    return newUpdate;
 }
 
 function objectSet( obj: Record<string, unknown>, path: string[], value: unknown )

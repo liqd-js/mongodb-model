@@ -1,6 +1,6 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions } from 'mongodb';
 import { flowStart, flowGet, LOG } from './helpers';
-import { addPrefixToFilter, projectionToProject, isUpdateOperator } from './helpers/mongo';
+import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator } from './helpers/mongo';
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
@@ -237,16 +237,16 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         if( this.paths.length === 1 && !this.paths[0].array )
         {
-            operations = addPrefixToFilter( update, this.paths[0].path );
+            operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths[0].path );
         }
         if( this.paths[this.paths.length - 1].array )
         {
-            operations = addPrefixToFilter( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
+            operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
             options = { arrayFilters: [{ 'entry.id': this.dbeID( id )}]};
         }
         else
         {
-            operations = addPrefixToFilter( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
+            operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
             options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id )}]};
         }
 
