@@ -4,12 +4,6 @@ import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOper
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
-const omitRoot = ( value: Record<string, unknown> ): Record<string, unknown> => 
-{
-    const { $root, ...rest } = value;
-
-    return rest;
-}
 
 export * from 'mongodb';
 export * from './helpers';
@@ -165,7 +159,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             const { converter, projection } = this.converters[conversion];
 
-            const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
+            const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: projection ? { ...projection, id: 1 } : undefined })).toArray();
             const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e.id ?? e._id ), converter( e as DBE )), i ), new Map());
 
             return Promise.all( ids.map( id => index.get( id ) ?? null ));
