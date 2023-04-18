@@ -1,4 +1,4 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions } from 'mongodb';
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError } from 'mongodb';
 import { flowStart, flowGet, LOG } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator } from './helpers/mongo';
 const Aggregator = require('@liqd-js/aggregator');
@@ -8,6 +8,8 @@ const isSet = ( value: any ): boolean => value !== undefined && value !== null &
 export * from 'mongodb';
 export * from './helpers';
 export { flowStart as _ };
+
+type CreateOptions = { duplicateIgnore?: boolean };
 
 type MongoRootDocument = Document & { _id: any };
 type MongoPropertyDocument = Document & { id: any };
@@ -82,11 +84,23 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     public dbeID( dtoID: DTO['id'] ): DBE['_id']{ return dtoID as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'] ): Promise<DTO['id']>
+    public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: CreateOptions ): Promise<DTO['id']>
     {
         const _id: DTO['id'] = id ?? await this.id();
 
-        await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
+        try
+        {
+            await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
+        }
+        catch( e: any )
+        {
+            if( options?.duplicateIgnore === true && e.code === 11000 )
+            {
+                return this.dtoID( await this.collection.findOne( e.keyValue, { projection: { _id: 1 }}).then( r => r?._id ));
+            }
+
+            throw e;
+        }
 
         return _id;
     }
@@ -159,7 +173,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             const { converter, projection } = this.converters[conversion];
 
-            const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: projection ? { ...projection, id: 1 } : undefined })).toArray();
+            const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
             const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e.id ?? e._id ), converter( e as DBE )), i ), new Map());
 
             return Promise.all( ids.map( id => index.get( id ) ?? null ));
@@ -193,7 +207,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         const { $root: rootProjection, ...propertyProjection } = options.projection ?? {};
 
-        if( isSet( propertyProjection )){ $project = addPrefixToFilter( projectionToProject( propertyProjection ), this.prefix, false )}
+        if( isSet( propertyProjection )){ $project = addPrefixToFilter( projectionToProject({ id: 1, ...propertyProjection }), this.prefix, false )}
         if( isSet( rootProjection )){ $rootProject = projectionToProject( rootProjection )}
 
         pipeline.push({ $replaceRoot: { newRoot: ( $rootProject ? { $mergeObjects: [ $project, { _root: $rootProject }]} : $project )}});
