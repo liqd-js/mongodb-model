@@ -1,5 +1,7 @@
 const Flow = require('@liqd-js/flow');
 
+export * from './mongo';
+
 export function flowStart( callback: Function, scope: object )
 {
     Flow.start( callback, scope );

@@ -18,6 +18,47 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
     return addPrefixToFilter( filter, prefix, prefixKeys );
 }
 
+export function resolveFilterValue( filter: Filter | any ): Filter | any
+{
+    if( typeof filter === 'string' ){ return filter; }
+    if( typeof filter !== 'object' || filter === null ){ return filter; }
+    if( typeof filter === 'object' &&
+    (
+        ( filter instanceof ObjectId ) ||
+        ( filter instanceof Date )  ||
+        ( filter instanceof RegExp ) // TODO is basic object alternative?
+    ))
+    {
+        return filter;
+    }
+    if( typeof filter === 'object' && filter.hasOwnProperty('$oid') && Object.keys( filter ).length === 1 )
+    {
+        return new ObjectId( filter.$oid ); 
+    }
+    
+    return resolveFilterOIDs( filter );
+}
+
+export function resolveFilterOIDs( filter: Filter ): Filter
+{
+    if( Array.isArray( filter ))
+    {
+        return filter.map(( item ) => resolveFilterValue( item ));
+    }
+
+    const newFilter: Filter = {};
+
+    for( const key in filter )
+    {
+        if( filter.hasOwnProperty( key ))
+        {
+            newFilter[key] = resolveFilterValue( filter[key] );
+        }
+    }
+
+    return newFilter;
+}
+
 export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: boolean = true ): Filter
 {
     if( Array.isArray( filter ))
