@@ -1,6 +1,6 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError } from 'mongodb';
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort } from 'mongodb';
 import { flowStart, flowGet, LOG } from './helpers';
-import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator } from './helpers/mongo';
+import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition } from './helpers/mongo';
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
@@ -14,8 +14,9 @@ type CreateOptions = { duplicateIgnore?: boolean };
 type MongoRootDocument = Document & { _id: any };
 type MongoPropertyDocument = Document & { id: any };
 
+export type ListPointer = { cursor?: string, prev?: string, next?: string };
 export type PropertyFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { $root?: Filter<RootDBE> };
-export type ListOptions<DBE extends Document> = FindOptions<DBE> & { filter? : Filter<DBE> };
+export type ListOptions<DBE extends Document> = FindOptions<DBE> & { filter? : Filter<DBE> } & ListPointer;
 export type PropertyListOptions<RootDBE extends Document, DBE extends Document> = Omit<FindOptions<DBE>, 'projection'> & 
 {
     filter? : PropertyFilter<RootDBE, DBE>
@@ -81,7 +82,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         let pipeline: Document[] = [];
 
-        isSet( filter ) && pipeline.push({ $match: filter });
+        isSet( filter ) && pipeline.push({ $match: resolveBSONObject( filter! )});
         isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
 
         flowGet( 'log' ) && LOG( pipeline );
@@ -141,19 +142,42 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     {
         const { converter, projection } = this.converters[conversion];
 
-        const dbe = await this.collection.findOne( filter, { projection });
+        const dbe = await this.collection.findOne( resolveBSONObject( filter ), { projection });
 
         return dbe ? await converter( dbe as DBE ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
 
-    public async list<K extends keyof Converters>( list: ListOptions<DBE>, conversion: K = 'dto' as K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>>>>
+    public async list<K extends keyof Converters>( list: ListOptions<DBE>, conversion: K = 'dto' as K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>
     {
         const { converter, projection } = this.converters[conversion];
-        const { filter = {}, ...options } = list;
-        
+        let { filter = {}, cursor, prev, next, ...options } = list;
+
+        // TODO pre kazdu entry urcime cursor = hodnoty sort klucov - potom podla smeru sortu vygenerujeme condition cez and a or do filtra
+        // Cursor appendneme len na prvy a posledny item $cursor
+        // ak nemam cursor tak na prvy ani cursor nedavam a robo bude posielat
+
+        // dobre final = prvy cursor nema iba keby mi prisiel uz v requeste nejaky a vsetkym ostatnym dam cursor
+
+        // TODO default cursor should be { _id: 1 }
+
+        filter = resolveBSONObject( filter );
+
+        if( cursor ){ filter = { $and: [ filter, generateCursorCondition( cursor, list.sort ?? { _id: 1 }, 'cursor' )]}} // TODO
+        if( prev ){ filter = { $and: [ filter, generateCursorCondition( prev, list.sort ?? { _id: 1 }, 'prev' )]}}
+        if( next ){ filter = { $and: [ filter, generateCursorCondition( next, list.sort ?? { _id: 1 }, 'next' )]}}
+
+        flowGet( 'log' ) && LOG( filter );
+
         let entries = await this.collection.find( filter, { projection, ...options }).toArray();
 
-        return Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
+        return Promise.all( entries.map( async( dbe ) => 
+        {
+            const dto = await converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
+
+            dto.$cursor = getCursor( dbe, options.sort ?? { _id: 1 });
+
+            return dto;
+        }));
     }
 
     public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<T[]>

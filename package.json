@@ -1,7 +1,7 @@
 {
   "name": "@liqd-js/mongodb-model",
   "description": "Mongo model class",
-  "version": "0.4.10",
+  "version": "0.4.14",
   "author": "radixxko",
   "license": "MIT",
   "main": "dist/model.js",
@@ -27,11 +27,11 @@
     "liqd"
   ],
   "devDependencies": {
-    "typescript": "^5.0.2"
+    "typescript": "^5.0.4"
   },
   "dependencies": {
     "@liqd-js/aggregator": "^1.0.0",
     "@liqd-js/flow": "^1.5.0",
-    "mongodb": "^5.1.0"
+    "mongodb": "^5.5.0"
   }
 }
