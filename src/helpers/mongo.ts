@@ -5,6 +5,13 @@ type Filter = Record<string, any>;
 export const toBase64 = ( str: string ) => Buffer.from( str, 'utf8' ).toString('base64url');
 export const fromBase64 = ( str: string ) => Buffer.from( str, 'base64url' ).toString('utf8');
 
+const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
+
+export function reverseSort( sort: Sort ): Sort
+{
+    return Object.fromEntries( Object.entries( sort ).map(([ key, value ]) => [ key, SORT_DESC.includes( value ) ? 1 : -1 ]));
+}
+
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
 {
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
@@ -157,7 +164,7 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
 export function bsonValue( value: any )
 {
     if( value instanceof ObjectId ){ return { $oid: value.toString() }}
-    if( value instanceof Date ){ return { $date: value.toISOString() }}
+    if( value instanceof Date ){ return { $date: value.getTime() }}
 
     return value;
 }
@@ -172,13 +179,16 @@ export function getCursor( dbe: Document, sort: Sort ): string
     return toBase64( JSON.stringify( Object.keys( sort ).map( key => bsonValue( objectGet( dbe, key.split('.') )))));
 }
 
-export function generateCursorCondition( cursor: string, sort: Sort, direction: 'cursor' | 'next' | 'prev' ): Filter
+export function generateCursorCondition( cursor: string, sort: Sort ): Filter
 {
-    const values = JSON.parse( fromBase64( cursor )), properties = Object.keys( sort ), directions = Object.values( sort ).map( value => ( direction === 'prev' ? -1 : 1 ) * ([ -1, 'desc', 'descending' ].includes( value ) ? -1 : 1 ));
+    const direction = cursor.startsWith('prev:') ? 'prev' : cursor.startsWith('next:') ? 'next' : undefined;
+    const properties = Object.keys( sort );
+    const directions = Object.values( sort ).map( value => ( direction === 'prev' ? -1 : 1 ) * ( SORT_DESC.includes( value ) ? -1 : 1 ));
+    const values = JSON.parse( fromBase64( cursor.substring( direction ? direction.length + 1 : 0 )));
 
     if( properties.length === 1 )
     {
-        return resolveBSONObject({[ properties[0]]: {[( directions[0] === 1 ? '$gt' : '$lt' ) + ( direction === 'cursor' ? 'e' : '' )]: values[0] }});
+        return {[ properties[0]]: {[( directions[0] === 1 ? '$gt' : '$lt' ) + ( !direction ? 'e' : '' )]: values[0] }};
     }
 
     const filter: Filter[] = [];
@@ -189,7 +199,7 @@ export function generateCursorCondition( cursor: string, sort: Sort, direction: 
 
         for( let j = 0; j <= i; j++ )
         {
-            condition[properties[j]] = resolveBSONObject({[( j < i ? '$eq' : directions[j] === 1 ? '$gt' : '$lt' ) + ( j === properties.length - 1 && direction === 'cursor' ? 'e' : '' )]: values[j] }); 
+            condition[properties[j]] = {[( j < i ? '$eq' : directions[j] === 1 ? '$gt' : '$lt' ) + ( j === properties.length - 1 && !direction ? 'e' : '' )]: values[j] }; 
         }
     }
 
