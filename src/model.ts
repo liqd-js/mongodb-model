@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort } from 'mongodb';
-import { flowStart, flowGet, LOG } from './helpers';
+import { flowStart, flowGet, LOG, Benchmark } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort } from './helpers/mongo';
 const Aggregator = require('@liqd-js/aggregator');
 
@@ -60,12 +60,24 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         {
             try
             {
+                let perf = new Benchmark();
+
                 const { converter, projection } = this.converters[conversion];
 
-                const entries = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection }).toArray();
-                const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e._id ?? e.id ), converter( e as DBE )), i ), new Map());
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find aggregator (${ids.length})`, { _id: { $in: ids }});
 
-                return Promise.all( ids.map( id => index.get( id ) ?? null ));
+                const entries = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection }).toArray();
+
+                let find = perf.step();
+
+                const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e._id ?? e.id ), converter( e as DBE )), i ), new Map());
+                const result = await Promise.all( ids.map( id => index.get( id ) ?? null ));
+
+                let convetor = perf.step();
+
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+
+                return result;
             }
             catch( e )
             {
@@ -156,13 +168,18 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         cursor && ( filter = { $and: [ filter, generateCursorCondition( cursor, sort )]});
 
         flowGet( 'log' ) && LOG( filter );
+        let perf = new Benchmark();
+
+        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list`, { filter });
 
         let entries = await this.collection.find( resolveBSONObject( filter ), { projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
+
+        let find = perf.step();
 
         ( !( last = limit ? entries.length <= limit : true )) && entries.pop();
         prev && entries.reverse();
 
-        return Promise.all( entries.map( async( dbe, i ) => 
+        const result = await Promise.all( entries.map( async( dbe, i ) => 
         {
             const dto = await converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
 
@@ -173,6 +190,12 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
             return dto;
         }));
+
+        let convetor = perf.step();
+
+        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+
+        return result;
     }
 
     public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<T[]>
@@ -201,12 +224,25 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             try
             {
+                let perf = new Benchmark();
+
                 const { converter, projection } = this.converters[conversion];
 
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find aggregator (${ids.length})` );
+
                 const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
+
+                let find = perf.step();
+
                 const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e.id ?? e._id ), converter( e as DBE )), i ), new Map());
 
-                return Promise.all( ids.map( id => index.get( id ) ?? null ));
+                const result = Promise.all( ids.map( id => index.get( id ) ?? null ));
+
+                let convetor = perf.step();
+
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+
+                return result;
             }
             catch( e )
             {
@@ -337,9 +373,21 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         const pipeline = this.pipeline({ ...list, projection });
 
+        let perf = new Benchmark();
+
+        flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
+
         let entries = await this.collection.aggregate( pipeline ).toArray();
 
-        return Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
+        let find = perf.step();
+
+        const result = Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
+
+        let convetor = perf.step();
+
+        flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+
+        return result;
 
         // TODO property options
 
