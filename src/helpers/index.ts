@@ -35,7 +35,7 @@ const { inspect } = require('util');
 
 export function LOG( ...args: unknown[] )
 {
-    console.log( ...args.map( a => inspect( a, { colors: true, depth: Infinity })));
+    console.log( ...args.map( a => typeof a === 'string' ? a : inspect( a, { colors: true, depth: Infinity })));
 }
 
 const formatter = new Intl.DateTimeFormat( 'en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', fractionalSecondDigits: 3, hour12: false });

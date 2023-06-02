@@ -1,4 +1,5 @@
 import { Document, ObjectId, FindOptions, UpdateFilter, Sort } from 'mongodb';
+import { LOG } from '.';
 
 type Filter = Record<string, any>;
 
@@ -12,8 +13,14 @@ export function reverseSort( sort: Sort ): Sort
     return Object.fromEntries( Object.entries( sort ).map(([ key, value ]) => [ key, SORT_DESC.includes( value ) ? 1 : -1 ]));
 }
 
+export function sortProjection( sort: Sort, id: string ): Record<string, 1>
+{
+    return Object.fromEntries([ ...Object.keys( sort ).map(( key => [ key, 1 ]), [ id, 1 ] )]);
+}
+
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
 {
+    if( typeof filter === 'string' && filter.match(/^\$root\./) ){ return '$' + filter.substring(6); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
     if( typeof filter === 'object' &&
@@ -86,13 +93,21 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
     {
         if( filter.hasOwnProperty( key ))
         {
-            if( !prefixKeys || key.startsWith('$') )
+            if( key === '$root' )
+            {
+                Object.assign( newFilter, addPrefixToValue( filter[key], prefix, false ));
+            }
+            else if(  key.startsWith('$root.') )
+            {
+                newFilter[key.substring(6)] = addPrefixToValue( filter[key], prefix, false );
+            }
+            else if( !prefixKeys || key.startsWith('$') )
             {
                 newFilter[key] = addPrefixToValue( filter[key], prefix, prefixKeys );
             }
             else
             {
-                newFilter[`${prefix}.${key}`] = addPrefixToValue( filter[key], prefix, prefixKeys );
+                newFilter[`${prefix}.${key}`] = addPrefixToValue( filter[key], prefix, false );
             }
         }
     }
@@ -205,3 +220,26 @@ export function generateCursorCondition( cursor: string, sort: Sort ): Filter
 
     return { $or: filter };
 }
+
+
+//console.log( addPrefixToFilter({ foo: 'bar', $root: { foo: 'bar' } }, 'prefix'));
+/*
+console.log( addPrefixToFilter({ foo: { bar: 'foo' }, $root: { foo: 'bar' } }, 'prefix'));
+
+
+LOG( addPrefixToFilter(
+{
+    $and: 
+    [
+        { active: true, $root: { active: true }, '$root.events.closed': { $exists: false }, $eq: [ '$events.closed', '$root.events.closed' ]},
+        { $or: 
+        [
+            { $root: { programmeID: { $gt: 1 }}},
+            { $root: { programmeID: { $eq: 1 }}, '$root.events.closed': { $gt: 1 }},
+            { $root: { programmeID: { $eq: 1 }}, '$root.events.closed': { $eq: 1 }, 'events.closed': { $gt: 1 }},
+            { $root: { programmeID: { $eq: 1 }}, '$root.events.closed': { $eq: 1 }, 'events.closed': { $eq: 1 }, events: { created: { $gt: 1 }}},
+            { $root: { programmeID: { $eq: 1 }}, '$root.events.closed': { $eq: 1 }, 'events.closed': { $eq: 1 }, events: { created: { $eq: 1 }}, id: { $gt: 1 }},
+        ]}
+    ]
+},
+'prefix' ));*/

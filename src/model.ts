@@ -1,6 +1,7 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort } from 'mongodb';
 import { flowStart, flowGet, LOG, Benchmark } from './helpers';
-import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort } from './helpers/mongo';
+import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
+import Cache from './helpers/cache';
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
@@ -31,23 +32,22 @@ export type AggregateOptions<DBE extends Document> =
 export type PropertyAggregateOptions<RootDBE extends Document, DBE extends Document> =
 {
     filter? : PropertyFilter<RootDBE, DBE>
-    projection? : FindOptions<DBE>['projection'] & { $root?: FindOptions<RootDBE>['projection'] }
+    projection? : FindOptions<DBE & { $root: RootDBE }>['projection']
 };
 
 export type AbstractConverter<DBE extends Document> = ( dbe: DBE ) => unknown | Promise<unknown>;
 
+export type AbstractConverterOptions<DBE extends Document> =
+{
+    converter: AbstractConverter<DBE>,
+    projection?: FindOptions<DBE>['projection'],
+    cache?: { retention?: string, cap?: string, frequency?: number, list?: boolean, precache?: boolean }, // precache prefetchne dalsiu stranu cez cursor
+}
+
 export type AbstractConverters<DBE extends Document> = 
 {
-    dto:
-    {
-        converter: AbstractConverter<DBE>,
-        projection?: FindOptions<DBE>['projection']
-    }
-    [key: string]: 
-    {
-        converter: AbstractConverter<DBE>,
-        projection?: FindOptions<DBE>['projection']
-    }
+    dto: AbstractConverterOptions<DBE>,
+    [key: string]: AbstractConverterOptions<DBE>
 }
 
 export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
@@ -64,7 +64,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
                 const { converter, projection } = this.converters[conversion];
 
-                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find aggregator (${ids.length})`, { _id: { $in: ids }});
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find aggregator (${ids.length})`);
 
                 const entries = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection }).toArray();
 
@@ -75,7 +75,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
                 let convetor = perf.step();
 
-                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
 
                 return result;
             }
@@ -161,7 +161,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     public async list<K extends keyof Converters>( list: ListOptions<DBE>, conversion: K = 'dto' as K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>
     {
-        const { converter, projection } = this.converters[conversion];
+        const { converter, projection, cache } = this.converters[conversion];
         let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
         let prev = cursor?.startsWith('prev:'), last = true;
 
@@ -170,22 +170,29 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         flowGet( 'log' ) && LOG( filter );
         let perf = new Benchmark();
 
-        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list`, { filter });
+        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list`);
 
-        let entries = await this.collection.find( resolveBSONObject( filter ), { projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
+        let entries = await this.collection.find( resolveBSONObject( filter ), { projection: cache?.list ? sortProjection( sort, '_id' ) : projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
 
         let find = perf.step();
 
         ( !( last = limit ? entries.length <= limit : true )) && entries.pop();
         prev && entries.reverse();
 
+        if( cache?.list )
+        {
+            flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} entries `, entries );
+        }
+
+        // TODO vytiahnut cez projection len _idcka, sort stlpce a potom dotiahnut data cez get aby sa pouzila cache
+
         const result = await Promise.all( entries.map( async( dbe, i ) => 
         {
-            const dto = await converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
+            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : converter( dbe as DBE )) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
 
             if(( limit && ( i > 0 || ( cursor && ( !prev || !last ))) && !( last && !prev && i === entries.length - 1 )))
             {
-                dto.$cursor = getCursor( dbe, sort );
+                dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             }
 
             return dto;
@@ -193,7 +200,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         let convetor = perf.step();
 
-        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
 
         return result;
     }
@@ -238,9 +245,14 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
                 const result = Promise.all( ids.map( id => index.get( id ) ?? null ));
 
+                /*for( let i = 0; i < ids.length; ++i )
+                {
+                    this.models.set( ids[i], result[i] );
+                }*/
+
                 let convetor = perf.step();
 
-                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
 
                 return result;
             }
@@ -257,12 +269,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     private pipeline( list: PropertyListOptions<RootDBE, DBE> ): Document[]
     {
         const { filter = {} as PropertyFilter<RootDBE, DBE>, ...options } = list;
-        const { $root: rootFilter, ...propertyFilter } = filter;
 
-        let $match = {}, pipeline:  Document[] = [], prefix = '$';
-
-        if( isSet( propertyFilter )){ $match = { ...$match, ...addPrefixToFilter( propertyFilter, this.prefix )}}
-        if( isSet( rootFilter )){ $match = { ...$match, ...rootFilter }}
+        let $match = addPrefixToFilter( filter, this.prefix ), pipeline:  Document[] = [], prefix = '$';
 
         isSet( $match ) && pipeline.push({ $match });
 
@@ -278,12 +286,12 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         //let $project: string | Filter<RootDBE> = '$' + this.prefix, $rootProject;
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
-        const { $root: rootProjection, ...propertyProjection } = options.projection ?? {};
+        const { $root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
 
         if( isSet( propertyProjection )){ $project = addPrefixToFilter( projectionToProject({ id: 1, ...propertyProjection }), this.prefix, false )}
         if( isSet( rootProjection )){ $rootProject = projectionToProject( rootProjection )}
 
-        pipeline.push({ $replaceRoot: { newRoot: ( $rootProject ? { $mergeObjects: [ $project, { _root: $rootProject }]} : $project )}});
+        pipeline.push({ $replaceRoot: { newRoot: ( $rootProject ? { $mergeObjects: [ $project, { $root: $rootProject }]} : $project )}});
 
         if( options.sort ){ pipeline.push({ $sort: options.sort }); }
         if( options.skip ){ pipeline.push({ $skip: options.skip }); }
@@ -371,7 +379,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         //let { filter: propertyFilter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
         //let { $root, }
 
-        const pipeline = this.pipeline({ ...list, projection });
+        const pipeline = this.pipeline({ ...resolveBSONObject( list ), projection });
 
         let perf = new Benchmark();
 
@@ -385,7 +393,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         let convetor = perf.step();
 
-        flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms` );
+        flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
 
         return result;
 
@@ -431,6 +439,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 export class AbstractModels
 {
     protected client: MongoClient;
+    public cache = new Cache();
 
     protected constructor( connectionString: string )
     {
