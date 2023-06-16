@@ -2,6 +2,7 @@ import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClien
 import { flowStart, flowGet, LOG, Benchmark } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
 import Cache from './helpers/cache';
+import { ModelError, ModelQueryError, ModelConverterError } from './helpers/errors';
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
@@ -50,6 +51,23 @@ export type AbstractConverters<DBE extends Document> =
     [key: string]: AbstractConverterOptions<DBE>
 }
 
+async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
+{
+    try
+    {
+        return await converter( dbe );
+    }
+    catch( e )
+    {
+        if( e instanceof ModelConverterError )
+        {
+            throw e;
+        }
+
+        throw new ModelConverterError( model, conversion.toString(), dbe._id ?? dbe.id, e as Error );
+    }
+}
+
 export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
 {
     private abstractFindAggregator;
@@ -70,7 +88,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
                 let find = perf.step();
 
-                const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e._id ?? e.id ), converter( e as DBE )), i ), new Map());
+                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
                 const result = await Promise.all( ids.map( id => index.get( id ) ?? null ));
 
                 let convetor = perf.step();
@@ -81,9 +99,12 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
             }
             catch( e )
             {
-                console.log( 'AbstractModel ' + this.constructor.name + ' error', e, { ids });
+                if( e instanceof ModelError )
+                {
+                    throw e;
+                }
 
-                throw e;
+                throw new ModelError( this, e!.toString() );
             }
         });
     }
@@ -156,7 +177,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         const dbe = await this.collection.findOne( resolveBSONObject( filter ), { projection });
 
-        return dbe ? await converter( dbe as DBE ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
+        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
 
     public async list<K extends keyof Converters>( list: ListOptions<DBE>, conversion: K = 'dto' as K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>
@@ -188,7 +209,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         const result = await Promise.all( entries.map( async( dbe, i ) => 
         {
-            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : converter( dbe as DBE )) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
+            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
 
             if(( limit && ( i > 0 || ( cursor && ( !prev || !last ))) && !( last && !prev && i === entries.length - 1 )))
             {
@@ -241,7 +262,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
                 let find = perf.step();
 
-                const index = entries.reduce(( i, e ) => ( i.set( this.dtoID( e.id ?? e._id ), converter( e as DBE )), i ), new Map());
+                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe.id ?? dbe._id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
 
                 const result = Promise.all( ids.map( id => index.get( id ) ?? null ));
 
@@ -258,9 +279,12 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             }
             catch( e )
             {
-                console.log( 'AbstractPropertyModel ' + this.constructor.name + ' error', e, { ids });
+                if( e instanceof ModelError )
+                {
+                    throw e;
+                }
 
-                throw e;
+                throw new ModelError( this, e!.toString() );
             }
         });
     }
@@ -278,7 +302,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             if( path.array )
             {
-                pipeline.push({ $unwind: { path: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + path.path }});
+                //pipeline.push({ $unwind: { path: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + path.path }});
+                pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + path.path });
                 isSet( $match ) && pipeline.push({ $match });
             }
         }
@@ -289,9 +314,21 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         const { $root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
 
         if( isSet( propertyProjection )){ $project = addPrefixToFilter( projectionToProject({ id: 1, ...propertyProjection }), this.prefix, false )}
-        if( isSet( rootProjection )){ $rootProject = projectionToProject( rootProjection )}
+        if( isSet( rootProjection )){ $rootProject = typeof rootProjection === 'object' ? addPrefixToFilter( projectionToProject( rootProjection ), '$$ROOT', false ): '$$ROOT' }
 
-        pipeline.push({ $replaceRoot: { newRoot: ( $rootProject ? { $mergeObjects: [ $project, { $root: $rootProject }]} : $project )}});
+        if( $rootProject )
+        {
+            pipeline.push
+            (
+                { $replaceWith: { $mergeObjects: [ $project, { _root: $rootProject }]}},
+                { $replaceWith: { $setField: { field: { $literal: '$root' }, input: '$$ROOT', value: '$_root' }}},
+                { $unset: '_root' }
+            );
+        }
+        else
+        {
+            pipeline.push({ $replaceWith: $project });
+        }
 
         if( options.sort ){ pipeline.push({ $sort: options.sort }); }
         if( options.skip ){ pipeline.push({ $skip: options.skip }); }
@@ -370,7 +407,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         const dbe = ( await this.collection.aggregate( this.pipeline({ filter, projection })).limit(1).toArray())[0];
         
-        return dbe ? await converter( dbe as DBE ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
+        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
 
     public async list<K extends keyof Converters>( list: PropertyListOptions<RootDBE, DBE>, conversion: K = 'dto' as K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>>>>
@@ -389,7 +426,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         let find = perf.step();
 
-        const result = Promise.all( entries.map( dbe => converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> ));
+        const result = Promise.all( entries.map( dbe => convert( this, converter, dbe as DBE, conversion ) as ReturnType<Converters[K]['converter']> ));
 
         let convetor = perf.step();
 
@@ -436,6 +473,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     }
 }
 
+const Clients = new Map<string, MongoClient>();
+
 export class AbstractModels
 {
     protected client: MongoClient;
@@ -443,8 +482,17 @@ export class AbstractModels
 
     protected constructor( connectionString: string )
     {
-        this.client = new MongoClient( connectionString ); 
-        this.client.connect();
+        if( Clients.has( connectionString ))
+        {
+            this.client = Clients.get( connectionString )!;
+        }
+        else
+        {
+            this.client = new MongoClient( connectionString, { minPoolSize: 3, maxPoolSize: 50, maxIdleTimeMS: 15000 }); 
+            this.client.connect();
+
+            Clients.set( connectionString, this.client );
+        }
     }
 
     public scope( callback: Function, scope: object )
