@@ -1,4 +1,4 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort } from 'mongodb';
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort, MongoClientOptions } from 'mongodb';
 import { flowStart, flowGet, LOG, Benchmark } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
 import Cache from './helpers/cache';
@@ -480,7 +480,7 @@ export class AbstractModels
     protected client: MongoClient;
     public cache = new Cache();
 
-    protected constructor( connectionString: string )
+    protected constructor( connectionString: string, options: MongoClientOptions = {} )
     {
         if( Clients.has( connectionString ))
         {
@@ -488,7 +488,7 @@ export class AbstractModels
         }
         else
         {
-            this.client = new MongoClient( connectionString, { minPoolSize: 3, maxPoolSize: 50, maxIdleTimeMS: 15000 }); 
+            this.client = new MongoClient( connectionString, { minPoolSize: 0, maxPoolSize: 100, maxIdleTimeMS: 15000, compressors: [ 'snappy' ], ...options });
             this.client.connect();
 
             Clients.set( connectionString, this.client );

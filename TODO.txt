@@ -1,0 +1,1 @@
+compression https://www.mongodb.com/docs/drivers/node/v3.6/fundamentals/connection/network-compression/
