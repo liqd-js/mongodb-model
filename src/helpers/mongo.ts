@@ -20,6 +20,7 @@ export function sortProjection( sort: Sort, id: string ): Record<string, 1>
 
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
 {
+    if( typeof filter === 'string' && filter.match(/^\$$ROOT\./) ){ return filter; }
     if( typeof filter === 'string' && filter.match(/^\$root\./) ){ return '$' + filter.substring(6); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
@@ -168,9 +169,9 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
 {
     const project: Record<string, unknown> = {};
 
-    for( let path of Object.keys( projection! ))
+    for( let [ path, property ] of Object.entries( projection! ))
     {
-        objectSet( project, path.split('.'), '$' + path );
+        objectSet( project, path.split('.'), typeof property === 'string' ? ( property.startsWith('$root.') ? property.replace(/^\$root/, '$$$ROOT') : '$' + property ) : '$' + path );
     }
 
     return project;
@@ -243,3 +244,10 @@ LOG( addPrefixToFilter(
     ]
 },
 'prefix' ));*/
+
+//console.log( projectionToProject({ test: 1, 'foo.bar': 1 }));
+
+// TODO podpora subobjektu
+//console.log( projectionToProject({ testik: 'test', 'foo.bar': 1, 'jobID': '$root._id', zamestnanec: { janko: '$employer' } }));
+//console.log( projectionToProject({ testik: 'test', 'foo.bar': 1, 'jobID': '$root._id' }) );
+//console.log( addPrefixToFilter( projectionToProject({ testik: 'test', 'foo.bar': 1, 'jobID': '$root._id' }), 'prefixik', false ) )
