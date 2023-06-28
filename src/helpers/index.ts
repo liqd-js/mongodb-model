@@ -1,5 +1,7 @@
 const Flow = require('@liqd-js/flow');
 
+import { ObjectId } from 'mongodb'; 
+
 export * from './mongo';
 
 export function flowStart( callback: Function, scope: object )
@@ -36,6 +38,43 @@ const { inspect } = require('util');
 export function LOG( ...args: unknown[] )
 {
     console.log( ...args.map( a => typeof a === 'string' ? a : inspect( a, { colors: true, depth: Infinity })));
+}
+
+function stringify(value: any, indentation: string = ''): string
+{
+    if (typeof value === 'undefined') {
+        return 'undefined';
+    }
+    if (value === null) {
+        return 'null';
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return value.toString();
+    }
+    if (typeof value === 'string') {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        const elements = value.map((element) => stringify(element, indentation));
+        return '[' + elements.join(',') + ']';
+    }
+    if (typeof value === 'object') {
+        if (value instanceof Date) { return 'ISODate("' + value.toISOString() + '")' }
+        if (value instanceof RegExp) { return value.toString() }
+        if (value instanceof ObjectId) { return 'ObjectId("' + value.toHexString() + '")' }
+
+        const properties = Object.keys(value).map((key) => {
+            const val = stringify(value[key], indentation + '  ');
+            return indentation + '"' + key + '": ' + val;
+        });
+        return '{\n' + properties.join(',\n') + '\n' + indentation + '}';
+    }
+    return '';
+}
+
+export function DUMP( obj: object )
+{
+    console.log( stringify( obj ));
 }
 
 const formatter = new Intl.DateTimeFormat( 'en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', fractionalSecondDigits: 3, hour12: false });

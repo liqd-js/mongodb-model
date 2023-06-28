@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort, MongoClientOptions } from 'mongodb';
-import { flowStart, flowGet, LOG, Benchmark } from './helpers';
+import { flowStart, flowGet, LOG, DUMP, Benchmark } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
 import Cache from './helpers/cache';
 import { ModelError, ModelQueryError, ModelConverterError } from './helpers/errors';
@@ -118,8 +118,6 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         isSet( filter ) && pipeline.push({ $match: resolveBSONObject( filter! )});
         isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
 
-        flowGet( 'log' ) && LOG( pipeline );
-
         return pipeline;
     }
 
@@ -228,6 +226,8 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<T[]>
     {
+        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline );
+
         return this.collection.aggregate( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
     }
 
@@ -334,8 +334,6 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         if( options.skip ){ pipeline.push({ $skip: options.skip }); }
         if( options.limit ){ pipeline.push({ $limit: options.limit }); }
         // TODO rest of operators
-
-        flowGet( 'log' ) && LOG( pipeline );
 
         return pipeline;
     }
@@ -464,6 +462,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyAggregateOptions<RootDBE,DBE> ): Promise<T[]>
     {
+        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline );
+
         return this.collection.aggregate( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
     }
 
