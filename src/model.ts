@@ -109,11 +109,18 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         });
     }
 
-    private pipeline( options: AggregateOptions<DBE> ): Document[]
+    private async pipeline( options: AggregateOptions<DBE> ): Promise<Document[]>
     {
         const { filter, projection } = options;
 
         let pipeline: Document[] = [];
+
+        let accessFilter = await this.accessFilter();
+
+        if( accessFilter )
+        {
+            pipeline.push({ $match: resolveBSONObject( accessFilter! )});
+        }
 
         isSet( filter ) && pipeline.push({ $match: resolveBSONObject( filter! )});
         isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
@@ -184,6 +191,13 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
         let prev = cursor?.startsWith('prev:'), last = true;
 
+        let accessFilter = await this.accessFilter();
+
+        if( accessFilter )
+        {
+            filter =  isSet( filter ) ? { $and: [ filter, accessFilter ]} : accessFilter;
+        }
+
         cursor && ( filter = { $and: [ filter, generateCursorCondition( cursor, sort )]});
 
         flowGet( 'log' ) && LOG( filter );
@@ -191,6 +205,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list`);
 
+        if( accessFilter )
+        {
+            LOG( this.constructor.name, { filter });
+        }
+ 
         let entries = await this.collection.find( resolveBSONObject( filter ), { projection: cache?.list ? sortProjection( sort, '_id' ) : projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
 
         let find = perf.step();
@@ -226,15 +245,17 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<T[]>
     {
-        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline );
+        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline );
 
-        return this.collection.aggregate( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
     }
 
     public async count( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<number>
     {
         return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
+
+    protected async accessFilter(): Promise<Filter<DBE> | void>{}
 }
 
 export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
@@ -258,7 +279,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
                 flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find aggregator (${ids.length})` );
 
-                const entries = await this.collection.aggregate( this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
+                const entries = await this.collection.aggregate( await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
 
                 let find = perf.step();
 
@@ -290,11 +311,20 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    private pipeline( list: PropertyListOptions<RootDBE, DBE> ): Document[]
+    private async pipeline( list: PropertyListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
     {
         const { filter = {} as PropertyFilter<RootDBE, DBE>, ...options } = list;
 
-        let $match = addPrefixToFilter( filter, this.prefix ), pipeline:  Document[] = [], prefix = '$';
+        let pipeline:  Document[] = [], prefix = '$';
+
+        let accessFilter = await this.accessFilter();
+
+        if( accessFilter )
+        {
+            pipeline.push({ $match: addPrefixToFilter( accessFilter, this.prefix ) });
+        }
+
+        let $match = addPrefixToFilter( filter, this.prefix );
 
         isSet( $match ) && pipeline.push({ $match });
 
@@ -334,6 +364,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         if( options.skip ){ pipeline.push({ $skip: options.skip }); }
         if( options.limit ){ pipeline.push({ $limit: options.limit }); }
         // TODO rest of operators
+
+        if( accessFilter )
+        {
+            LOG( this.constructor.name, { pipeline });
+        }
 
         return pipeline;
     }
@@ -403,7 +438,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     {
         const { converter, projection } = this.converters[conversion];
 
-        const dbe = ( await this.collection.aggregate( this.pipeline({ filter, projection })).limit(1).toArray())[0];
+        const dbe = ( await this.collection.aggregate( await this.pipeline({ filter, projection })).limit(1).toArray())[0];
         
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
@@ -420,7 +455,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
 
-        let entries = await this.collection.aggregate( pipeline ).toArray();
+        let entries = await this.collection.aggregate( await pipeline ).toArray();
 
         let find = perf.step();
 
@@ -462,15 +497,23 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyAggregateOptions<RootDBE,DBE> ): Promise<T[]>
     {
-        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline );
+        flowGet( 'log' ) && DUMP([ ...await this.pipeline( options! ), ...pipeline ]);
 
-        return this.collection.aggregate( isSet( options ) ? [ ...this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate([ ...await this.pipeline( options! ), ...pipeline ]).toArray() as Promise<T[]>;
+
+        /* WHY THE HELL WAS IT LIKE THAT
+        
+        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline );
+
+        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;*/
     }
 
     public async count( pipeline: Document[], options?: PropertyAggregateOptions<RootDBE,DBE> ): Promise<number>
     {
         return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
+
+    protected async accessFilter(): Promise<PropertyFilter<RootDBE,DBE> | void>{}
 }
 
 const Clients = new Map<string, MongoClient>();
