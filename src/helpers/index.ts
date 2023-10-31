@@ -108,3 +108,35 @@ export class Benchmark
         return formatter.format( new Date() );
     }
 }
+
+export function deleteNullProperties( obj: any ): void
+{
+    if( Array.isArray( obj ))
+    {
+        for( var i = obj.length - 1; i >= 0; --i )
+        {
+            if( obj[i] === null || obj[i] === undefined )
+            {
+                obj.splice( i, 1 );
+            }
+            else if( typeof obj[i] === 'object' )
+            {
+                deleteNullProperties( obj[i] );
+            }
+        }
+    }
+    else if( obj )
+    {
+        for( var [ key, value ] of Object.entries( obj ))
+        {
+            if( value === null || value === undefined )
+            {
+                delete obj[key];
+            }
+            else if( typeof obj[key] === 'object' )
+            {
+                deleteNullProperties( obj[key] );
+            }
+        }
+    }
+}
