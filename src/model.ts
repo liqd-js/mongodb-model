@@ -247,7 +247,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     {
         flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline );
 
-        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : pipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[]).toArray() as Promise<T[]>;
     }
 
     public async count( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<number>
