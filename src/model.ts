@@ -1,8 +1,8 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoServerError, Sort, MongoClientOptions } from 'mongodb';
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoClientOptions } from 'mongodb';
 import { flowStart, flowGet, LOG, DUMP, Benchmark } from './helpers';
-import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, objectGet, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
+import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
 import Cache from './helpers/cache';
-import { ModelError, ModelQueryError, ModelConverterError } from './helpers/errors';
+import { ModelError, ModelConverterError } from './helpers/errors';
 const Aggregator = require('@liqd-js/aggregator');
 
 const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
@@ -247,7 +247,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     {
         flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline );
 
-        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : pipeline ).toArray() as Promise<T[]>;
     }
 
     public async count( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<number>
@@ -324,7 +324,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             pipeline.push({ $match: addPrefixToFilter( accessFilter, this.prefix ) });
         }
 
-        let $match = addPrefixToFilter( filter, this.prefix );
+        let $match = resolveBSONObject( addPrefixToFilter( filter, this.prefix ));
 
         isSet( $match ) && pipeline.push({ $match });
 
@@ -499,7 +499,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     {
         flowGet( 'log' ) && DUMP([ ...await this.pipeline( options! ), ...pipeline ]);
 
-        return this.collection.aggregate([ ...await this.pipeline( options! ), ...pipeline ]).toArray() as Promise<T[]>;
+        return this.collection.aggregate([ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ]).toArray() as Promise<T[]>;
 
         /* WHY THE HELL WAS IT LIKE THAT
         

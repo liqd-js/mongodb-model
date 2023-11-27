@@ -55,6 +55,15 @@ export function resolveBSONValue( value: any ): any
     {
         if( value.hasOwnProperty('$oid') ){ return new ObjectId( value.$oid )}
         if( value.hasOwnProperty('$date') ){ return new Date( value.$date )} // TODO verify it is not colliding
+        if( value.hasOwnProperty('$function') )
+        {
+            if( typeof value.$function.body === 'function' )
+            {
+                return { $function: { ...value.$function, body: value.$function.body.toString() }};
+            }
+
+            return value;
+        }
     }
     
     return resolveBSONObject( value );
