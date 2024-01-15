@@ -33,6 +33,30 @@ export function i18n( i18n: { [key: string]: string } | string ): string
     return i18n[Object.keys(i18n)[0]]!;
 }
 
+export function multiI18n( i18n: { [key: string]: string } | string ): {[key: string]: string }
+{
+    const locales: Set<string> = Flow.get('locales') || [];
+    const result: {[key: string]: string } = {};
+
+    for( let locale of locales )
+    {
+        if( typeof i18n === 'string' )
+        {
+            result[locale] = i18n;
+        }
+        else if( i18n.hasOwnProperty( locale ))
+        {
+            result[locale] = i18n[locale]!;
+        }
+        else
+        {
+            result[locale] = i18n.en ?? i18n[Object.keys(i18n)[0]]!;
+        }
+    }
+
+    return result;
+}
+
 const { inspect } = require('util');
 
 export function LOG( ...args: unknown[] )

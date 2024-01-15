@@ -256,6 +256,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     }
 
     protected async accessFilter(): Promise<Filter<DBE> | void>{}
+
+    public async delete( id: DTO['id'] ): Promise<Boolean>
+    {
+        return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] })).deletedCount === 1;
+    }
 }
 
 export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
