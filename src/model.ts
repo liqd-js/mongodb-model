@@ -245,9 +245,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     public async aggregate<T>( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<T[]>
     {
-        flowGet( 'log' ) && DUMP( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline );
+        const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
-        return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[]).toArray() as Promise<T[]>;
+        flowGet( 'log' ) && DUMP( aggregationPipeline );
+
+        return this.collection.aggregate( aggregationPipeline ).toArray() as Promise<T[]>;
     }
 
     public async count( pipeline: Document[], options?: AggregateOptions<DBE> ): Promise<number>
@@ -502,9 +504,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyAggregateOptions<RootDBE,DBE> ): Promise<T[]>
     {
-        flowGet( 'log' ) && DUMP([ ...await this.pipeline( options! ), ...pipeline ]);
+        const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
-        return this.collection.aggregate([ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ]).toArray() as Promise<T[]>;
+        flowGet( 'log' ) && DUMP( aggregationPipeline );
+
+        return this.collection.aggregate( aggregationPipeline ).toArray() as Promise<T[]>;
 
         /* WHY THE HELL WAS IT LIKE THAT
         
