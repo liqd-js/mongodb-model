@@ -1,4 +1,4 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoClientOptions } from 'mongodb';
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoClientOptions, Sort } from 'mongodb';
 import { flowStart, flowGet, LOG, DUMP, Benchmark } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
 import Cache from './helpers/cache';
@@ -176,11 +176,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return filtered ? entries.filter( Boolean ) : entries;
     }
 
-    public async find<K extends keyof Converters>( filter: Filter<DBE>, conversion: K = 'dto' as K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
+    public async find<K extends keyof Converters>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
-        const dbe = await this.collection.findOne( resolveBSONObject( filter ), { projection });
+        const dbe = await this.collection.findOne( resolveBSONObject( filter ), { projection, sort });
 
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
@@ -441,11 +441,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         return filtered ? entries.filter( Boolean ) : entries;
     }
 
-    public async find<K extends keyof Converters>( filter: PropertyFilter<RootDBE,DBE>, conversion: K = 'dto' as K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
+    public async find<K extends keyof Converters>( filter: PropertyFilter<RootDBE,DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
-        const dbe = ( await this.collection.aggregate( await this.pipeline({ filter, projection })).limit(1).toArray())[0];
+        const dbe = ( await this.collection.aggregate( await this.pipeline({ filter, projection })).sort(sort ?? {}).limit(1).toArray())[0];
         
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
