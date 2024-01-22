@@ -504,7 +504,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyAggregateOptions<RootDBE,DBE> ): Promise<T[]>
     {
-        const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
+        const aggregationPipeline = [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
