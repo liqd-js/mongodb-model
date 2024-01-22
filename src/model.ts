@@ -445,7 +445,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     {
         const { converter, projection } = this.converters[conversion];
 
-        const dbe = ( await this.collection.aggregate( await this.pipeline({ filter, projection })).sort(sort ?? {}).limit(1).toArray())[0];
+        let cursor = this.collection.aggregate( await this.pipeline({ filter, projection }));
+
+        if( sort ){ cursor = cursor.sort( sort )}
+
+        const dbe = ( await cursor.limit(1).toArray())[0];
         
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }
