@@ -1,6 +1,6 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoClientOptions, Sort } from 'mongodb';
 import { flowStart, flowGet, LOG, DUMP, Benchmark } from './helpers';
-import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection } from './helpers/mongo';
+import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection, collectAddedFields } from './helpers/mongo';
 import Cache from './helpers/cache';
 import { ModelError, ModelConverterError } from './helpers/errors';
 const Aggregator = require('@liqd-js/aggregator');
@@ -17,12 +17,13 @@ type MongoRootDocument = Document & { _id: any };
 type MongoPropertyDocument = Document & { id: any };
 
 export type PropertyFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { $root?: Filter<RootDBE> };
-export type ListOptions<DBE extends Document> = FindOptions<DBE> & { filter? : Filter<DBE>, cursor?: string };
+export type ListOptions<DBE extends Document> = FindOptions<DBE> & { filter? : Filter<DBE>, cursor?: string, pipeline?: Document[]};
 export type PropertyListOptions<RootDBE extends Document, DBE extends Document> = Omit<FindOptions<DBE>, 'projection'> & 
 {
     filter? : PropertyFilter<RootDBE, DBE>
     cursor?: string
-    projection? : FindOptions<DBE>['projection'] & { $root?: FindOptions<RootDBE>['projection'] }
+    projection? : FindOptions<DBE>['projection'] & { $root?: FindOptions<RootDBE>['projection'] },
+    pipeline?: Document[]
 };
 
 export type AggregateOptions<DBE extends Document> =
@@ -209,8 +210,31 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         {
             LOG( this.constructor.name, { filter });
         }
+
+        //TODO options nepojdu pri aggregatione
  
-        let entries = await this.collection.find( resolveBSONObject( filter ), { projection: cache?.list ? sortProjection( sort, '_id' ) : projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
+        let entries: WithId<DBE>[] = [];
+        
+        if( !isSet( list.pipeline ))
+        {
+            entries = await this.collection.find( resolveBSONObject( filter ), { projection: cache?.list ? sortProjection( sort, '_id' ) : projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
+        }
+        else if( list.pipeline ) // toto je vzdy troubo
+        {
+            let pipka = [];
+
+            if( isSet(filter) ){ pipka.push({ $match: resolveBSONObject( filter )})}
+            if( cache?.list || projection ){ pipka.push({ $project: cache?.list ? sortProjection( sort, '_id' ) : projection })}
+
+            pipka.push( ...list.pipeline.map( resolveBSONObject ));
+
+            if( isSet( collectAddedFields( list.pipeline ))){ pipka.push({ $unset: collectAddedFields( list.pipeline )})}
+
+            if( isSet( sort )){ pipka.push({ $sort: prev ? reverseSort( sort ) : sort }) }
+            if( limit ){ pipka.push({ $limit: limit + 1 }) }
+
+            entries = await this.collection.aggregate( pipka ).toArray() as WithId<DBE>[];
+        }
 
         let find = perf.step();
 
@@ -366,6 +390,10 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             pipeline.push({ $replaceWith: $project });
         }
+
+        //TODO add support for '$root.property' projection if present in pipeline
+
+        if( options.pipeline ){ pipeline.push( ...options.pipeline.map( resolveBSONObject ), { $unset: collectAddedFields( options.pipeline )}); }
 
         if( options.sort ){ pipeline.push({ $sort: options.sort }); }
         if( options.skip ){ pipeline.push({ $skip: options.skip }); }

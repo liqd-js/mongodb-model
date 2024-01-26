@@ -231,6 +231,25 @@ export function generateCursorCondition( cursor: string, sort: Sort ): Filter
     return { $or: filter };
 }
 
+export function collectAddedFields( pipeline: any[] ): string[]
+{
+    const fields = new Set<string>();
+
+    for (const stage of pipeline) {
+        if (stage.$addFields) {
+            Object.keys(stage.$addFields).forEach(prop => fields.add(prop));
+        } else if (stage.$lookup) {
+            fields.add(stage.$lookup.as);
+        } else if (stage.$unset) {
+            stage.$unset.forEach((prop: string) => fields.delete(prop));
+        } else if (!stage.$match) {
+            throw new Error(`Unknown pipeline stage: ${JSON.stringify(stage)}`);
+        }
+    }
+
+    return [...fields];
+}
+
 
 //console.log( addPrefixToFilter({ foo: 'bar', $root: { foo: 'bar' } }, 'prefix'));
 /*
