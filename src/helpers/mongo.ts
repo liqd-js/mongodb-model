@@ -235,15 +235,23 @@ export function collectAddedFields( pipeline: any[] ): string[]
 {
     const fields = new Set<string>();
 
-    for (const stage of pipeline) {
-        if (stage.$addFields) {
+    for( const stage of pipeline )
+    {
+        if( stage.$addFields )
+        {
             Object.keys(stage.$addFields).forEach(prop => fields.add(prop));
-        } else if (stage.$lookup) {
+        }
+        else if( stage.$lookup )
+        {
             fields.add(stage.$lookup.as);
-        } else if (stage.$unset) {
+        }
+        else if( stage.$unset )
+        {
             stage.$unset.forEach((prop: string) => fields.delete(prop));
-        } else if (!stage.$match) {
-            throw new Error(`Unknown pipeline stage: ${JSON.stringify(stage)}`);
+        }
+        else if ( !stage.$match )
+        {
+            throw new Error(`Unsupported pipeline stage: "${Object.keys(stage)[0]}"`);
         }
     }
 

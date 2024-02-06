@@ -89,7 +89,9 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
                 let find = perf.step();
 
-                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
+                // TODO bezpecnostna habadura
+                //const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
+                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
                 const result = await Promise.all( ids.map( id => index.get( id ) ?? null ));
 
                 let convetor = perf.step();
@@ -167,12 +169,18 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     public async get<K extends keyof Converters>( id: DTO['id'][], conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
     public async get<K extends keyof Converters>( id: DTO['id'] | Array<DTO['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
+        const { converter, projection } = this.converters[conversion];
+
         if( !Array.isArray( id ))
         {
-            return await this.abstractFindAggregator.call( id, conversion ) as Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
+            const entry = await this.abstractFindAggregator.call( id, conversion ) as DBE | null;
+
+            return entry ? convert( this, converter, entry as DBE, conversion ) : null;
         }
 
-        let entries = await this.abstractFindAggregator.call( id, conversion ) as Array<Awaited<ReturnType<Converters[K]['converter']>> | null>;
+        let entries: any = await this.abstractFindAggregator.call( id, conversion ) as Array<Awaited<ReturnType<Converters[K]['converter']>> | null>;
+
+        entries = await Promise.all( entries.map(( entry: any ) => entry ? convert( this, converter, entry as DBE, conversion ) : null ));
         
         return filtered ? entries.filter( Boolean ) : entries;
     }
@@ -314,7 +322,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
                 let find = perf.step();
 
-                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe.id ?? dbe._id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
+                //const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe.id ?? dbe._id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
+                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe.id ?? dbe._id ), dbe as DBE ), i ), new Map());
 
                 const result = Promise.all( ids.map( id => index.get( id ) ?? null ));
 
@@ -393,7 +402,15 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         //TODO add support for '$root.property' projection if present in pipeline
 
-        if( options.pipeline ){ pipeline.push( ...options.pipeline.map( resolveBSONObject ), { $unset: collectAddedFields( options.pipeline )}); }
+        if( options.pipeline )
+        {
+            pipeline.push( ...options.pipeline.map( resolveBSONObject ));
+            
+            if( isSet( collectAddedFields( options.pipeline )))
+            {
+                pipeline.push({ $unset: collectAddedFields( options.pipeline )});
+            }
+        }
 
         if( options.sort ){ pipeline.push({ $sort: options.sort }); }
         if( options.skip ){ pipeline.push({ $skip: options.skip }); }
@@ -459,12 +476,18 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public async get<K extends keyof Converters>( id: DTO['id'][], conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
     public async get<K extends keyof Converters>( id: DTO['id'] | Array<DTO['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
+        const { converter, projection } = this.converters[conversion];
+
         if( !Array.isArray( id ))
         {
-            return await this.abstractFindAggregator.call( id, conversion ) as Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
+            const entry = await this.abstractFindAggregator.call( id, conversion ) as DBE | null;
+
+            return entry ? convert( this, converter, entry as DBE, conversion ) : null;
         }
 
-        let entries = await this.abstractFindAggregator.call( id, conversion ) as Array<Awaited<ReturnType<Converters[K]['converter']>> | null>;
+        let entries: any = await this.abstractFindAggregator.call( id, conversion ) as Array<Awaited<DBE|null>>;
+
+        entries = await Promise.all( entries.map(( entry: any ) => entry ? convert( this, converter, entry as DBE, conversion ) : null ));
         
         return filtered ? entries.filter( Boolean ) : entries;
     }
