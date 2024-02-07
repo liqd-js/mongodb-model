@@ -1,4 +1,5 @@
 import { Document, ObjectId, FindOptions, UpdateFilter, Sort } from 'mongodb';
+import crypto from 'crypto';
 import { LOG } from '.';
 
 type Filter = Record<string, any>;
@@ -7,6 +8,36 @@ export const toBase64 = ( str: string ) => Buffer.from( str, 'utf8' ).toString('
 export const fromBase64 = ( str: string ) => Buffer.from( str, 'base64url' ).toString('utf8');
 
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
+
+function stableStringify( obj: any, sort: boolean ): string
+{
+    if( obj instanceof ObjectId ){ return stableStringify( obj.toString(), sort )}
+    if( obj instanceof Date ){ return stableStringify( obj.toISOString(), sort )}
+    if( obj instanceof RegExp ){ return stableStringify( obj.toString(), sort )}
+    if( obj instanceof Set ){ return stableStringify([...obj], sort )}
+    if( obj instanceof Map ){ return stableStringify( Object.fromEntries([...obj.entries()]), sort )}
+    if( typeof obj !== 'object' || obj === null ){ return JSON.stringify( obj ); }
+    if( Array.isArray( obj ))
+    {
+        const arr = obj.map( v => stableStringify( v, sort )); sort && arr.sort();
+
+        return `[${ arr.join(',') }]`;
+    }
+
+    const pairs = Object.keys( obj ).sort().map( key => `${ JSON.stringify( key ) }:${ stableStringify( obj[key], sort )}`);
+
+    return `{${ pairs.join(',') }}`;
+}
+
+export function objectHash( obj: any, options: { sort?: boolean, alg?: 'sha1' | 'sha256'  } = {})
+{
+    return crypto.createHash( options.alg ?? 'sha1' ).update( stableStringify( obj, options.sort ?? true )).digest('hex');
+}
+
+export function objectHashID( obj: any, options: { sort?: boolean, alg?: 'sha1' | 'sha256'  } = {})
+{
+    return new ObjectId( crypto.createHash( options.alg ?? 'sha1' ).update( stableStringify( obj, options.sort ?? true )).digest('hex').substring(0, 24));
+}
 
 export function reverseSort( sort: Sort ): Sort
 {
