@@ -29,9 +29,11 @@ function stableStringify( obj: any, sort: boolean ): string
     return `{${ pairs.join(',') }}`;
 }
 
-export function objectHash( obj: any, options: { sort?: boolean, alg?: 'sha1' | 'sha256'  } = {})
+export function objectHash( obj: any, options: { sort?: boolean, alg?: 'plain' | 'sha1' | 'sha256' } = {})
 {
-    return crypto.createHash( options.alg ?? 'sha1' ).update( stableStringify( obj, options.sort ?? true )).digest('hex');
+    const value = stableStringify( obj, options.sort ?? true );
+
+    return options.alg !== 'plain' ? crypto.createHash( options.alg ?? 'sha1' ).update( value ).digest('hex') : value;
 }
 
 export function objectHashID( obj: any, options: { sort?: boolean, alg?: 'sha1' | 'sha256'  } = {})
