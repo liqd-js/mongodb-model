@@ -172,7 +172,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         //let find = perf.step();
         //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
 
-        const documents = await this.abstractFindAggregator.call( Array.isArray( id ) ? id : id, conversion ) as Array<DBE|null>;
+        const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
         const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
 
         if( filtered ){ entries.filter( Boolean )}
@@ -529,6 +529,19 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public async get<K extends keyof Converters>( id: DTO['id'][], conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
     public async get<K extends keyof Converters>( id: DTO['id'] | Array<DTO['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
+        //let perf = new Benchmark();
+        //let find = perf.step();
+        //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
+
+        const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
+        const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
+
+        if( filtered ){ entries.filter( Boolean )}
+
+        return Array.isArray( id ) ? entries : entries[0] ?? null as any;
+
+        /*
+
         const { converter, projection } = this.converters[conversion];
 
         if( !Array.isArray( id ))
@@ -542,7 +555,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         entries = await Promise.all( entries.map(( entry: any ) => entry ? convert( this, converter, entry as DBE, conversion ) : null ));
         
-        return filtered ? entries.filter( Boolean ) : entries;
+        return filtered ? entries.filter( Boolean ) : entries;*/
     }
 
     public async find<K extends keyof Converters>( filter: PropertyFilter<RootDBE,DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
