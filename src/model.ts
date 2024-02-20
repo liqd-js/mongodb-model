@@ -326,7 +326,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] })).deletedCount === 1;
     }
 
-    public async scope( scope: object )
+    public scope( scope: object )
     {
         Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
 
@@ -652,7 +652,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         throw new Error('Method not implemented.');
     }
 
-    public async scope( scope: object )
+    public scope( scope: object )
     {
         Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
 
