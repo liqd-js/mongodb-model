@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, MongoClient, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoClientOptions, Sort } from 'mongodb';
-import { flowStart, flowGet, LOG, DUMP, Benchmark } from './helpers';
+import { flowStart, flowGet, LOG, DUMP, Benchmark, flowSet } from './helpers';
 import { addPrefixToFilter, addPrefixToUpdate, projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection, collectAddedFields } from './helpers/mongo';
 import Cache from './helpers/cache';
 import { ModelError, ModelConverterError } from './helpers/errors';
@@ -325,6 +325,13 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     {
         return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] })).deletedCount === 1;
     }
+
+    public async scope( scope: object )
+    {
+        Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
+
+        return this;
+    }
 }
 
 export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
@@ -643,6 +650,13 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     protected async resolveCustomFilter( customFilter: any ): Promise<{ filter?: Filter<DBE>, pipeline: Document[] }>
     {
         throw new Error('Method not implemented.');
+    }
+
+    public async scope( scope: object )
+    {
+        Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
+
+        return this;
     }
 }
 

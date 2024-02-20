@@ -14,6 +14,11 @@ export function flowGet<T>( key: string, fallback?: T ): T
     return Flow.get( key, fallback );
 }
 
+export function flowSet( key: string, value: any )
+{
+    Flow.set( key, value );
+}
+
 export function i18n( i18n: { [key: string]: string } | string ): string
 {
     if( typeof i18n === 'string' ){ return i18n }
