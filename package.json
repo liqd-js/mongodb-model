@@ -1,7 +1,7 @@
 {
   "name": "@liqd-js/mongodb-model",
   "description": "Mongo model class",
-  "version": "0.13.0-beta.8",
+  "version": "0.13.0-beta.9",
   "author": "radixxko",
   "license": "MIT",
   "main": "dist/model.js",
@@ -11,7 +11,7 @@
   ],
   "homepage": "https://liqd-js.com/lib/mongo-model",
   "scripts": {
-    "test": "nyc mocha",
+    "test": "nyc mocha --require ts-node/register test/**/*.ts",
     "coverage": "nyc report --reporter=text-lcov | coveralls",
     "build": "rm -rf ./dist/* && tsc",
     "version": "rm -rf ./dist/* && tsc && npm publish"
@@ -27,7 +27,12 @@
     "liqd"
   ],
   "devDependencies": {
-    "@types/node": "^20.11.19",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.24",
+    "coveralls": "^3.1.1",
+    "mocha": "^10.3.0",
+    "nyc": "^15.1.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
   "dependencies": {

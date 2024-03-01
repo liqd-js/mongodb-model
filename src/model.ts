@@ -113,7 +113,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     private async pipeline( options: AggregateOptions<DBE> ): Promise<Document[]>
     {
-        const { filter, projection } = options;
+        let { filter, projection } = options;
 
         let pipeline: Document[] = [];
 
@@ -124,7 +124,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
             pipeline.push({ $match: resolveBSONObject( accessFilter! )});
         }
 
+        let custom = options.customFilter ? await this.resolveCustomFilter( options.customFilter ) : undefined;
+
         isSet( filter ) && pipeline.push({ $match: resolveBSONObject( filter! )});
+        isSet( custom?.filter ) && pipeline.push({ $match: resolveBSONObject( custom?.filter! )});
+        isSet( custom?.pipeline ) && pipeline.push( ...custom?.pipeline! );
         isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
 
         return pipeline;
