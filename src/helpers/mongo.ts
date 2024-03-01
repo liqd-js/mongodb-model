@@ -48,7 +48,7 @@ export function reverseSort( sort: Sort ): Sort
 
 export function sortProjection( sort: Sort, id: string ): Record<string, 1>
 {
-    return Object.fromEntries([ ...Object.keys( sort ).map(( key => [ key, 1 ]), [ id, 1 ] )]);
+    return Object.fromEntries([ ...Object.keys( sort ).map(( key => [ key, 1 ]) ), [ id, 1 ]]);
 }
 
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
@@ -179,6 +179,11 @@ export function addPrefixToUpdate<RootDBE,DBE>( update: Partial<DBE> | UpdateFil
 
 export function objectSet( obj: Record<string, unknown>, path: string[], value: unknown )
 {
+    if ( !path.length )
+    {
+        throw new Error('Path is empty');
+    }
+
     if( path.length === 1 )
     {
         obj[ path[0] ] = value;
@@ -195,6 +200,11 @@ export function objectSet( obj: Record<string, unknown>, path: string[], value: 
 
 export function objectGet( obj: Record<string, unknown>, path: string[] ): any
 {
+    if ( !path.length )
+    {
+        throw new Error('Path is empty');
+    }
+
     if( path.length === 1 )
     {
         return obj[ path[0] ];
@@ -243,6 +253,11 @@ export function generateCursorCondition( cursor: string, sort: Sort ): Filter
     const properties = Object.keys( sort );
     const directions = Object.values( sort ).map( value => ( direction === 'prev' ? -1 : 1 ) * ( SORT_DESC.includes( value ) ? -1 : 1 ));
     const values = JSON.parse( fromBase64( cursor.substring( direction ? direction.length + 1 : 0 )));
+
+    if ( properties.length !== values.length )
+    {
+        throw new Error('Cursor does not match sort properties');
+    }
 
     if( properties.length === 1 )
     {
