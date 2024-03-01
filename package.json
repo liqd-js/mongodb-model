@@ -11,8 +11,8 @@
   ],
   "homepage": "https://liqd-js.com/lib/mongo-model",
   "scripts": {
-    "test": "nyc mocha --require ts-node/register test/**/*.ts",
-    "coverage": "nyc report --reporter=text-lcov | coveralls",
+    "test": "mocha --require ts-node/register test/**/*.ts",
+    "coverage": "nyc npm run test",
     "build": "rm -rf ./dist/* && tsc",
     "version": "rm -rf ./dist/* && tsc && npm publish"
   },
@@ -31,6 +31,7 @@
     "@types/node": "^20.11.24",
     "coveralls": "^3.1.1",
     "mocha": "^10.3.0",
+    "mocha-lcov-reporter": "^1.3.0",
     "nyc": "^15.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
