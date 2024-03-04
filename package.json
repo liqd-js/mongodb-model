@@ -13,7 +13,6 @@
   "scripts": {
     "test": "mocha --require ts-node/register test/**/*.ts",
     "coverage": "nyc npm run test",
-  "tmp": "ts-node test/test",
     "build": "rm -rf ./dist/* && tsc",
     "version": "rm -rf ./dist/* && tsc && npm publish"
   },

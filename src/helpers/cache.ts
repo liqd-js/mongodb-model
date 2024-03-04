@@ -2,11 +2,6 @@ export default class Cache
 {
     private static cache: Map<any, Map<string, Map<any, any>>> = new Map();
 
-    constructor()
-    {
-        
-    }
-
     public static set<T>( convertor: any, type: string, id: any, value: T ): T
     {
         let convertorCache = this.cache.get( convertor );

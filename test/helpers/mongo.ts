@@ -10,7 +10,7 @@ describe('objectHash', () =>
     {
         const obj = 'test';
         const expected = JSON.stringify(obj);
-        assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'ObjectId not correctly stringified' );
+        assert.equal( objectHash( obj, { alg: 'plain' } ), expected, 'ObjectId not correctly stringified' );
     });
 
     it('should stringify ObjectId', () =>
@@ -111,11 +111,18 @@ describe('objectHash', () =>
         assert.equal( objectHash( obj, { sort: false, alg: 'plain' } ), expected, 'nested object with arrays without sort not correctly stringified' );
     });
 
-    it('should hash using sh1 algorithm', () =>
+    it('should hash using sha1 algorithm - default params', () =>
     {
         const obj = { b: 2, a: 1 };
         const expected = crypto.createHash('sha1').update(JSON.stringify({ a: 1, b: 2 })).digest('hex');
-        assert.equal( objectHash( obj, { sort: true }), expected, 'simple object not correctly hashed using SHA1' );
+        assert.equal( objectHash( obj ), expected, 'simple object not correctly hashed using SHA1' );
+    });
+
+    it('should hash using sha1 algorithm - explicit params', () =>
+    {
+        const obj = { b: 2, a: 1 };
+        const expected = crypto.createHash('sha1').update(JSON.stringify({ a: 1, b: 2 })).digest('hex');
+        assert.equal( objectHash( obj, { sort: true, alg: 'sha1' }), expected, 'simple object not correctly hashed using SHA1' );
     });
 
     it('should hash using sha256 algorithm', () =>
@@ -128,11 +135,25 @@ describe('objectHash', () =>
 
 describe('objectHashId', () =>
 {
-    it('should create correct hash ID', () =>
+    it('should create correct hash ID using sha1', () =>
     {
         const obj = { b: 2, a: 1 };
         const expected = crypto.createHash('sha1').update('{"a":1,"b":2}').digest('hex').substring(0, 24);
-        assert.equal( objectHashID( obj, { sort: true }), expected, 'incorrect object hash ID' );
+        assert.equal( objectHashID( obj, { sort: true, alg: 'sha1' }), expected, 'incorrect object hash ID' );
+    });
+
+    it('should create correct hash ID using sha1 - default params', () =>
+    {
+        const obj = { b: 2, a: 1 };
+        const expected = crypto.createHash('sha1').update('{"a":1,"b":2}').digest('hex').substring(0, 24);
+        assert.equal( objectHashID( obj), expected, 'incorrect object hash ID' );
+    });
+
+    it('should create correct hash ID using sha256', () =>
+    {
+        const obj = { b: 2, a: 1 };
+        const expected = crypto.createHash('sha256').update('{"a":1,"b":2}').digest('hex').substring(0, 24);
+        assert.equal( objectHashID( obj, { sort: true, alg: 'sha256' }), expected, 'incorrect object hash ID' );
     });
 });
 
@@ -219,6 +240,15 @@ describe('resolveBSONValue', () =>
         const value = { $function: { body: function() { return 'test'; } } };
         assert.deepStrictEqual(resolveBSONValue(value), { $function: { body: function() { return 'test'; }.toString() } }, 'function not converted correctly');
     });
+
+    it('should handle $function property where body is not a function', () => {
+        const value = {
+            $function: {
+                body: 'This is not a function'
+            }
+        };
+        assert.deepStrictEqual(resolveBSONValue(value), value);
+    });
 });
 
 describe('resolveBSONObject', () =>
@@ -262,9 +292,9 @@ describe('addPrefixToFilter', () =>
 {
     it('should add prefix to keys in an object', () =>
     {
-        const filter = { a: 1, b: 2 };
+        const filter = { a: 1, b: new ObjectId('5f4d6f9e6f0a4d001f9a2a4d') };
         const prefix = 'prefix';
-        const expected = { 'prefix.a': 1, 'prefix.b': 2 };
+        const expected = { 'prefix.a': filter.a, 'prefix.b': filter.b };
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to keys in object');
     });
 
