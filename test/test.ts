@@ -136,8 +136,9 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         const filter: any = {};
         const pipeline: any[] = [];
 
+        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
         customFilter.applicationStatus  && (filter['status'] = { $in: customFilter.applicationStatus });
-        customFilter.applicationCreatedBetween      && pipeline.push(applicationCreatedBetween(customFilter.applicationCreatedBetween));
+        customFilter.applicationCreatedBetween && pipeline.push(applicationCreatedBetween(customFilter.applicationCreatedBetween));
 
         return { filter, pipeline };
     }
