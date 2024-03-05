@@ -72,7 +72,7 @@ describe('AbstractPropertyModel - application', () =>
             applicationPipeline[0],
             applicationPipeline[1],
             applicationPipeline[2],
-            applicationCreatedBetween(betweenFilter),
+            ...applicationCreatedBetween(betweenFilter),
         ]);
     });
 
