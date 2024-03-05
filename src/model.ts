@@ -111,7 +111,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         });
     }
 
-    private async pipeline( options: AggregateOptions<DBE> ): Promise<Document[]>
+    protected async pipeline( options: AggregateOptions<DBE> ): Promise<Document[]>
     {
         let { filter, projection } = options;
 
@@ -392,7 +392,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    private async pipeline( list: PropertyListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
+    protected async pipeline( list: PropertyListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
     {
         let { filter = {} as PropertyFilter<RootDBE, DBE>, ...options } = list;
 
