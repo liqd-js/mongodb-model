@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
 
@@ -645,3 +645,48 @@ describe('collectAddedFields', () =>
         assert.throws(() => collectAddedFields(pipeline), /Unsupported pipeline stage: "\$unsupported"/);
     });
 });
+
+describe('optimizeMatch', () =>
+{
+    it('should leave object without $and and $or intact', () =>
+    {
+        const match = {a: 1, b: {$gte: 1}, c: {$in: ['a', 'b']}};
+        assert.deepStrictEqual(optimizeMatch(match), match);
+    });
+
+    it('should remove empty elements inside $and', () =>
+    {
+        const match = {$and: [undefined, {}, null, {a: 1}, {b: 2}]};
+        assert.deepStrictEqual(optimizeMatch(match), {$and: [{a: 1}, {b: 2}]});
+    })
+
+    it('should extract properties from $and with one element and empty $match root', () =>
+    {
+        const match = {$and: [{c: { $in: ['a', 'b']}}]};
+        assert.deepStrictEqual(optimizeMatch(match), {c: { $in: ['a', 'b']}});
+    })
+
+    it('should extract properties from $and with one element and non-empty $match root', () =>
+    {
+        const match = {a: 1, $and: [{b: 'a', c: { $in: ['a', 'b']}}]};
+        assert.deepStrictEqual(optimizeMatch(match), {a: 1, b: 'a', c: { $in: ['a', 'b']}});
+    })
+
+    it('should keep properties inside $and if conflicts with $match root', () =>
+    {
+        const match = {c: 'a', $and: [{c: { $in: ['a', 'b']}}]};
+        assert.deepStrictEqual(optimizeMatch(match), match);
+    })
+
+    it('should keep all properties inside $and if any conflicts with $match root', () =>
+    {
+        const match = {c: 'a', $and: [{a: 1, b: 1, c: { $in: ['a', 'b']}}]};
+        assert.deepStrictEqual(optimizeMatch(match), match);
+    })
+
+    it('should extract properties from nested $and/$or', () =>
+    {
+        const match = { $and: [{ $or: [{ $and: [{ a: 1 }] }] }] }
+        assert.deepStrictEqual(optimizeMatch(match), {a: 1});
+    })
+})

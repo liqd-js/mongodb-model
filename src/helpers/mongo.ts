@@ -306,6 +306,37 @@ export function collectAddedFields( pipeline: any[] ): string[]
     return [...fields];
 }
 
+export function optimizeMatch( obj: any ): any {
+    if ( !obj ) { return undefined }
+
+    let result: any = {};
+
+    for ( const [key, value] of Object.entries(obj) )
+    {
+        if ( Array.isArray(value) )
+        {
+            const filteredArray = value
+                .map( (item: any) => optimizeMatch(item) )
+                .filter( (optimizedItem: any) => optimizedItem && Object.keys(optimizedItem).length );
+
+            if ( filteredArray.length > 1 )
+            {
+                result[key] = filteredArray
+            }
+            else if ( filteredArray.length === 1 )
+            {
+                const isInRoot = Object.keys( filteredArray[0] ).some( key => result[key] );
+                result = { ...result, ...( isInRoot ? { [key]: [ filteredArray[0] ] } : filteredArray[0] ) }
+            }
+        }
+        else
+        {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
 
 //console.log( addPrefixToFilter({ foo: 'bar', $root: { foo: 'bar' } }, 'prefix'));
 /*
