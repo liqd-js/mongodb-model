@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
 
@@ -689,4 +689,172 @@ describe('optimizeMatch', () =>
         const match = { $and: [{ $or: [{ $and: [{ a: 1 }] }] }] }
         assert.deepStrictEqual(optimizeMatch(match), {a: 1});
     })
+})
+
+describe('extractFields', () =>
+{
+    it('should extract fields from simple $match', () =>
+    {
+        const pipeline = [{ $match: { a: 1, b: 2 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['a', 'b'], ignored: []});
+    });
+
+    it('should extract fields from $match with nested $and and $or', () =>
+    {
+        const pipeline = [{ $match: { $and: [{ a: 1 }, { $or: [{ b: 2 }, { c: 3 }] }] } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['a', 'b', 'c'], ignored: []});
+    });
+
+    it('should add ignored fields created in $project', () =>
+    {
+        const pipeline = [{ $project: { a: '$positions', b: 1 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+    });
+
+    it('should exclude fields in $match created in $project before', () =>
+    {
+        const pipeline = [{ $project: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+    });
+
+    it('should add ignored fields created in $addFields', () =>
+    {
+        const pipeline = [{ $addFields: { a: '$positions', b: 1 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+    });
+
+    it('should exclude fields in $match created in $addFields before', () =>
+    {
+        const pipeline = [{ $addFields: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+    });
+
+    it('should add ignored fields created in $group', () =>
+    {
+        const pipeline = [{ $group: { a: '$positions', b: 1 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+    });
+
+    it('should exclude fields in $match created in $group before', () =>
+    {
+        const pipeline = [{ $group: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+    });
+
+    it('should combine multiple stages and operators', () =>
+    {
+        const pipeline = [
+            {
+                $match: {
+                    _id: 1,
+                    programmeID: {
+                        $in: [new ObjectId("63e29c4cdcc1dceb68cdeb8c")]
+                    },
+                    "positions.events.opened": {
+                        $lt: new Date("2023-07-05T00:00:00.000Z")
+                    },
+                    $and: [{
+                        $or: [{
+                            "positions.events.closed": {
+                                $gte: new Date("2023-07-03T00:00:00.000Z")
+                            }
+                        },{
+                            "positions.events.hired": {
+                                $gte: new Date("2023-07-03T00:00:00.000Z")
+                            }
+                        }]
+                    }]
+                }
+            },{
+                $replaceWith: {
+                    id: "$positions.id",
+                    jobID: "$$ROOT._id",
+                }
+            },{
+                $project: {
+                    statusAt: {
+                        $function: {
+                            body: "...",
+                            args: ["$events", new Date("2023-07-05T00:00:00.000Z"), {}],
+                            lang: "js"
+                        }
+                    },
+                    mapped: {
+                        $map: {
+                            input: "$mapInput",
+                            as: "position",
+                            in: {
+                                id: "$$position.id",
+                                status: "$$position.status"
+                            }
+                        }
+                    },
+                    filtered: {
+                        $filter: {
+                            input: "$filterInput",
+                            as: "position",
+                            cond: {
+                                $eq: [1, 1]
+                            }
+                        }
+                    },
+                    merged: {
+                        $mergeObjects: ["$merge1", {a: 'a'}]
+                    },
+                    elemAt: { $arrayElemAt: [ '$arrayElemAt', 0 ]},
+                }
+            },
+            {
+                $match: {
+                    statusAt: {
+                        $ne: null
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    placedJobs: {
+                        $sum: {
+                            $cond: [{ $eq: ["$statusAt","hired"] }, 1, 0]
+                        }
+                    },
+                }
+            },
+            {
+                $lookup: {
+                    from: "contracts",
+                    localField: "engagements.id",
+                    foreignField: "_id",
+                    as: "positions"
+                }
+            },
+            {
+                $match: {
+                    placedJobs: { $gt: 5 }
+                }
+            }
+        ];
+        const expected = {
+            used: [
+                '_id', 'programmeID', 'positions.events.opened', 'positions.events.closed', 'positions.events.hired', 'positions.id',
+                '$ROOT._id', 'events', 'engagements.id', 'mapInput', 'filterInput', 'merge1', 'arrayElemAt'
+            ].sort(),
+            ignored: [ 'id', 'jobID', 'statusAt', '_id', 'placedJobs', 'positions', 'mapped', 'filtered', 'merged', 'elemAt' ].sort()
+        }
+        const {used, ignored } = extractFields(pipeline);
+        assert.deepStrictEqual({used: used.sort(), ignored: ignored.sort()}, expected);
+    });
+
+    it('should throw error for unsupported stages', () =>
+    {
+        const pipeline = [{ $unsupported: {} }];
+        assert.throws(() => extractFields(pipeline), /Unsupported pipeline stage: "\$unsupported"/);
+    });
+
+    it('should throw error for unsupported operators', () =>
+    {
+        const pipeline = [{ $match: { $unsupported: {} } }];
+        assert.throws(() => extractFields(pipeline), /Unsupported operator: "\$unsupported"/);
+    });
 })
