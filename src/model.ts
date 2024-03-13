@@ -12,7 +12,7 @@ export * from 'mongodb';
 export * from './helpers';
 export { flowStart as _ };
 
-type CreateOptions = { duplicateIgnore?: boolean };
+export type CreateOptions = { duplicateIgnore?: boolean };
 
 type MongoRootDocument = Document & { _id: any };
 type MongoPropertyDocument = Document & { id: any };
@@ -53,6 +53,7 @@ export type PropertyAggregateOptions<RootDBE extends Document, DBE extends Docum
 };
 
 export type AbstractConverter<DBE extends Document> = ( dbe: DBE ) => unknown | Promise<unknown>;
+export type AbstractFromConverter<DBE extends Document, T> = ( data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
 
 export type AbstractConverterOptions<DBE extends Document> =
 {
@@ -63,7 +64,11 @@ export type AbstractConverterOptions<DBE extends Document> =
 
 export type AbstractConverters<DBE extends Document> = 
 {
+    from?: { [key: string]: AbstractFromConverter<DBE, any> },
     dto: AbstractConverterOptions<DBE>,
+}
+&
+{
     [key: string]: AbstractConverterOptions<DBE>
 }
 
@@ -140,6 +145,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: CreateOptions ): Promise<DTO['id']>
     {
+        /*if( options?.converter )
+        {
+            dbe = await options.converter( dbe as T );
+        }*/
+
         const _id: DTO['id'] = id ?? await this.id();
 
         try
@@ -157,6 +167,11 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         }
 
         return _id;
+    }
+
+    public async createFrom( data: any, id?: DTO['id'], options?: CreateOptions ): Promise<DTO['id']>
+    {
+        throw new Error('Method not implemented.');
     }
 
     public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
