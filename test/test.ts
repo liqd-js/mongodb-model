@@ -1,9 +1,9 @@
-import {AbstractConverters, AbstractModel, AbstractPropertyModel, AggregateOptions} from "../src/model";
+import {AbstractConverters, AbstractModel, AbstractPropertyModel, AggregateOptions, LOG} from "../src/model";
 import {Filter, MongoClient, ObjectId} from "mongodb";
 import 'dotenv/config';
 
-type JobDBE = { _id: ObjectId, name: string, created: Date, positions: PositionDBE[], engagements: EngagementDBE[] };
-type JobDTO = { _id: string, name: string, created: Date, positions: PositionDTO[], engagements: EngagementDTO[] };
+type JobDBE = { _id: ObjectId, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
+type JobDTO = { _id: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
 
 type EngagementDBE = { id: ObjectId, agencyID: ObjectId, recruiterID: ObjectId, date: Date, applications: ApplicationDBE[] };
 type EngagementDTO = { id: string, agencyID: string, recruiterID: string, date: Date, applications: ApplicationDTO[] };
@@ -19,7 +19,7 @@ export const accessFilter = { name: { $in: ['a', 'b'] } };
 /**
  * Pipelines
  */
-export const jobCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { created: { $gte: params.between.from, $lt: params.between.to } } }]);
+export const jobCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 export const applicationCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 
 export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<JobDBE>>
@@ -136,8 +136,10 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         const filter: any = {};
         const pipeline: any[] = [];
 
+        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
+
         customFilter.applicationStatus  && (filter['status'] = { $in: customFilter.applicationStatus });
-        customFilter.applicationCreatedBetween      && pipeline.push(applicationCreatedBetween(customFilter.applicationCreatedBetween));
+        customFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(customFilter.applicationCreatedBetween));
 
         return { filter, pipeline };
     }
@@ -183,15 +185,3 @@ export const jobModel = new JobModel();
 export const engagementModel = new EngagementModel();
 export const applicationModel = new ApplicationModel();
 export const positionModel = new PositionModel();
-
-// const dbe: JobDBE = {
-//     _id: new ObjectId(),
-//     test: 'a',
-//     date: new Date('2024-01-01'),
-//     child: { id: new ObjectId(), prop: 'a' },
-//     children: [
-//         { id: new ObjectId(), prop: 'a', children: [ { id: new ObjectId(), prop: 'a' } ] },
-//         { id: new ObjectId(), prop: 'a', children: [ { id: new ObjectId(), prop: 'a' } ] }
-//     ],
-//
-// }

@@ -306,18 +306,178 @@ export function collectAddedFields( pipeline: any[] ): string[]
     return [...fields];
 }
 
+export function optimizeMatch( obj: any ): any {
+    if ( !obj ) { return undefined }
 
-//console.log( addPrefixToFilter({ foo: 'bar', $root: { foo: 'bar' } }, 'prefix'));
+    let result: any = {};
+
+    for ( const [key, value] of Object.entries(obj) )
+    {
+        if ( key === '$and' || key === '$or' )
+        {
+            const filteredArray = (value as any[])
+                .map( (item: any) => optimizeMatch(item) )
+                .filter( (optimizedItem: any) => optimizedItem && Object.keys(optimizedItem).length );
+
+            if ( filteredArray.length > 1 )
+            {
+                result[key] = filteredArray
+            }
+            else if ( filteredArray.length === 1 )
+            {
+                const isInRoot = Object.keys( filteredArray[0] ).some( key => result[key] );
+                result = { ...result, ...( isInRoot ? { [key]: [ filteredArray[0] ] } : filteredArray[0] ) }
+            }
+        }
+        else
+        {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
+
+export function extractFields(pipeline: Document[] )//: Set<string>
+{
+    const usedFields: Set<string> = new Set();
+    const ignoredFields: Set<string> = new Set();
+
+    for ( const el of pipeline )
+    {
+        const stage = Object.keys(el)[0];
+
+        switch ( stage )
+        {
+            case '$match':
+                const extracted = extractRecursively( el.$match );
+                for ( const field of extracted )
+                {
+                    // TODO: doesn't have to be full match - startsWith
+                    if ( ignoredFields.has(field) ) { continue; }
+
+                    usedFields.add(field);
+                }
+                break;
+            case '$project':
+            case '$addFields':
+            case '$group':
+                for ( const [key, value] of Object.entries(el[stage]) )
+                {
+                    ignoredFields.add( key );
+                    if ( typeof value === 'object' || (typeof value === 'string' && value.startsWith('$')) )
+                    {
+                        extractRecursively( value ).forEach(key => usedFields.add(key));
+                    }
+                }
+                break;
+            case '$lookup':
+                ignoredFields.add( el.$lookup.as );
+                !ignoredFields.has( el.$lookup.localField ) && usedFields.add( el.$lookup.localField )
+                break;
+            case '$replaceWith':
+                if ( typeof el.$replaceWith === 'object' )
+                {
+                    Object.entries(el.$replaceWith).forEach(
+                        ([key, value]) =>
+                            ignoredFields.add(key)
+                            && extractRecursively( value ).forEach(key => usedFields.add(key))
+                    );
+                }
+                break;
+            case '$unwind': break;
+            default:
+                throw new Error(`Unsupported pipeline stage: "${stage}"`);
+        }
+    }
+
+    return { used: Array.from(usedFields), ignored: Array.from(ignoredFields) };
+}
+
+const MATHEMATICAL_OPERATORS = ['$sum', '$subtract', '$multiply', '$divide', '$mod', '$abs', '$ceil', '$floor', '$ln', '$log', '$log10', '$pow', '$sqrt', '$trunc'];
+function extractRecursively( obj: any /* TODO: ignoredFields? */ ): Set<string>
+{
+    const fields: Set<string> = new Set();
+
+    if ( !obj ) { return fields; }
+
+    if ( typeof obj !== 'object' )
+    {
+        if ( typeof obj === 'string' && obj.startsWith('$') )
+        {
+            fields.add(obj);
+        }
+    }
+    else
+    {
+        for ( const [key, value] of Object.entries(obj) )
+        {
+            if ( key === '$and' || key === '$or' || key === '$expr' )
+            {
+                for ( const item of value as any[] )
+                {
+                    extractRecursively( item ).forEach(key => fields.add(key));
+                }
+            }
+            else if ( key === '$map' || key === '$filter' )
+            {
+                fields.add((value as any).input);
+            }
+            else if ( key === '$mergeObjects' )
+            {
+                for ( const item of value as any[] )
+                {
+                    if ( typeof item === 'string' && item.startsWith('$') )
+                    {
+                        extractRecursively( item ).forEach(key => fields.add(key));
+                    }
+                }
+            }
+            else if ( key === '$arrayElemAt' )
+            {
+                fields.add((value as any[])[0]);
+            }
+            else if ( key === '$function' )
+            {
+                (value as any).args
+                    .filter( (arg: any) => typeof arg === 'string' && arg.startsWith('$'))
+                    .forEach( (arg: string) => fields.add(arg));
+            }
+            else if ( MATHEMATICAL_OPERATORS.includes(key) )
+            {
+                extractRecursively( value ).forEach(key => fields.add(key));
+            }
+            else if ( Array.isArray( value ) )
+            {
+                value.forEach( (item: any) => typeof item === 'string' && item.startsWith('$') && fields.add(item) );
+            }
+            else if ( !key.startsWith('$') )
+            {
+                fields.add(key);
+            }
+            else
+            {
+                throw new Error(`Unsupported operator: "${key}"`);
+            }
+        }
+    }
+
+    const result: Set<string> = new Set();
+    for ( const field of fields )
+    {
+        result.add(field.startsWith('$') ? field.replace(/^\$/, '') : field);
+    }
+
+    return result;
+}
+
 /*
-console.log( addPrefixToFilter({ foo: { bar: 'foo' }, $root: { foo: 'bar' } }, 'prefix'));
-
-
 LOG( addPrefixToFilter(
 {
-    $and: 
+    $and:
     [
         { active: true, $root: { active: true }, '$root.events.closed': { $exists: false }, $eq: [ '$events.closed', '$root.events.closed' ]},
-        { $or: 
+        { $or:
         [
             { $root: { programmeID: { $gt: 1 }}},
             { $root: { programmeID: { $eq: 1 }}, '$root.events.closed': { $gt: 1 }},
