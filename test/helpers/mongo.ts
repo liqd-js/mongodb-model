@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, filterUnwindedProperties, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
 
@@ -735,6 +735,12 @@ describe('extractFields', () =>
         assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
+    it('should add fields in $expr', () =>
+    {
+        const pipeline = [{ $match: { $expr: {$gt: ['$positions', 1] }} }];
+        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: []});
+    });
+
     it('should exclude fields in $match created in $group before', () =>
     {
         const pipeline = [{ $group: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
@@ -856,5 +862,57 @@ describe('extractFields', () =>
     {
         const pipeline = [{ $match: { $unsupported: {} } }];
         assert.throws(() => extractFields(pipeline), /Unsupported operator: "\$unsupported"/);
+    });
+})
+
+describe('getPartiallyResolvedFilter', () =>
+{
+    it('should resolve simple object filter', () =>
+    {
+        const filter = { x: 1, 'a.x': 2, 'a.b.x': 3, 'a.b.c.x': 4 };
+
+        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), { x: 1 });
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { x: 1, 'a.x': 2 });
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), { x: 1, 'a.x': 2, 'a.b.x': 3 });
+    })
+
+    it('should resolve comparison operators', () =>
+    {
+        const filter = { x: { $eq: '$b' }, 'a.x': { $gt: 2 }, 'a.b.x': { $lt: 3 }, 'a.b.c.x': { $gte: 4 } };
+
+        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), { x: { $eq: '$b' } });
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { x: { $eq: '$b' }, 'a.x': { $gt: 2 } });
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), { x: { $eq: '$b' }, 'a.x': { $gt: 2 }, 'a.b.x': { $lt: 3 } });
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'aaa'), filter);
+    });
+
+    it('should resolve logical operators', () =>
+    {
+        const filter = {
+            $and: [
+                {
+                    'a.x': 1,
+                    $or: [
+                        { $not: { 'a.b.x': 1 } },
+                        { 'a.b.y': 1 }
+                    ]
+                }
+            ]
+        };
+        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { $and: [{'a.x': 1}] });
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), filter);
+    });
+
+    it('should resolve $expr', () =>
+    {
+        const filter = { $expr: { $eq: ['$a', '$b'] } };
+        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'b'), undefined);
+        assert.deepStrictEqual(filterUnwindedProperties(filter, 'c'), filter);
     });
 })

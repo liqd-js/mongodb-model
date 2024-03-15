@@ -1,6 +1,5 @@
-import { Document, ObjectId, FindOptions, UpdateFilter, Sort } from 'mongodb';
+import {Document, FindOptions, ObjectId, Sort, UpdateFilter} from 'mongodb';
 import crypto from 'crypto';
-import { LOG } from '.';
 
 type Filter = Record<string, any>;
 
@@ -412,12 +411,16 @@ function extractRecursively( obj: any /* TODO: ignoredFields? */ ): Set<string>
     {
         for ( const [key, value] of Object.entries(obj) )
         {
-            if ( key === '$and' || key === '$or' || key === '$expr' )
+            if ( key === '$and' || key === '$or' )
             {
                 for ( const item of value as any[] )
                 {
                     extractRecursively( item ).forEach(key => fields.add(key));
                 }
+            }
+            else if ( key === '$expr' )
+            {
+                extractRecursively( value ).forEach(key => fields.add(key));
             }
             else if ( key === '$map' || key === '$filter' )
             {
@@ -469,6 +472,135 @@ function extractRecursively( obj: any /* TODO: ignoredFields? */ ): Set<string>
     }
 
     return result;
+}
+
+const COMPARISON_OPERATORS = ['$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin'];
+const LOGICAL_OPERATORS = ['$and', '$or', '$nor', '$not'];
+const ELEMENT_OPERATORS = ['$exists', '$type'];
+const EVALUATION_OPERATORS = ['$regex', '$expr', '$jsonSchema', '$mod', '$text', '$where'];
+const ARRAY_OPERATORS = ['$all', '$elemMatch', '$size'];
+
+export function filterUnwindedProperties(input: any, prefix: string ): any | undefined
+{
+    if ( typeof input === 'string' && isPrefixedField( input, prefix ) )
+    {
+        return input
+    }
+
+    if ( typeof input !== 'object' || Array.isArray( input ) )
+    {
+        throw new Error('Invalid input', input);
+    }
+
+    const result: any = {};
+
+    for ( const [key, value] of Object.entries(input) )
+    {
+        if ( !key.startsWith('$') && !isPrefixedField( key, prefix ) )
+        {
+            // TODO: if value is object, it can be a field or an operator
+            if ( typeof value === 'object' )
+            {
+                const resolved = filterUnwindedProperties(value, prefix);
+                if ( resolved )
+                {
+                    result[key] = resolved;
+                }
+            }
+            else
+            {
+                result[key] = value;
+            }
+            continue;
+        }
+
+        if ( COMPARISON_OPERATORS.includes( key ) )
+        {
+            if ( Array.isArray( value ) )
+            {
+                if ( value.length === 2 && Array.isArray(value[1]) )
+                {
+                    if ( typeof value[0] !== 'object' && !isPrefixedField(value[0], prefix ) )
+                    {
+                        result[key] = value;
+                    }
+                }
+                else if ( value.every( (item: any) => !isPrefixedField( item, prefix ) ) )
+                {
+                    if ( typeof value[0] !== 'object' ) // $lt: [{$cond: {...}, 2]
+                    {
+                        result[key] = value;
+                    }
+                }
+            }
+            else if ( typeof value !== 'object' )
+            {
+                if ( !isPrefixedField( value, prefix ) )
+                {
+                    result[key] = value;
+                }
+            }
+        }
+        else if ( LOGICAL_OPERATORS.includes( key ) )
+        {
+            if ( Array.isArray( value ) )
+            {
+                const partial = [];
+
+                for ( const item of value )
+                {
+                    const resolved = filterUnwindedProperties(item, prefix);
+                    if ( resolved )
+                    {
+                        partial.push(resolved);
+                    }
+                }
+                if ( partial.length )
+                {
+                    result[key] = partial;
+                }
+            }
+            else if ( typeof value === 'object' )
+            {
+                const resolved = filterUnwindedProperties(value, prefix);
+                if ( resolved )
+                {
+                    result[key] = resolved;
+                }
+            }
+        }
+        else if ( ELEMENT_OPERATORS.includes( key ) || ARRAY_OPERATORS.includes( key ) )
+        {
+            result[key] = value;
+        }
+        else if ( EVALUATION_OPERATORS.includes( key ) )
+        {
+            if ( key === '$expr' )
+            {
+                const resolved = filterUnwindedProperties(value, prefix);
+                if ( resolved )
+                {
+                    result[key] = resolved;
+                }
+            }
+            else
+            {
+                result[key] = value;
+            }
+        }
+        else if ( key === '$function' && (value as any).args.every( (arg: any) => !isPrefixedField(arg, prefix) ) )
+        {
+            result[key] = value;
+        }
+        // TODO: more complex combinations - $cond inside $lt: [$cond, [ ... ]] and other aggregation operators
+    }
+
+    return Object.keys(result).length ? result : undefined;
+}
+
+function isPrefixedField( field: any, prefix: string ): boolean
+{
+    return typeof field === 'string' && (field.startsWith(prefix) || field.startsWith('$' + prefix));
 }
 
 /*
