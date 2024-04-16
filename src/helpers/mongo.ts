@@ -603,6 +603,10 @@ function isPrefixedField( field: any, prefix: string ): boolean
     return typeof field === 'string' && (field.startsWith(prefix) || field.startsWith('$' + prefix));
 }
 
+export const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
+export const Arr = ( value: any ): any[] => Array.isArray( value ) ? value : [ value ];
+
+
 /*
 LOG( addPrefixToFilter(
 {

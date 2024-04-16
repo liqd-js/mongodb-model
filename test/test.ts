@@ -1,13 +1,6 @@
-import {
-    AbstractConverters,
-    AbstractModel,
-    AbstractPropertyModel,
-    AggregateOptions,
-    extractFields, filterUnwindedProperties,
-    LOG
-} from "../src/model";
 import {Filter, MongoClient, ObjectId} from "mongodb";
 import 'dotenv/config';
+import {AbstractConverters, AbstractModel, AbstractPropertyModel, ModelAggregateOptions, filterUnwindedProperties, LOG} from "../src";
 
 type JobDBE = { _id: ObjectId, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
 type JobDTO = { _id: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
@@ -66,7 +59,7 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
         return { filter, pipeline };
     }
 
-    public pipeline( options: AggregateOptions<JobDBE> )
+    public pipeline( options: ModelAggregateOptions<JobDBE> )
     {
         return super.pipeline( options );
     }
@@ -96,7 +89,7 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
         );
     }
 
-    public pipeline( options: AggregateOptions<EngagementDBE> )
+    public pipeline( options: ModelAggregateOptions<EngagementDBE> )
     {
         return super.pipeline( options );
     }
@@ -133,7 +126,7 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         );
     }
 
-    public pipeline( options: AggregateOptions<ApplicationDBE> )
+    public pipeline( options: ModelAggregateOptions<ApplicationDBE> )
     {
         return super.pipeline( options );
     }
@@ -173,7 +166,7 @@ export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, Po
         );
     }
 
-    public pipeline( options: AggregateOptions<PositionDBE> )
+    public pipeline( options: ModelAggregateOptions<PositionDBE> )
     {
         return super.pipeline( options );
     }
