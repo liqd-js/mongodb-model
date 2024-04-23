@@ -322,14 +322,8 @@ export function optimizeMatch( obj: any ): any {
             {
                 if ( key === '$and' )
                 {
-                    // merge elements that don't contain keys with $
-                    if ( filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => !itemKey.startsWith('$') )) )
-                    {
-                        const merged = mergeProperties(...filteredArray);
-                        result = { ...result, ...merged }
-                    }
-                    // merge elements that have only $and keys (current is $and) or $or keys (current is $or)
-                    else if ( filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => itemKey === '$and' )) )
+                    if ( filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => !itemKey.startsWith('$') ))
+                        || filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => itemKey === '$and' )))
                     {
                         const merged = mergeProperties(...filteredArray);
                         result = { ...result, ...merged }
