@@ -394,38 +394,22 @@ function mergeProperties( ...objects: object[] ): object
     {
         throw new Error('Invalid input - expected objects');
     }
-    
-    for ( const obj of objects as any[] )
-    {
-        for ( const key of Object.keys(obj) )
-        {
-            if ( !result[key] )
-            {
-                result[key] = {};
-            }
 
-            if ( typeof obj[key] === 'object' )
+    for (const obj of objects as any[])
+    {
+        for (const [key, value] of Object.entries(obj))
+        {
+            if (typeof value === 'object')
             {
-                if ( typeof result[key] !== 'object' )
-                {
-                    result[key] = { $eq: result[key] };
-                }
-                result[key] = { ...result[key], ...obj[key] };
+                result[key] = { ...result[key], ...value };
             }
             else
             {
-                if ( Object.keys(result[key]).length === 0 )
-                {
-                    result[key] = obj[key];
-                }
-                else
-                {
-                    result[key] = { ...result[key], $eq: obj[key] };
-                }
+                result[key] = result[key] ? { $eq: value } : value;
             }
         }
     }
-    
+
     return result;
 }
 
