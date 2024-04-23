@@ -13,8 +13,6 @@ describe('AbstractModel - job', () =>
 {
     it('should work', async () =>
     {
-        const cursor = getCursor({ title: 'a' }, { title: 1 });
-        console.log(cursor);
         const pipeline = await jobModel.newList({
             filter: { title: 'a' },
             accessFilter: () => { return new Promise(() => true) },
@@ -22,6 +20,14 @@ describe('AbstractModel - job', () =>
             cursor: 'prev:WyJhIl0',
         });
         LOG(pipeline);
+        assert.deepStrictEqual(pipeline, [
+            {
+                '$match': {
+                    title: { '$eq': 'a', '$lt': 'a' },
+                    surname: { '$in': [ 'a', 'b' ] }
+                }
+            }
+        ])
     });
 
     it('should create empty pipeline with access filter', async () =>
@@ -49,69 +55,69 @@ describe('AbstractModel - job', () =>
 })
 
 
-// describe('AbstractPropertyModel - application', () =>
-// {
-//     it('should create empty pipeline without access filter', async () =>
-//     {
-//         const pipeline = await applicationModel.pipeline({});
-//         assert.deepStrictEqual( pipeline, applicationPipeline);
-//     });
-//
-//     it('should create pipeline with filter', async () => {
-//         const pipeline = await applicationModel.pipeline({ filter: { name: 'a' } });
-//         assert.deepStrictEqual( pipeline, [
-//             applicationPipeline[0],
-//             applicationPipeline[1],
-//             { "$match": { 'engagements.applications.name': 'a' } },
-//             applicationPipeline[2],
-//         ]);
-//     });
-//
-//     it('should create pipeline with custom property filter', async () =>
-//     {
-//         const pipeline = await applicationModel.pipeline({ customFilter: { applicationStatus: ['a'] } });
-//         assert.deepStrictEqual( pipeline, [
-//             applicationPipeline[0],
-//             applicationPipeline[1],
-//             { "$match": { 'engagements.applications.status': { $in: ['a'] } } },
-//             applicationPipeline[2],
-//         ]);
-//     });
-//
-//     it('should create pipeline with custom pipeline filter', async () =>
-//     {
-//         const pipeline = await applicationModel.pipeline({ customFilter: { applicationCreatedBetween: betweenFilter } });
-//         assert.deepStrictEqual( pipeline, [
-//             applicationPipeline[0],
-//             applicationPipeline[1],
-//             applicationPipeline[2],
-//             ...applicationCreatedBetween(betweenFilter),
-//         ]);
-//     });
-//
-//     it('should combine application and job custom filters', async () =>
-//     {
-//         const pipeline = await applicationModel.pipeline({ customFilter: { applicationCreatedBetween: betweenFilter, jobCreatedBetween: betweenFilter }, filter: { name: 'a', '$root.engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378'), status: 'dropout' } });
-//         LOG(pipeline);
-//         assert.deepStrictEqual( pipeline, [
-//             applicationPipeline[0],
-//             applicationPipeline[1],
-//             {
-//                 "$match": {
-//                     'engagements.applications.status': 'dropout',
-//                     'engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378'),
-//                     'engagements.applications.name': 'a'
-//                 }
-//             },
-//             applicationPipeline[2],
-//             ...jobCreatedBetween(betweenFilter),
-//             ...applicationCreatedBetween(betweenFilter),
-//         ]);
-//     });
-//
-//     it('should combine application and job custom filters - property + property');
-//
-//     it('should combine application and position custom filters - property + property');
-//
-//     it('should combine application, engagement and position custom filters - pipeline + pipeline + pipeline');
-// })
+describe('AbstractPropertyModel - application', () =>
+{
+    it('should create empty pipeline without access filter', async () =>
+    {
+        const pipeline = await applicationModel.pipeline({});
+        assert.deepStrictEqual( pipeline, applicationPipeline);
+    });
+
+    it('should create pipeline with filter', async () => {
+        const pipeline = await applicationModel.pipeline({ filter: { name: 'a' } });
+        assert.deepStrictEqual( pipeline, [
+            applicationPipeline[0],
+            applicationPipeline[1],
+            { "$match": { 'engagements.applications.name': 'a' } },
+            applicationPipeline[2],
+        ]);
+    });
+
+    it('should create pipeline with custom property filter', async () =>
+    {
+        const pipeline = await applicationModel.pipeline({ customFilter: { applicationStatus: ['a'] } });
+        assert.deepStrictEqual( pipeline, [
+            applicationPipeline[0],
+            applicationPipeline[1],
+            { "$match": { 'engagements.applications.status': { $in: ['a'] } } },
+            applicationPipeline[2],
+        ]);
+    });
+
+    it('should create pipeline with custom pipeline filter', async () =>
+    {
+        const pipeline = await applicationModel.pipeline({ customFilter: { applicationCreatedBetween: betweenFilter } });
+        assert.deepStrictEqual( pipeline, [
+            applicationPipeline[0],
+            applicationPipeline[1],
+            applicationPipeline[2],
+            ...applicationCreatedBetween(betweenFilter),
+        ]);
+    });
+
+    it('should combine application and job custom filters', async () =>
+    {
+        const pipeline = await applicationModel.pipeline({ customFilter: { applicationCreatedBetween: betweenFilter, jobCreatedBetween: betweenFilter }, filter: { name: 'a', '$root.engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378'), status: 'dropout' } });
+        LOG(pipeline);
+        assert.deepStrictEqual( pipeline, [
+            applicationPipeline[0],
+            applicationPipeline[1],
+            {
+                "$match": {
+                    'engagements.applications.status': 'dropout',
+                    'engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378'),
+                    'engagements.applications.name': 'a'
+                }
+            },
+            applicationPipeline[2],
+            ...jobCreatedBetween(betweenFilter),
+            ...applicationCreatedBetween(betweenFilter),
+        ]);
+    });
+
+    it('should combine application and job custom filters - property + property');
+
+    it('should combine application and position custom filters - property + property');
+
+    it('should combine application, engagement and position custom filters - pipeline + pipeline + pipeline');
+})

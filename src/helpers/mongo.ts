@@ -380,7 +380,7 @@ export function optimizeMatch( obj: any ): any {
     return result;
 }
 
-function mergeProperties( ...objects: object[] ): object
+export function mergeProperties( ...objects: object[] ): object
 {
     const result: any = {};
 
@@ -389,17 +389,31 @@ function mergeProperties( ...objects: object[] ): object
         throw new Error('Invalid input - expected objects');
     }
 
-    for (const obj of objects as any[])
+    for ( const obj of objects as any[] )
     {
-        for (const [key, value] of Object.entries(obj))
+        for ( const [key, value] of Object.entries(obj) )
         {
-            if (typeof value === 'object')
+            !result[key] && (result[key] = {});
+
+            if ( typeof result[key] !== 'object' )
+            {
+                result[key] = { $eq: result[key] };
+            }
+
+            if ( typeof value === 'object' )
             {
                 result[key] = { ...result[key], ...value };
             }
             else
             {
-                result[key] = result[key] ? { $eq: value } : value;
+                if ( Object.keys(result[key]).length === 0 )
+                {
+                    result[key] = value;
+                }
+                else
+                {
+                    result[key] = { ...result[key], $eq: value };
+                }
             }
         }
     }

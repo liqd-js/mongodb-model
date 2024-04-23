@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, filterUnwindedProperties, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, filterUnwindedProperties, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties} from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
@@ -809,6 +809,28 @@ describe('optimizeMatch', () =>
             b: 4,
         });
     })
+})
+
+describe('mergeProperties', () => {
+    it('should keep non-conflicting properties', () => {
+        const merged = mergeProperties({ a: 1 }, { b: 2 });
+        assert.deepStrictEqual(merged, { a: 1, b: 2 });
+    });
+
+    it('should prepend $eq to conflicting properties', () => {
+        const merged = mergeProperties({ a: 5 }, { a: { $gte: 2 } });
+        assert.deepStrictEqual(merged, { a: { $eq: 5, $gte: 2 } });
+    });
+
+    it('should overwrite conflicting properties - same condition', () => {
+        const merged = mergeProperties({ a: 5 }, { a: { $eq: 2 } });
+        assert.deepStrictEqual(merged, { a: { $eq: 2 }});
+    });
+
+    it('should overwrite conflicting properties - same condition', () => {
+        const merged = mergeProperties({ a: { $eq: 2 } }, { a: 5 });
+        assert.deepStrictEqual(merged, { a: { $eq: 5 }});
+    });
 })
 
 describe('extractFields', () =>
