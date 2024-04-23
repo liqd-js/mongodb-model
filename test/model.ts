@@ -1,41 +1,54 @@
-// import {accessFilter, applicationCreatedBetween, applicationModel, jobCreatedBetween, jobModel} from "./test";
-// import assert from "node:assert";
-// import {ObjectId} from "mongodb";
-// import {LOG} from "../src/helpers";
-//
-// const accessFilterPipeline = [ { "$match": accessFilter } ];
-// const engagementsPipeline = [ {$unwind: '$engagements'}, {$replaceWith: '$engagements'} ];
-// const applicationPipeline = [{$unwind: '$engagements'}, {$unwind: '$engagements.applications'}, {$replaceWith: '$engagements.applications'}];
-//
-// const betweenFilter = { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } };
-//
-// describe('AbstractModel - job', () =>
-// {
-//     it('should create empty pipeline with access filter', async () =>
-//     {
-//         const pipeline = await jobModel.pipeline({});
-//         assert.deepStrictEqual( pipeline, accessFilterPipeline);
-//     });
-//
-//     it('should create pipeline with filter', async () => {
-//         const pipeline = await jobModel.pipeline({ filter: { name: 'a' } });
-//         assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { name: 'a' } } ]);
-//     });
-//
-//     it('should create pipeline with custom filter', async () =>
-//     {
-//         const pipeline = await jobModel.pipeline({ customFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
-//         assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { 'events.created': { $gte: new Date('2024-01-01'), $lt: new Date('2024-12-01') } } }]);
-//     });
-//
-//     it('should combine all options', async () =>
-//     {
-//         const pipeline = await jobModel.pipeline({ filter: { name: 'a' }, customFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
-//         assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { name: 'a' } }, { $match: { 'events.created': { $gte: new Date('2024-01-01'), $lt: new Date('2024-12-01') } } }]);
-//     });
-// })
-//
-//
+import {accessFilter, applicationCreatedBetween, applicationModel, jobCreatedBetween, jobModel} from "./test";
+import assert from "node:assert";
+import {ObjectId} from "mongodb";
+import {getCursor, LOG} from "../src/helpers";
+
+const accessFilterPipeline = [ { "$match": accessFilter } ];
+const engagementsPipeline = [ {$unwind: '$engagements'}, {$replaceWith: '$engagements'} ];
+const applicationPipeline = [{$unwind: '$engagements'}, {$unwind: '$engagements.applications'}, {$replaceWith: '$engagements.applications'}];
+
+const betweenFilter = { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } };
+
+describe('AbstractModel - job', () =>
+{
+    it('should work', async () =>
+    {
+        const cursor = getCursor({ title: 'a' }, { title: 1 });
+        console.log(cursor);
+        const pipeline = await jobModel.newList({
+            filter: { title: 'a' },
+            accessFilter: () => { return new Promise(() => true) },
+            sort: { title: 1 },
+            cursor: 'prev:WyJhIl0',
+        });
+        LOG(pipeline);
+    });
+
+    // it('should create empty pipeline with access filter', async () =>
+    // {
+    //     const pipeline = await jobModel.pipeline({});
+    //     assert.deepStrictEqual( pipeline, accessFilterPipeline);
+    // });
+    //
+    // it('should create pipeline with filter', async () => {
+    //     const pipeline = await jobModel.pipeline({ filter: { name: 'a' } });
+    //     assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { name: 'a' } } ]);
+    // });
+    //
+    // it('should create pipeline with custom filter', async () =>
+    // {
+    //     const pipeline = await jobModel.pipeline({ customFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
+    //     assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { 'events.created': { $gte: new Date('2024-01-01'), $lt: new Date('2024-12-01') } } }]);
+    // });
+    //
+    // it('should combine all options', async () =>
+    // {
+    //     const pipeline = await jobModel.pipeline({ filter: { name: 'a' }, customFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
+    //     assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { name: 'a' } }, { $match: { 'events.created': { $gte: new Date('2024-01-01'), $lt: new Date('2024-12-01') } } }]);
+    // });
+})
+
+
 // describe('AbstractPropertyModel - application', () =>
 // {
 //     it('should create empty pipeline without access filter', async () =>

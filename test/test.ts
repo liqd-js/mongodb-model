@@ -1,6 +1,14 @@
 import {Filter, MongoClient, ObjectId} from "mongodb";
 import 'dotenv/config';
-import {AbstractConverters, AbstractModel, AbstractPropertyModel, ModelAggregateOptions, filterUnwindedProperties, LOG} from "../src";
+import {
+    AbstractConverters,
+    AbstractModel,
+    AbstractPropertyModel,
+    ModelAggregateOptions,
+    filterUnwindedProperties,
+    LOG,
+    ModelListOptions
+} from "../src";
 
 type JobDBE = { _id: ObjectId, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
 type JobDTO = { _id: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
@@ -14,7 +22,7 @@ type ApplicationDTO = { id: string, date: Date, status: string };
 type PositionDBE = { id: ObjectId, events: { opened: Date, closed?: Date } };
 type PositionDTO = { id: string, events: { opened: Date, closed?: Date } };
 
-export const accessFilter = { name: { $in: ['a', 'b'] } };
+export const accessFilter = { $and: [{surname: { $in: ['a', 'b'] } }, {}] };
 
 /**
  * Pipelines
@@ -42,6 +50,11 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
                 }
             }
         );
+    }
+
+    public newList( list: ModelListOptions<JobDBE> & { accessFilter?: () => Promise<Filter<JobDBE> | void> } )
+    {
+        return super.newList( list );
     }
 
     protected async accessFilter(): Promise<Filter<JobDBE>>

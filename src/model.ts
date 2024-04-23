@@ -3,6 +3,7 @@ import {flowGet, LOG, DUMP, Benchmark, flowSet, Arr, isSet} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, generateCursorCondition, reverseSort, sortProjection, collectAddedFields } from './helpers/mongo';
 import { ModelError, ModelConverterError } from './helpers/errors';
 import {AbstractConverter, AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal} from "./types";
+import QueryBuilder from "./helpers/query-builder";
 export const Aggregator = require('@liqd-js/aggregator');
 
 export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
@@ -47,6 +48,20 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
                 throw new ModelError( this, e!.toString() );
             }
         });
+    }
+
+    async newList( list: ModelListOptions<DBE> & { accessFilter?: () => Promise<Filter<DBE> | void> } )
+    {
+        const queryBuilder = new QueryBuilder<DBE>();
+        const pipeline = await queryBuilder.list( {
+            filter: list.filter,
+            pipeline: list.pipeline,
+            accessFilter: this.accessFilter,
+            sort: list.sort,
+            cursor: list.cursor
+        });
+
+        return pipeline;
     }
 
     protected async pipeline( options: ModelAggregateOptions<DBE> ): Promise<Document[]>
@@ -210,7 +225,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
             entries = await this.collection.aggregate( pipka ).toArray() as WithId<DBE>[];
 
-            if( list.count )
+            if ( list.count )
             {
                 total = await this.collection.aggregate([ ...pipka, { $count: 'count' }]).toArray().then( r => r[0]?.count ?? 0 );
             }
@@ -244,9 +259,9 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
 
-        if( list.count )
+        if ( list.count )
         {
-            Object.defineProperty( result, 'total', { value: total ?? 0, writable: false });
+            Object.defineProperty(result, 'total', { value: total ?? 0, writable: false });
         }
 
         return result;
