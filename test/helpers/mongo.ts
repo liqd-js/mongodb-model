@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, filterUnwindedProperties, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
+import {objectStringify} from "@liqd-js/fast-object-hash";
 
 
 describe('objectHash', () =>
@@ -657,7 +658,7 @@ describe('optimizeMatch', () =>
     it('should remove empty elements inside $and', () =>
     {
         const match = {$and: [undefined, {}, null, {a: 1}, {b: 2}]};
-        assert.deepStrictEqual(optimizeMatch(match), {$and: [{a: 1}, {b: 2}]});
+        assert.deepStrictEqual(optimizeMatch(match), {a: 1, b: 2});
     })
 
     it('should extract properties from $and with one element and empty $match root', () =>
@@ -688,6 +689,125 @@ describe('optimizeMatch', () =>
     {
         const match = { $and: [{ $or: [{ $and: [{ a: 1 }] }] }] }
         assert.deepStrictEqual(optimizeMatch(match), {a: 1});
+    })
+
+    it('should merge nested $and', () => {
+        const match = {
+            '$and': [
+                {
+                    '$and': [
+                        {
+                            '$and': [
+                                { title: 'a' },
+                                { surname: { '$in': [ 'a', 'b' ] } }
+                            ]
+                        },
+                        {$or: []}
+                    ]
+                },
+                {}
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { title: 'a', surname: { $in: ['a', 'b'] }} );
+    })
+
+    it('should handle simple $or', () => {
+        const match = {
+            $or: [
+                {a: 1}, {b: 2}, {a: 4}, {a: {$gte: 3}}
+            ]
+        };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {$or: [ { a: 1 }, { b: 2 }, { a: 4 }, { a: { $gte: 3 } } ]}
+        );
+    });
+
+    it('should merge simple nested $or', () => {
+        const match = {
+            $or: [
+                { $or: [{ a: 1}, {b: 4}] },
+                { b: 2 },
+                { $or: [{ a: 2}, {b: 5}, { a: {gte: 6} }, { b: 7 }] },
+                { a: 2 }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {
+            $or: [
+                { a: 1 },
+                { b: 4 },
+                { b: 2 },
+                { a: 2 },
+                { b: 5 },
+                { a: { gte: 6 } },
+                { b: 7 },
+                { a: 2 }
+            ]
+        });
+    })
+
+    it('should merge nested $or combined with $and', () => {
+        const match = {
+            $or: [
+                { $or: [{ $and: [{ a: 1}, {b: 4}] }, { b: 2 }], a: 4 },
+                { $or: [{ $and: [{ a: 2}, {b: 5}] }, { a: {gte: 6} }, { b: 7 }] },
+                { a: 2 }
+            ]
+        }
+
+        const optimized = objectStringify( optimizeMatch(match), { sortArrays: true });
+        const expected = objectStringify({
+            $or: [
+                { $or: [{ a: 1, b: 4}, {b: 2}], a: 4 },
+                { a: 2 },
+                { a: 2, b: 5 },
+                { a: {gte: 6} },
+                { b: 7 },
+            ].sort()
+        }, { sortArrays: true });
+        assert.deepStrictEqual(optimized, expected);
+    })
+
+    it('should not merge combination of $and and $or', () => {
+        const match = {
+            $and: [
+                { $or: [{ a: 1 }, { b: 2 }] },
+                { $or: [{ a: {gte: 1} }, { d: 4 }] }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should not merge combination of $or and $and', () => {
+        const match = {
+            $or: [
+                { $and: [{ a: 1}, {b: 4}] }, { b: 2 }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {
+            $or: [
+                { a: 1, b: 4 },
+                { b: 2 }
+            ]
+        });
+    })
+
+    it('should merge object properties', () => {
+        const match = {
+            $and: [
+                { $and: [{ a: 1}, {b: 4}] },
+                { a: 2 },
+                { a: { $lt: 4} },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {
+            a: { $eq: 2, $lt: 4 },
+            b: 4,
+        });
     })
 })
 

@@ -320,12 +320,61 @@ export function optimizeMatch( obj: any ): any {
 
             if ( filteredArray.length > 1 )
             {
-                result[key] = filteredArray
+                if ( key === '$and' )
+                {
+                    // merge elements that don't contain keys with $
+                    if ( filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => !itemKey.startsWith('$') )) )
+                    {
+                        const merged = mergeProperties(...filteredArray);
+                        result = { ...result, ...merged }
+                    }
+                    // merge elements that have only $and keys (current is $and) or $or keys (current is $or)
+                    else if ( filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => itemKey === '$and' )) )
+                    {
+                        const merged = mergeProperties(...filteredArray);
+                        result = { ...result, ...merged }
+                    }
+                    else
+                    {
+                        result[key] = filteredArray
+                    }
+                }
+                else if ( key === '$or' )
+                {
+                    if ( filteredArray.every( ( item: any ) => (Object.keys(item).length === 1 && item.$or) || Object.keys(item).every( itemKey => !itemKey.startsWith('$'))) )
+                    {
+                        const merged = [];
+                        for ( const item of filteredArray )
+                        {
+                            if ( item.$or )
+                            {
+                                merged.push(...item.$or);
+                            }
+                            else
+                            {
+                                merged.push(item);
+                            }
+                        }
+                        result = { ...result, $or: merged }
+                    }
+                    else
+                    {
+                        const or = filteredArray.filter( el => Object.keys(el).length === 1 && el.$or );
+                        const rest = filteredArray.filter( el => Object.keys(el).length > 1 || !el.$or );
+                        result[key] = [ ...rest, ...or[0].$or ]
+                    }
+                }
+                else
+                {
+                    result[key] = filteredArray
+                }
+
             }
             else if ( filteredArray.length === 1 )
             {
                 const isInRoot = Object.keys( filteredArray[0] ).some( key => result[key] );
-                result = { ...result, ...( isInRoot ? { [key]: [ filteredArray[0] ] } : filteredArray[0] ) }
+                const properties = mergeProperties( filteredArray[0] );
+                result = { ...result, ...( isInRoot ? { [key]: [ filteredArray[0] ] } : properties ) }
             }
         }
         else
@@ -334,6 +383,49 @@ export function optimizeMatch( obj: any ): any {
         }
     }
 
+    return result;
+}
+
+function mergeProperties( ...objects: object[] ): object
+{
+    const result: any = {};
+
+    if ( !objects.every(el => typeof el === 'object' && !Array.isArray(el)) )
+    {
+        throw new Error('Invalid input - expected objects');
+    }
+    
+    for ( const obj of objects as any[] )
+    {
+        for ( const key of Object.keys(obj) )
+        {
+            if ( !result[key] )
+            {
+                result[key] = {};
+            }
+
+            if ( typeof obj[key] === 'object' )
+            {
+                if ( typeof result[key] !== 'object' )
+                {
+                    result[key] = { $eq: result[key] };
+                }
+                result[key] = { ...result[key], ...obj[key] };
+            }
+            else
+            {
+                if ( Object.keys(result[key]).length === 0 )
+                {
+                    result[key] = obj[key];
+                }
+                else
+                {
+                    result[key] = { ...result[key], $eq: obj[key] };
+                }
+            }
+        }
+    }
+    
     return result;
 }
 
