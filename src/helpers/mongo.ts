@@ -305,6 +305,22 @@ export function collectAddedFields( pipeline: any[] ): string[]
     return [...fields];
 }
 
+/*
+
+{ a: 1, b: 2 }                                                   => { a: 1, b: 2 }
+{ $and: [ {a: 1}, {b: 2} ] }                                    => { a: 1, b: 2 }
+{ $or: [ {a: 1}, {b: 2} ] }                                     => { $or: [ {a: 1}, {b: 2} ] }
+{ $and: [ {$and: [{a: 1}, {b: 2}]} ]                            => { a: 1, b: 2 }
+{ $and: [ {$and: [{a: 1}, {b: 2}], c: 4}, {d: 3} ]              => { a: 1, b: 2, c: 4, d: 3 }
+{ $and: [ {$and: [{a: 1}, {b: 2}], a: 4}, {d: 3} ]              => false
+{ $and: [ {$or: [{a: 1}, {b: 2}]}, {d: 3} ]                     => { $or: [ {a: 1}, {b: 2} ], d: 3 }
+{ $and: [ {$or: [{a: 1}, {b: 2}], c: 4}, {d: 3} ]               => { $or: [ {a: 1}, {b: 2} ], c: 4, d: 3 }
+{ $and: [ {$or: [{a: 1}, {b: 2}], a: 4}, {d: 3} ]               => { $or: [ {a: 1}, {b: 2} ], a: 4, d: 3 }
+{ $or: [ {$or: [{a: 1}, {a: 2}] }]}                             => { $or: [ {a: 1}, {a: 2} ] }
+{ $or: [ {$or: [{a: 1}, {a: 2}], b: 3} ]                        => { $or: [ {a: 1}, {a: 2} ], b: 3 }
+
+*/
+
 export function optimizeMatch( obj: any ): any {
     if ( !obj ) { return undefined }
 
@@ -322,11 +338,19 @@ export function optimizeMatch( obj: any ): any {
             {
                 if ( key === '$and' )
                 {
+                    // TODO: combo $and + key na jednej úrovni
                     if ( filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => !itemKey.startsWith('$') ))
                         || filteredArray.every( ( item: any ) => Object.keys(item).every( (itemKey: string) => itemKey === '$and' )))
                     {
                         const merged = mergeProperties(...filteredArray);
-                        result = { ...result, ...merged }
+                        if ( merged === false )
+                        {
+                            result[key] = filteredArray;
+                        }
+                        else
+                        {
+                            result = { ...result, ...merged }
+                        }
                     }
                     else
                     {
@@ -380,7 +404,7 @@ export function optimizeMatch( obj: any ): any {
     return result;
 }
 
-export function mergeProperties( ...objects: object[] ): object
+export function mergeProperties( ...objects: object[] ): object | false
 {
     const result: any = {};
 
@@ -393,14 +417,27 @@ export function mergeProperties( ...objects: object[] ): object
     {
         for ( const [key, value] of Object.entries(obj) )
         {
-            !result[key] && (result[key] = {});
+            if ( !result[key] )
+            {
+                result[key] = value;
+                continue;
+            }
 
-            if ( typeof result[key] !== 'object' )
+            if ( isConflicting( result[key], value ) )
+            {
+                return false;
+            }
+
+            if ( isEq( result[key] ) )
             {
                 result[key] = { $eq: result[key] };
             }
 
-            if ( typeof value === 'object' )
+            if ( typeof value === 'object' && ( value instanceof Date || value instanceof ObjectId || value instanceof RegExp ) )
+            {
+                result[key] = { ...result[key], $eq: value };
+            }
+            else if ( typeof value === 'object' )
             {
                 result[key] = { ...result[key], ...value };
             }
@@ -420,6 +457,75 @@ export function mergeProperties( ...objects: object[] ): object
 
     return result;
 }
+
+function isConflicting( obj1: any, obj2: any ) {
+    if ( !obj1 || !obj2 ) { return false; }
+
+    if ( isEq( obj1 ) && isEq( obj2 ) )
+    {
+        return true;
+    }
+
+    if ( typeof obj1 === 'object' && typeof obj2 === 'object' )
+    {
+        for ( const key of Object.keys(obj1) )
+        {
+            if ( obj2.hasOwnProperty(key) )
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function isEq( obj: any )
+{
+    return typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean' || obj === null
+        || ( typeof obj === 'object'
+            && (
+                (
+                    ( obj instanceof ObjectId ) ||
+                    ( obj instanceof Date ) ||
+                    ( obj instanceof RegExp )
+                )
+                ||
+                ( Object.keys( obj ).length === 1 && Object.keys( obj ).every( key => key === '$eq' ) )
+            )
+        );
+}
+
+// function addedProperty( currVal: any, appendVal: any )
+// {
+//     if ( !currVal )
+//     {
+//         return appendVal;
+//     }
+//
+//     // currVal = { $gte: 2 }
+//     // currVal = new ObjectId('...')
+//     // currVal = 2
+//     // currVal = { $and: [ { $gte: 2 }, { $lt: 5 } ] }
+//
+//     if( typeof currVal !== 'object' || currVal === null ){ return currVal; }
+//     if( typeof currVal === 'object' &&
+//         (
+//             ( currVal instanceof ObjectId ) ||
+//             ( currVal instanceof Date )  ||
+//             ( currVal instanceof RegExp )
+//         ))
+//     {
+//         return currVal;
+//     }
+//     if( typeof currVal === 'object' && Object.keys( currVal ).length === 1 )
+//     {
+//
+//     }
+//
+//     const x = { $eq: obj[key] };
+//     return { $and: [ x, appendVal ] };
+// }
 
 export function extractFields(pipeline: Document[] )//: Set<string>
 {

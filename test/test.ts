@@ -22,7 +22,7 @@ type ApplicationDTO = { id: string, date: Date, status: string };
 type PositionDBE = { id: ObjectId, events: { opened: Date, closed?: Date } };
 type PositionDTO = { id: string, events: { opened: Date, closed?: Date } };
 
-export const accessFilter = { $and: [{surname: { $in: ['a', 'b'] } }, {}] };
+export const accessFilter = { $and: [{name: { $in: ['Test job 1 - all applications created after 2024-01-01'] } }, {}] };
 
 /**
  * Pipelines
@@ -50,11 +50,6 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
                 }
             }
         );
-    }
-
-    public newList( list: ModelListOptions<JobDBE> & { accessFilter?: () => Promise<Filter<JobDBE> | void> } )
-    {
-        return super.newList( list );
     }
 
     protected async accessFilter(): Promise<Filter<JobDBE>>
@@ -600,4 +595,4 @@ const matchUnwind1 = {
         ]
     }
 }
-LOG(filterUnwindedProperties(matchUnwind1, 'a.b.cd'));
+// LOG(filterUnwindedProperties(matchUnwind1, 'a.b.cd'));

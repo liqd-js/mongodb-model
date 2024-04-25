@@ -1,5 +1,26 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, filterUnwindedProperties, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties} from '../../src/helpers';
+import {
+    addPrefixToFilter,
+    addPrefixToUpdate,
+    bsonValue,
+    collectAddedFields,
+    extractFields,
+    generateCursorCondition,
+    getCursor,
+    filterUnwindedProperties,
+    isUpdateOperator,
+    objectGet,
+    objectHash,
+    objectHashID,
+    objectSet,
+    optimizeMatch,
+    projectionToProject,
+    resolveBSONValue,
+    reverseSort,
+    sortProjection,
+    mergeProperties,
+    LOG
+} from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
@@ -693,11 +714,11 @@ describe('optimizeMatch', () =>
 
     it('should merge nested $and', () => {
         const match = {
-            '$and': [
+            $and: [
                 {
-                    '$and': [
+                    $and: [
                         {
-                            '$and': [
+                            $and: [
                                 { title: 'a' },
                                 { surname: { '$in': [ 'a', 'b' ] } }
                             ]
@@ -795,20 +816,97 @@ describe('optimizeMatch', () =>
         });
     })
 
+    it('should not merge conflicting properties', () => {
+        const match = {
+            $and: [
+                { a: 1 },
+                { a: 2 },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
     it('should merge object properties', () => {
         const match = {
             $and: [
                 { $and: [{ a: 1}, {b: 4}] },
-                { a: 2 },
                 { a: { $lt: 4} },
             ]
         }
         const optimized = optimizeMatch(match);
-        assert.deepStrictEqual(optimized, {
-            a: { $eq: 2, $lt: 4 },
-            b: 4,
-        });
+        assert.deepStrictEqual(optimized, { a: { $lt: 4, $eq: 1 }, b: 4 });
     })
+
+    it('should keep basic object intact', () => {
+        const match = { a: 1, b: 2 };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    });
+
+    it('should keep simple $or intact', () => {
+        const match = {
+            $or: [
+                { a: 1 },
+                { b: 2 },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    });
+
+    it('should keep unknown properties intact ($exists)', () => {
+        const match = {
+            a: { $exists: true }
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should keep unknown properties intact ($nor)', () => {
+        const match = {
+            $nor: [{ a: 1 }]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should keep nested $and with conflicting properties intact', () => {
+        const match = {
+            $and: [
+                { $and: [{ a: 1}, {b: 2}] },
+                { a: 4 },
+                { d: 3 }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { $and: [{ a: 1, b: 2 }, { a: 4 }, { d: 3 }] });
+    })
+
+    it('should merge $and with conflicting properties but different conditions', () => {
+        const match = {
+            $and: [
+                { $and: [{ a: 1}, {b: 2}] },
+                { a: { $gte: 4 } },
+                { a: { $in: [1, 2, 3, 4] } },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: { $eq: 1, $gte: 4, $in: [1, 2, 3, 4] }, b: 2 });
+    })
+
+    it('should process ObjectId values', () => {
+        const match = {
+            $and:
+            [
+                {a: new ObjectId('5f4d6f9e6f0a4d001f9a2a4d')},
+                {a: new ObjectId('5f4d6f9e6f0a4d001f9a2a4a')},
+                {a: {$gte: new ObjectId('5f4d6f9e6f0a4d001f9a2a4b')}},
+            ]
+        };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    });
 })
 
 describe('mergeProperties', () => {
@@ -817,19 +915,14 @@ describe('mergeProperties', () => {
         assert.deepStrictEqual(merged, { a: 1, b: 2 });
     });
 
-    it('should prepend $eq to conflicting properties', () => {
+    it('should prepend $eq to conflicting properties - different condition', () => {
         const merged = mergeProperties({ a: 5 }, { a: { $gte: 2 } });
         assert.deepStrictEqual(merged, { a: { $eq: 5, $gte: 2 } });
     });
 
-    it('should overwrite conflicting properties - same condition', () => {
+    it('should return false for conflicting properties - same condition', () => {
         const merged = mergeProperties({ a: 5 }, { a: { $eq: 2 } });
-        assert.deepStrictEqual(merged, { a: { $eq: 2 }});
-    });
-
-    it('should overwrite conflicting properties - same condition', () => {
-        const merged = mergeProperties({ a: { $eq: 2 } }, { a: 5 });
-        assert.deepStrictEqual(merged, { a: { $eq: 5 }});
+        assert.deepStrictEqual(merged, false);
     });
 })
 

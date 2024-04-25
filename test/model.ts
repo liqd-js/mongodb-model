@@ -1,7 +1,7 @@
 import {accessFilter, applicationCreatedBetween, applicationModel, jobCreatedBetween, jobModel} from "./test";
 import assert from "node:assert";
 import {ObjectId} from "mongodb";
-import {getCursor, LOG} from "../src/helpers";
+import {DUMP, LOG, optimizeMatch} from "../src/helpers";
 
 const accessFilterPipeline = [ { "$match": accessFilter } ];
 const engagementsPipeline = [ {$unwind: '$engagements'}, {$replaceWith: '$engagements'} ];
@@ -9,27 +9,17 @@ const applicationPipeline = [{$unwind: '$engagements'}, {$unwind: '$engagements.
 
 const betweenFilter = { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } };
 
+describe('list test', () => {
+    it('should return a pipeline with access filter', async () => {
+        const res = await jobModel.list({
+            filter: {'engagements.id': new ObjectId('65e703099c9f4de34fc18db2')},
+        });
+        LOG(res);
+    });
+});
+
 describe('AbstractModel - job', () =>
 {
-    it('should work', async () =>
-    {
-        const pipeline = await jobModel.newList({
-            filter: { title: 'a' },
-            accessFilter: () => { return new Promise(() => true) },
-            sort: { title: 1 },
-            cursor: 'prev:WyJhIl0',
-        });
-        LOG(pipeline);
-        assert.deepStrictEqual(pipeline, [
-            {
-                '$match': {
-                    title: { '$eq': 'a', '$lt': 'a' },
-                    surname: { '$in': [ 'a', 'b' ] }
-                }
-            }
-        ])
-    });
-
     it('should create empty pipeline with access filter', async () =>
     {
         const pipeline = await jobModel.pipeline({});
