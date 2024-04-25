@@ -733,6 +733,14 @@ describe('optimizeMatch', () =>
         assert.deepStrictEqual(optimized, { title: 'a', surname: { $in: ['a', 'b'] }} );
     })
 
+    it('should handle $or with one element', () => {
+        const match = {
+            $or: [{a: 1}]
+        };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: 1 });
+    });
+
     it('should handle simple $or', () => {
         const match = {
             $or: [
