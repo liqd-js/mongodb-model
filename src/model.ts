@@ -50,18 +50,57 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         });
     }
 
-    async newList( list: ModelListOptions<DBE>, count: boolean = false )
+    public async newList<K extends keyof Converters>(list: ModelListOptions<DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>>
     {
-        const queryBuilder = new QueryBuilder<DBE>();
-        const pipeline = await queryBuilder.list( {
-            filter: list.filter,
-            pipeline: list.pipeline,
-            accessFilter: this.accessFilter,
-            sort: !count ? list.sort : undefined,
-            cursor: list.cursor
-        });
+        const { converter, projection, cache } = this.converters[conversion];
+        let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
+        let prev = cursor?.startsWith('prev:'), last = true;
 
-        return pipeline;
+        if( list.customFilter )
+        {
+            const custom = await this.resolveCustomFilter( list.customFilter );
+
+            if( custom.filter )
+            {
+                filter = isSet( filter ) ? { $and: [ filter, custom.filter ]} : custom.filter;
+            }
+
+            if( custom.pipeline )
+            {
+                list.pipeline = list.pipeline ? [ ...list.pipeline, ...custom.pipeline ] : custom.pipeline;
+            }
+        }
+
+        const params = { filter, sort, accessFilter: this.accessFilter, cursor, pipeline: list.pipeline };
+        const queryBuilder = new QueryBuilder<DBE>();
+        const pipe = await queryBuilder.list( params );
+        let promises = [ this.collection.aggregate( pipe ).toArray() ];
+
+        if ( list.count )
+        {
+            promises.push( this.collection.aggregate( await queryBuilder.count( params ) ).toArray().then( r => r[0]?.count ?? 0 ));
+        }
+
+        let [ entries, total ] = await Promise.all( promises );
+
+        const result = await Promise.all( entries.map( async( dbe, i ) =>
+        {
+            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
+
+            if(( limit && ( i > 0 || ( cursor && ( !prev || !last ))) && !( last && !prev && i === entries.length - 1 )))
+            {
+                dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
+            }
+
+            return dto;
+        }));
+
+        if ( list.count )
+        {
+            Object.defineProperty(result, 'total', { value: total ?? 0, writable: false });
+        }
+
+        return result;
     }
 
     protected async pipeline( options: ModelAggregateOptions<DBE> ): Promise<Document[]>
@@ -162,6 +201,13 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
         let prev = cursor?.startsWith('prev:'), last = true;
 
+        let accessFilter = await this.accessFilter();
+
+        if( accessFilter )
+        {
+            filter =  isSet( filter ) ? { $and: [ filter, accessFilter ]} : accessFilter;
+        }
+
         if( list.customFilter )
         {
             const custom = await this.resolveCustomFilter( list.customFilter );
@@ -177,17 +223,64 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
             }
         }
 
-        const params = { filter, sort, accessFilter: this.accessFilter, cursor, pipeline: list.pipeline };
-        const queryBuilder = new QueryBuilder<DBE>();
-        const pipe = await queryBuilder.list( params );
-        let promises = [ this.collection.aggregate( pipe ).toArray() ];
+        cursor && ( filter = { $and: [ filter, generateCursorCondition( cursor, sort )]});
 
-        if ( list.count )
+        flowGet( 'log' ) && LOG( filter );
+        let perf = new Benchmark();
+
+        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list`);
+
+        if( accessFilter )
         {
-            promises.push( this.collection.aggregate( await queryBuilder.count( params ) ).toArray().then( r => r[0]?.count ?? 0 ));
+            LOG( this.constructor.name, { filter });
         }
 
-        let [ entries, total ] = await Promise.all( promises );
+        //TODO options nepojdu pri aggregatione
+
+        let entries: WithId<DBE>[] = [], total = undefined;
+
+        if( !isSet( list.pipeline ))
+        {
+            entries = await this.collection.find( resolveBSONObject( filter ), { projection: cache?.list ? sortProjection( sort, '_id' ) : projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
+
+            if( list.count )
+            {
+                total = await this.collection.countDocuments( resolveBSONObject( filter ));
+            }
+        }
+        else if( list.pipeline ) // toto je vzdy troubo
+        {
+            let pipka = [];
+
+            if( isSet(filter) ){ pipka.push({ $match: resolveBSONObject( filter )})}
+            if( cache?.list || projection ){ pipka.push({ $project: cache?.list ? sortProjection( sort, '_id' ) : projection })}
+
+            pipka.push( ...list.pipeline.map( resolveBSONObject ));
+
+            if( isSet( collectAddedFields( list.pipeline ))){ pipka.push({ $unset: collectAddedFields( list.pipeline )})}
+
+            if( isSet( sort )){ pipka.push({ $sort: prev ? reverseSort( sort ) : sort }) }
+            if( limit ){ pipka.push({ $limit: limit + 1 }) }
+
+            entries = await this.collection.aggregate( pipka ).toArray() as WithId<DBE>[];
+
+            if( list.count )
+            {
+                total = await this.collection.aggregate([ ...pipka, { $count: 'count' }]).toArray().then( r => r[0]?.count ?? 0 );
+            }
+        }
+
+        let find = perf.step();
+
+        ( !( last = limit ? entries.length <= limit : true )) && entries.pop();
+        prev && entries.reverse();
+
+        if( cache?.list )
+        {
+            flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} entries `, entries );
+        }
+
+        // TODO vytiahnut cez projection len _idcka, sort stlpce a potom dotiahnut data cez get aby sa pouzila cache
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
@@ -201,9 +294,13 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
             return dto;
         }));
 
-        if ( list.count )
+        let convetor = perf.step();
+
+        flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} list in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
+
+        if( list.count )
         {
-            Object.defineProperty(result, 'total', { value: total ?? 0, writable: false });
+            Object.defineProperty( result, 'total', { value: total ?? 0, writable: false });
         }
 
         return result;
