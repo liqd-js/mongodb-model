@@ -156,7 +156,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
-    public dbeID( dtoID: DTO['id'] ): DBE['id']{ return dtoID as DBE['id']; }
+    public dbeID( id: DTO['id'] | DBE['id'] ): DBE['id']{ return id as DBE['id']; }
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     /*public async create(  parentID<> dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
@@ -200,13 +200,13 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         return {matchedCount: res.matchedCount, modifiedCount: res.modifiedCount}
     }
 
-    public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
-    public async get<K extends keyof Converters>( id: DTO['id'], conversion: K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
-    public async get( id: DTO['id'][] ): Promise<Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>>;
-    public async get<K extends keyof Converters>( id: DTO['id'][], conversion: K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
-    public async get<K extends keyof Converters>( id: DTO['id'][], conversion: K, filtered: true ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>>>>;
-    public async get<K extends keyof Converters>( id: DTO['id'][], conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
-    public async get<K extends keyof Converters>( id: DTO['id'] | Array<DTO['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
+    public async get( id: DTO['id'] | DBE['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
+    public async get<K extends keyof Converters>( id: DTO['id'] | DBE['id'], conversion: K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
+    public async get( id: Array<DTO['id'] | DBE['id']> ): Promise<Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>>;
+    public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['id']> , conversion: K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
+    public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['id']>, conversion: K, filtered: true ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>>>>;
+    public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
+    public async get<K extends keyof Converters>( id: DTO['id'] | DBE['id'] | Array<DTO['id'] | DBE['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
         //let perf = new Benchmark();
         //let find = perf.step();
