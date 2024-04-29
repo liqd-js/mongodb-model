@@ -84,7 +84,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         const stages = this.prefix.split;
 
         // TODO: project after each stage - extend with fields used in the future stages
-        for ( let i = 0; i < stages.length; i++ )
+        for ( let i = 0; i <= stages.length; i++ )
         {
             if ( i !== 0 )
             {

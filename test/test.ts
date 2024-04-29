@@ -134,9 +134,14 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         );
     }
 
-    protected async accessFilter(): Promise<Filter<ApplicationDBE>>
+    public dbeID(id: ApplicationDTO["id"] | ApplicationDBE["id"]): ApplicationDBE["id"]
     {
-        return accessFilter;
+        return new ObjectId(id);
+    }
+
+    public dtoID(dbeID: ApplicationDBE["id"]): ApplicationDTO["id"]
+    {
+        return dbeID.toString();
     }
 
     public pipeline( options: ModelAggregateOptions<ApplicationDBE> )
