@@ -167,7 +167,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         return _id;
     }*/
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<{matchedCount: number, modifiedCount: number}>
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
@@ -190,9 +190,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options });
 
-        let status = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
+        let res = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
 
-        flowGet( 'log' ) && LOG({ status });
+        flowGet('log') && LOG({res});
+
+        return {matchedCount: res.matchedCount, modifiedCount: res.modifiedCount}
     }
 
     public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;

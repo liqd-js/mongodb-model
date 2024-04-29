@@ -161,9 +161,10 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         throw new Error('Method not implemented.');
     }
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<void>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<{matchedCount: number, modifiedCount: number}>
     {
-        await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+        const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+        return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
     }
 
     public async get( id: DTO['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
