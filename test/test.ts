@@ -52,6 +52,16 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
         );
     }
 
+    public dbeID(id: ApplicationDTO["id"] | ApplicationDBE["id"]): ApplicationDBE["id"]
+    {
+        return new ObjectId(id);
+    }
+
+    public dtoID(dbeID: ApplicationDBE["id"]): ApplicationDTO["id"]
+    {
+        return dbeID.toString();
+    }
+
     protected async accessFilter(): Promise<Filter<JobDBE>>
     {
         return accessFilter;
@@ -95,6 +105,16 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
                 }
             }
         );
+    }
+
+    public dbeID(id: ApplicationDTO["id"] | ApplicationDBE["id"]): ApplicationDBE["id"]
+    {
+        return new ObjectId(id);
+    }
+
+    public dtoID(dbeID: ApplicationDBE["id"]): ApplicationDTO["id"]
+    {
+        return dbeID.toString();
     }
 
     public pipeline( options: ModelAggregateOptions<EngagementDBE> )

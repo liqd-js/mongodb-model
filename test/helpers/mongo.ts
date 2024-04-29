@@ -1,28 +1,7 @@
 import * as assert from 'assert';
-import {
-    addPrefixToFilter,
-    addPrefixToUpdate,
-    bsonValue,
-    collectAddedFields,
-    extractFields,
-    generateCursorCondition,
-    getCursor,
-    filterUnwindedProperties,
-    isUpdateOperator,
-    objectGet,
-    objectHash,
-    objectHashID,
-    objectSet,
-    optimizeMatch,
-    projectionToProject,
-    resolveBSONValue,
-    reverseSort,
-    sortProjection,
-    mergeProperties,
-    LOG, subfilter
-} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, LOG, subfilter, filterUnwindedProperties} from '../../src/helpers';
 import crypto from 'crypto';
-import {ObjectId, Sort} from "mongodb";
+import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
 
 
@@ -678,7 +657,7 @@ describe('optimizeMatch', () =>
 
     it('should remove empty elements inside $and', () =>
     {
-        const match = {$and: [undefined, {}, null, {a: 1}, {b: 2}]};
+        const match = {$and: [undefined, {}, null, {a: 1}, {b: 2}]} as Filter<any>;
         assert.deepStrictEqual(optimizeMatch(match), {a: 1, b: 2});
     })
 
@@ -939,55 +918,55 @@ describe('extractFields', () =>
     it('should extract fields from simple $match', () =>
     {
         const pipeline = [{ $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['a', 'b'], ignored: []});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['a', 'b'], ignored: []});
     });
 
     it('should extract fields from $match with nested $and and $or', () =>
     {
         const pipeline = [{ $match: { $and: [{ a: 1 }, { $or: [{ b: 2 }, { c: 3 }] }] } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['a', 'b', 'c'], ignored: []});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['a', 'b', 'c'], ignored: []});
     });
 
     it('should add ignored fields created in $project', () =>
     {
         const pipeline = [{ $project: { a: '$positions', b: 1 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should exclude fields in $match created in $project before', () =>
     {
         const pipeline = [{ $project: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should add ignored fields created in $addFields', () =>
     {
         const pipeline = [{ $addFields: { a: '$positions', b: 1 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should exclude fields in $match created in $addFields before', () =>
     {
         const pipeline = [{ $addFields: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should add ignored fields created in $group', () =>
     {
         const pipeline = [{ $group: { a: '$positions', b: 1 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should add fields in $expr', () =>
     {
         const pipeline = [{ $match: { $expr: {$gt: ['$positions', 1] }} }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: []});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: []});
     });
 
     it('should exclude fields in $match created in $group before', () =>
     {
         const pipeline = [{ $group: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should combine multiple stages and operators', () =>
@@ -1091,24 +1070,24 @@ describe('extractFields', () =>
             ].sort(),
             ignored: [ 'id', 'jobID', 'statusAt', '_id', 'placedJobs', 'positions', 'mapped', 'filtered', 'merged', 'elemAt' ].sort()
         }
-        const {used, ignored } = extractFields(pipeline);
+        const {used, ignored } = getUsedFields(pipeline);
         assert.deepStrictEqual({used: used.sort(), ignored: ignored.sort()}, expected);
     });
 
     it('should throw error for unsupported stages', () =>
     {
         const pipeline = [{ $unsupported: {} }];
-        assert.throws(() => extractFields(pipeline), /Unsupported pipeline stage: "\$unsupported"/);
+        assert.throws(() => getUsedFields(pipeline), /Unsupported pipeline stage: "\$unsupported"/);
     });
 
     it('should throw error for unsupported operators', () =>
     {
         const pipeline = [{ $match: { $unsupported: {} } }];
-        assert.throws(() => extractFields(pipeline), /Unsupported operator: "\$unsupported"/);
+        assert.throws(() => getUsedFields(pipeline), /Unsupported operator: "\$unsupported"/);
     });
 })
 
-describe('getPartiallyResolvedFilter', () =>
+describe('filterUnwindedProperties', () =>
 {
     it('should resolve simple object filter', () =>
     {
@@ -1158,6 +1137,21 @@ describe('getPartiallyResolvedFilter', () =>
         assert.deepStrictEqual(filterUnwindedProperties(filter, 'b'), undefined);
         assert.deepStrictEqual(filterUnwindedProperties(filter, 'c'), filter);
     });
+
+    it('test', () => {
+        const filter = {
+            $and: [
+                { 'x': 1 },
+                { $and: [
+                        { 'y': 2 },
+                        { 'engagements.x': 2 },
+                        { 'engagements.applications.x': 3 },
+                    ]},
+            ]
+        }
+        const filtered = filterUnwindedProperties(filter, 'engagements');
+        LOG(filtered);
+    })
 })
 
 describe('subfilter', () =>
@@ -1167,7 +1161,7 @@ describe('subfilter', () =>
             'x': 1,
             'engagements.x': 2,
             'engagements.applications.x': 3,
-        }, '', 'engagements');
+        }, '', 'engagements.applications.x');
 
         assert.deepStrictEqual(filter, {
             'x': 1,

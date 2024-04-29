@@ -77,7 +77,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         // add prefix to filter, projection, ...
         const custom = list.customFilter ? await this.resolveCustomFilter(list.customFilter) : undefined;
-        filter = addPrefixToFilter( optimizeMatch( { $and: [ filter, custom?.filter ] } ), this.prefix );
+        filter = addPrefixToFilter( optimizeMatch( { $and: [ filter, custom?.filter! ] } ) as Filter<DBE>, this.prefix );
 
         const filterStages = splitFilterToStages( filter, this.prefix );
 

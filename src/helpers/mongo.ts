@@ -305,23 +305,12 @@ export function collectAddedFields( pipeline: any[] ): string[]
     return [...fields];
 }
 
-/*
-
-{ a: 1, b: 2 }                                                   => { a: 1, b: 2 }
-{ $and: [ {a: 1}, {b: 2} ] }                                    => { a: 1, b: 2 }
-{ $or: [ {a: 1}, {b: 2} ] }                                     => { $or: [ {a: 1}, {b: 2} ] }
-{ $and: [ {$and: [{a: 1}, {b: 2}]} ]                            => { a: 1, b: 2 }
-{ $and: [ {$and: [{a: 1}, {b: 2}], c: 4}, {d: 3} ]              => { a: 1, b: 2, c: 4, d: 3 }
-{ $and: [ {$and: [{a: 1}, {b: 2}], a: 4}, {d: 3} ]              => false
-{ $and: [ {$or: [{a: 1}, {b: 2}]}, {d: 3} ]                     => { $or: [ {a: 1}, {b: 2} ], d: 3 }
-{ $and: [ {$or: [{a: 1}, {b: 2}], c: 4}, {d: 3} ]               => { $or: [ {a: 1}, {b: 2} ], c: 4, d: 3 }
-{ $and: [ {$or: [{a: 1}, {b: 2}], a: 4}, {d: 3} ]               => { $or: [ {a: 1}, {b: 2} ], a: 4, d: 3 }
-{ $or: [ {$or: [{a: 1}, {a: 2}] }]}                             => { $or: [ {a: 1}, {a: 2} ] }
-{ $or: [ {$or: [{a: 1}, {a: 2}], b: 3} ]                        => { $or: [ {a: 1}, {a: 2} ], b: 3 }
-
-*/
-
-export function optimizeMatch( obj: any ): any {
+/**
+ * Optimizes match filter by merging conditions and removing unnecessary operators
+ * @param obj - filter to optimize
+ * @returns optimized filter
+ */
+export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undefined {
     if ( !obj ) { return undefined }
 
     let result: any = {};
@@ -330,7 +319,7 @@ export function optimizeMatch( obj: any ): any {
     {
         if ( key === '$and' || key === '$or' )
         {
-            const filteredArray = (value as any[])
+            const filteredArray = value
                 .map( (item: any) => optimizeMatch(item) )
                 .filter( (optimizedItem: any) => optimizedItem && Object.keys(optimizedItem).length );
 
@@ -377,8 +366,8 @@ export function optimizeMatch( obj: any ): any {
                     }
                     else
                     {
-                        const or = filteredArray.filter( el => Object.keys(el).length === 1 && el.$or );
-                        const rest = filteredArray.filter( el => Object.keys(el).length > 1 || !el.$or );
+                        const or = filteredArray.filter( (el: MongoFilter<any>) => Object.keys(el).length === 1 && el.$or );
+                        const rest = filteredArray.filter( (el: MongoFilter<any>) => Object.keys(el).length > 1 || !el.$or );
                         result[key] = [ ...rest, ...(or[0]?.$or || []) ]
                     }
                 }
@@ -404,6 +393,11 @@ export function optimizeMatch( obj: any ): any {
     return result;
 }
 
+/**
+ * Merges properties of multiple objects into one object - helper for optimizeMatch
+ * @param objects - objects to merge
+ * @returns merged object or false if there are conflicting properties
+ */
 export function mergeProperties( ...objects: object[] ): object | false
 {
     const result: any = {};
@@ -458,7 +452,8 @@ export function mergeProperties( ...objects: object[] ): object | false
     return result;
 }
 
-function isConflicting( obj1: any, obj2: any ) {
+function isConflicting( obj1: any, obj2: any )
+{
     if ( !obj1 || !obj2 ) { return false; }
 
     if ( isEq( obj1 ) && isEq( obj2 ) )
@@ -496,38 +491,11 @@ function isEq( obj: any )
         );
 }
 
-// function addedProperty( currVal: any, appendVal: any )
-// {
-//     if ( !currVal )
-//     {
-//         return appendVal;
-//     }
-//
-//     // currVal = { $gte: 2 }
-//     // currVal = new ObjectId('...')
-//     // currVal = 2
-//     // currVal = { $and: [ { $gte: 2 }, { $lt: 5 } ] }
-//
-//     if( typeof currVal !== 'object' || currVal === null ){ return currVal; }
-//     if( typeof currVal === 'object' &&
-//         (
-//             ( currVal instanceof ObjectId ) ||
-//             ( currVal instanceof Date )  ||
-//             ( currVal instanceof RegExp )
-//         ))
-//     {
-//         return currVal;
-//     }
-//     if( typeof currVal === 'object' && Object.keys( currVal ).length === 1 )
-//     {
-//
-//     }
-//
-//     const x = { $eq: obj[key] };
-//     return { $and: [ x, appendVal ] };
-// }
-
-export function extractFields(pipeline: Document[] )//: Set<string>
+/**
+ * Extracts fields used in the pipeline
+ * @param pipeline
+ */
+export function getUsedFields( pipeline: Document[] ): {used: string[], ignored: string[]}
 {
     const usedFields: Set<string> = new Set();
     const ignoredFields: Set<string> = new Set();
@@ -808,7 +776,7 @@ export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, path: string
     {
         const stage = stages.slice(0, i).join('.');
         const nextStage = stages.slice(0, i + 1).join('.');
-        result.push( optimizeMatch( subfilter( filter, stage, nextStage ) ) );
+        result.push( optimizeMatch( subfilter( filter, stage, nextStage ) ) as MongoFilter<DBE> );
     }
 
     return result;
