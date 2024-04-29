@@ -105,6 +105,40 @@ describe('AbstractPropertyModel - application', () =>
         ]);
     });
 
+    it('tmp', async () =>
+    {
+        const pipeline = await applicationModel.list({
+            filter: {
+                $and: [
+                    { name: 'a'/*, '$root.engagements.id': 10 */},
+                    { '$root.engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378') },
+                    { status: 'dropout' },
+                    {
+                        $or: [
+                            { '$root.engagements.x': new ObjectId('65e7053f3c67bebc2e959378')},
+                            { name: 'b' }
+                        ]
+                    },
+                    {
+                        $or: [
+                            { '$root.engagements.applications.id': new ObjectId('65e7053f3c67bebc2e959378')},
+                            { '$root.engagements.applications.recruiterID': new ObjectId('65e7053f3c67bebc2e959378')},
+                        ]
+                    },
+                    // {'$root._id': { $in: [new ObjectId('65e703099c9f4de34fc18db2')] }}
+                ]
+            },
+            sort: { name: -1 },
+            limit: 100,
+            projection: {
+                name: 1
+            },
+            pipeline: [{$lookup: 1}]
+        });
+        LOG(pipeline);
+        // assert.deepStrictEqual( pipeline, applicationPipeline);
+    });
+
     it('should combine application and job custom filters - property + property');
 
     it('should combine application and position custom filters - property + property');

@@ -134,6 +134,11 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         );
     }
 
+    protected async accessFilter(): Promise<Filter<ApplicationDBE>>
+    {
+        return accessFilter;
+    }
+
     public pipeline( options: ModelAggregateOptions<ApplicationDBE> )
     {
         return super.pipeline( options );

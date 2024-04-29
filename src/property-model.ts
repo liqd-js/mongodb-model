@@ -1,5 +1,5 @@
 import {Collection, Document, Filter, FindOptions, MongoClient, MongoClientOptions, ObjectId, UpdateFilter, UpdateOptions} from "mongodb";
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, DUMP, flowGet, flowSet, flowStart, isUpdateOperator, LOG, projectionToProject, resolveBSONObject} from "./helpers";
+import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, DUMP, flowGet, flowSet, flowStart, isUpdateOperator, LOG, optimizeMatch, projectionToProject, resolveBSONObject, splitFilterToStages} from "./helpers";
 import {ModelError} from "./helpers/errors";
 import Cache from "./helpers/cache";
 import {Aggregator, convert} from "./model"
@@ -75,38 +75,41 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             pipeline.push({ $match: addPrefixToFilter( accessFilter, this.prefix ) });
         }
 
-        let custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
+        // add prefix to filter, projection, ...
+        const custom = list.customFilter ? await this.resolveCustomFilter(list.customFilter) : undefined;
+        filter = addPrefixToFilter( optimizeMatch( { $and: [ filter, custom?.filter ] } ), this.prefix );
 
-        if( custom?.filter )
+        const filterStages = splitFilterToStages( filter, this.prefix );
+
+        const stages = this.prefix.split;
+
+        // TODO: project after each stage - extend with fields used in the future stages
+        for ( let i = 0; i < stages.length; i++ )
         {
-            filter = ( isSet( filter ) ? { $and: [ filter, custom.filter ]} : custom.filter ) as PropertyModelFilter<RootDBE, DBE>;
-        }
-
-        let $match = resolveBSONObject( addPrefixToFilter( filter, this.prefix ));
-
-        //isSet( $match ) && pipeline.push({ $match });
-
-        for( let path of this.paths )
-        {
-            if( path.array )
+            if ( i !== 0 )
             {
-                //pipeline.push({ $unwind: { path: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + path.path }});
-                pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + path.path });
-                //isSet( $match ) && pipeline.push({ $match });
+                pipeline.push({$unwind: prefix = (prefix === '$' ? prefix : prefix + '.') + this.paths[i - 1].path});
+            }
 
-                // matchovat veci co uz mam unwindnute postupne $root, $root.property, $root.property.property2
+            if ( filterStages[i] && Object.keys( filterStages[i] ).length )
+            {
+                pipeline.push({ $match: filterStages[i] });
             }
         }
-
-        isSet( $match ) && pipeline.push({ $match });
 
         //let $project: string | Filter<RootDBE> = '$' + this.prefix, $rootProject;
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
-        const { $root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
+        const {$root: rootProjection, ...propertyProjection} = options.projection ?? {}; // TODO add support for '$root.property' projection
 
-        if( isSet( propertyProjection )){ $project = addPrefixToFilter( projectionToProject({ id: 1, ...propertyProjection }), this.prefix, false )}
-        if( isSet( rootProjection )){ $rootProject = typeof rootProjection === 'object' ? addPrefixToFilter( projectionToProject( rootProjection ), '$$ROOT', false ): '$$ROOT' }
+        if (isSet(propertyProjection))
+        {
+            $project = addPrefixToFilter(projectionToProject({id: 1, ...propertyProjection}), this.prefix, false)
+        }
+        if (isSet(rootProjection))
+        {
+            $rootProject = typeof rootProjection === 'object' ? addPrefixToFilter(projectionToProject(rootProjection), '$$ROOT', false) : '$$ROOT'
+        }
 
         if( $rootProject )
         {
@@ -250,8 +253,6 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public async list<K extends keyof Converters>(list: PropertyModelListOptions<RootDBE, DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Converters[K]['converter']>>>>>
     {
         const { converter, projection } = this.converters[conversion];
-        //let { filter: propertyFilter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
-        //let { $root, }
 
         const pipeline = this.pipeline({ ...resolveBSONObject( list ), projection });
 
@@ -285,33 +286,6 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         }
 
         return result;
-
-        // TODO property options
-
-        /*
-        //let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
-        let prev = cursor?.startsWith('prev:'), last = true;
-
-        cursor && ( filter = { $and: [ filter, generateCursorCondition( cursor, sort )]});
-
-        flowGet( 'log' ) && LOG( filter );
-
-        let entries = await this.collection.find( resolveBSONObject( filter ), { projection, limit: limit ? limit + 1 : limit, sort: prev ? reverseSort( sort ) : sort, ...options }).toArray();
-
-        ( !( last = limit ? entries.length <= limit : true )) && entries.pop();
-        prev && entries.reverse();
-
-        return Promise.all( entries.map( async( dbe, i ) =>
-        {
-            const dto = await converter( dbe as DBE ) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
-
-            if(( limit && ( i > 0 || ( cursor && ( !prev || !last ))) && !( last && !prev && i === entries.length - 1 )))
-            {
-                dto.$cursor = getCursor( dbe, sort );
-            }
-
-            return dto;
-        }));*/
     }
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE,DBE> ): Promise<T[]>

@@ -19,7 +19,7 @@ import {
     reverseSort,
     sortProjection,
     mergeProperties,
-    LOG
+    LOG, subfilter
 } from '../../src/helpers';
 import crypto from 'crypto';
 import {ObjectId, Sort} from "mongodb";
@@ -1158,4 +1158,305 @@ describe('getPartiallyResolvedFilter', () =>
         assert.deepStrictEqual(filterUnwindedProperties(filter, 'b'), undefined);
         assert.deepStrictEqual(filterUnwindedProperties(filter, 'c'), filter);
     });
+})
+
+describe('subfilter', () =>
+{
+    it('should extract filters from basic filter - root', () => {
+        const filter = subfilter({
+            'x': 1,
+            'engagements.x': 2,
+            'engagements.applications.x': 3,
+        }, '', 'engagements');
+
+        assert.deepStrictEqual(filter, {
+            'x': 1,
+        });
+    })
+
+    it('should extract filters from basic filter - first level', () => {
+        const filter = subfilter({
+            'x': 1,
+            'engagements.x': 2,
+            'engagements.applications.x': 3,
+        }, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            'x': 1,
+            'engagements.x': 2,
+        });
+    })
+
+    it('should extract filters from basic filter - last level', () => {
+        const filter = subfilter({
+            'x': 1,
+            'engagements.x': 2,
+            'engagements.applications.x': 3,
+        }, 'engagements.applications', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            'x': 1,
+            'engagements.x': 2,
+            'engagements.applications.x': 3,
+        });
+    })
+
+    it('should extract filters from simple $and - root', () => {
+        const filter = subfilter({
+            $and: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        }, '', 'engagements');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { 'x': 1 },
+            ]
+        });
+    })
+
+    it('should extract filters from simple $and - first level', () => {
+        const filter = subfilter({
+            $and: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        }, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+            ]
+        });
+    })
+
+    it('should extract filters from simple $and - last level', () => {
+        const filter = subfilter({
+            $and: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        }, 'engagements.applications', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        });
+    })
+
+    it('should extract filters from nested $and - root', () => {
+        const filter = subfilter({
+            $and: [
+                { 'x': 1 },
+                { $and: [
+                        { 'y': 2 },
+                        { 'engagements.x': 2 },
+                        { 'engagements.applications.x': 3 },
+                    ]},
+            ]
+        }, '', 'engagements');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { 'x': 1 },
+                {
+                    $and: [
+                        { 'y': 2 },
+                    ]
+                }
+            ]
+        });
+    });
+
+    it('should extract filters from nested $and - root - empty', () => {
+        const filter = subfilter({
+            $and: [
+                { $and: [
+                        { 'engagements.x': 2 },
+                        { 'engagements.applications.x': 3 },
+                    ]},
+            ]
+        }, '', 'engagements');
+
+        assert.deepStrictEqual(filter, {});
+    });
+
+    it('should extract filters from nested $and - first level', () => {
+        const filter = subfilter({
+            $and: [
+                { 'x': 1 },
+                { $and: [
+                    { 'y': 2 },
+                    { 'engagements.x': 2 },
+                    { 'engagements.applications.x': 3 },
+                ]},
+            ]
+        }, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { 'x': 1 },
+                {
+                    $and: [
+                        { 'y': 2 },
+                        { 'engagements.x': 2 },
+                    ]
+                }
+            ]
+        });
+    });
+
+    it('should not extract partial filters from basic $or - root', () => {
+        const filter = subfilter({
+            $or: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        }, '', 'engagements');
+
+        assert.deepStrictEqual(filter, {});
+    })
+
+    it('should not extract partial filters from basic $or - first level', () => {
+        const filter = subfilter({
+            $or: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        }, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {});
+    })
+
+
+    it('should extract filters from basic $or - first level', () => {
+        const filter = {
+            $or: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+            ]
+        };
+        const sub = subfilter(filter, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(sub, filter);
+    })
+
+    it('should extract filter from basic $or - last level', () => {
+        const filter = {
+            $or: [
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
+            ]
+        };
+        const sub = subfilter(filter, 'engagements.applications', 'engagements.applications');
+
+        assert.deepStrictEqual(sub, filter);
+    })
+
+    it('should extract filter from nested $or - root', () => {
+        const filter = {
+            $or: [
+                { 'x': 1 },
+                { $or: [
+                        { 'y': 2 },
+                        { 'engagements.x': 2 },
+                    ]},
+            ]
+        };
+        const sub = subfilter(filter, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(sub, filter);
+    })
+
+    it('should extract filter from combination of $and and $or - root', () => {
+        const filter = subfilter({
+            $and: [
+                { x: 1 },
+                { 'engagements.x': 2 },
+                { $or: [
+                    { 'engagements.x': 3 },
+                    { 'engagements.y': 4 },
+                ]},
+            ],
+            $or: [
+                { 'engagements.z': 5 },
+                { 'engagements.applications.z': 6 },
+            ]
+        }, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { x: 1 },
+                { 'engagements.x': 2 },
+                {
+                    $or: [
+                        { 'engagements.x': 3 },
+                        { 'engagements.y': 4 },
+                    ]
+                },
+            ]
+        });
+    })
+
+    it('should extract filter from combination of $and and $or - nested', () => {
+        const filter = subfilter({
+            $and: [
+                { x: 1 },
+                { 'engagements.x': 2 },
+                { $or: [
+                    { 'engagements.applications.x': 3 },
+                    { 'engagements.y': 4 },
+                ]},
+            ],
+            $or: [
+                { 'engagements.z': 5 },
+                { 'engagements.z': 6 },
+            ]
+        }, 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {
+            $and: [
+                { x: 1 },
+                { 'engagements.x': 2 },
+            ],
+            $or: [
+                { 'engagements.z': 5 },
+                { 'engagements.z': 6 },
+            ]
+        });
+    })
+
+    it('should skip unsupported operator', () => {
+        // $nor
+        const filter = subfilter({
+            $unsupported: [
+                { x: 1 },
+                { y: 2 }
+            ]
+        }, '', 'engagements');
+
+        assert.deepStrictEqual(filter, {});
+    })
+
+    it('should add unsupported operators at the last level', () => {
+        const filter = {
+            $unsupported: [
+                { x: 1 },
+                { y: 2 }
+            ]
+        }
+        const sub = subfilter( filter, 'engagements', 'engagements' );
+        assert.deepStrictEqual( sub, filter );
+    })
 })

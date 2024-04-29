@@ -1,4 +1,4 @@
-import {Document, FindOptions, ObjectId, Sort, UpdateFilter} from 'mongodb';
+import {Document, FindOptions, ObjectId, Sort, UpdateFilter, Filter as MongoFilter} from 'mongodb';
 import crypto from 'crypto';
 
 type Filter = Record<string, any>;
@@ -379,7 +379,7 @@ export function optimizeMatch( obj: any ): any {
                     {
                         const or = filteredArray.filter( el => Object.keys(el).length === 1 && el.$or );
                         const rest = filteredArray.filter( el => Object.keys(el).length > 1 || !el.$or );
-                        result[key] = [ ...rest, ...or[0].$or ]
+                        result[key] = [ ...rest, ...(or[0]?.$or || []) ]
                     }
                 }
                 else
@@ -791,6 +791,87 @@ export function filterUnwindedProperties(input: any, prefix: string ): any | und
 function isPrefixedField( field: any, prefix: string ): boolean
 {
     return typeof field === 'string' && (field.startsWith(prefix) || field.startsWith('$' + prefix));
+}
+
+/**
+ * Splits filter into stages to be put between unwinds based on the path
+ * @param filter
+ * @param path
+ * @returns {MongoFilter[]} - array of optimized filters for each stage
+ */
+export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, path: string ): MongoFilter<DBE>[]
+{
+    const stages = path.split('.');
+    const result: MongoFilter<DBE>[] = [];
+
+    for ( let i = 0; i <= stages.length; i++ )
+    {
+        const stage = stages.slice(0, i).join('.');
+        const nextStage = stages.slice(0, i + 1).join('.');
+        result.push( optimizeMatch( subfilter( filter, stage, nextStage ) ) );
+    }
+
+    return result;
+}
+
+/**
+ * Extracts properties from filter that are relevant for the given stage
+ * @param filter
+ * @param stage
+ * @param nextStage
+ */
+export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string )
+{
+    const result: MongoFilter<any> = {};
+
+    if ( stage === nextStage )
+    {
+        return filter;
+    }
+
+    for ( const [key, value] of Object.entries(filter) )
+    {
+        if ( key === '$and' )
+        {
+            for ( const andCondition of value as any[] )
+            {
+                const sub = subfilter( andCondition, stage, nextStage );
+                if ( Object.keys(sub).length )
+                {
+                    if ( !result.$and )
+                    {
+                        result.$and = [];
+                    }
+                    result.$and.push( sub );
+                }
+            }
+        }
+        else if ( key === '$or' )
+        {
+            const tmpFilter: MongoFilter<any> = {};
+            for ( const orCondition of value as any[] )
+            {
+                // try to extract, if they're equal, add, otherwise skip
+                const sub = subfilter( orCondition, stage, nextStage );
+                if ( !tmpFilter.$or )
+                {
+                    tmpFilter.$or = [];
+                }
+                tmpFilter.$or.push( sub );
+            }
+
+            if ( objectHash(tmpFilter.$or) === objectHash(value) )
+            {
+                result.$or = tmpFilter.$or;
+            }
+        }
+        else if ( !key.startsWith('$') && ( !key.startsWith(stage) || ( key.startsWith(stage) && !key.startsWith( nextStage ))))
+        {
+            result[key] = value;
+        }
+    }
+
+    return result;
 }
 
 export const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
