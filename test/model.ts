@@ -107,7 +107,7 @@ describe('AbstractPropertyModel - application', () =>
 
     it('tmp', async () =>
     {
-        const pipeline = await applicationModel.list({
+        const pipeline = await applicationModel.pipeline({
             filter: {
                 $and: [
                     { name: 'a'/*, '$root.engagements.id': 10 */},

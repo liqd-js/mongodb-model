@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, LOG, subfilter, filterUnwindedProperties} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, LOG, subfilter, transformToElemMatch} from '../../src/helpers';
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
@@ -1087,73 +1087,6 @@ describe('extractFields', () =>
     });
 })
 
-describe('filterUnwindedProperties', () =>
-{
-    it('should resolve simple object filter', () =>
-    {
-        const filter = { x: 1, 'a.x': 2, 'a.b.x': 3, 'a.b.c.x': 4 };
-
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), { x: 1 });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { x: 1, 'a.x': 2 });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), { x: 1, 'a.x': 2, 'a.b.x': 3 });
-    })
-
-    it('should resolve comparison operators', () =>
-    {
-        const filter = { x: { $eq: '$b' }, 'a.x': { $gt: 2 }, 'a.b.x': { $lt: 3 }, 'a.b.c.x': { $gte: 4 } };
-
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), { x: { $eq: '$b' } });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { x: { $eq: '$b' }, 'a.x': { $gt: 2 } });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), { x: { $eq: '$b' }, 'a.x': { $gt: 2 }, 'a.b.x': { $lt: 3 } });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'aaa'), filter);
-    });
-
-    it('should resolve logical operators', () =>
-    {
-        const filter = {
-            $and: [
-                {
-                    'a.x': 1,
-                    $or: [
-                        { $not: { 'a.b.x': 1 } },
-                        { 'a.b.y': 1 }
-                    ]
-                }
-            ]
-        };
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { $and: [{'a.x': 1}] });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), filter);
-    });
-
-    it('should resolve $expr', () =>
-    {
-        const filter = { $expr: { $eq: ['$a', '$b'] } };
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'b'), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'c'), filter);
-    });
-
-    it('test', () => {
-        const filter = {
-            $and: [
-                { 'x': 1 },
-                { $and: [
-                        { 'y': 2 },
-                        { 'engagements.x': 2 },
-                        { 'engagements.applications.x': 3 },
-                    ]},
-            ]
-        }
-        const filtered = filterUnwindedProperties(filter, 'engagements');
-        LOG(filtered);
-    })
-})
-
 describe('subfilter', () =>
 {
     it('should extract filters from basic filter - root', () => {
@@ -1161,7 +1094,7 @@ describe('subfilter', () =>
             'x': 1,
             'engagements.x': 2,
             'engagements.applications.x': 3,
-        }, '', 'engagements.applications.x');
+        }, '', 'engagements', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             'x': 1,
@@ -1173,7 +1106,7 @@ describe('subfilter', () =>
             'x': 1,
             'engagements.x': 2,
             'engagements.applications.x': 3,
-        }, 'engagements', 'engagements.applications');
+        }, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             'x': 1,
@@ -1186,7 +1119,7 @@ describe('subfilter', () =>
             'x': 1,
             'engagements.x': 2,
             'engagements.applications.x': 3,
-        }, 'engagements.applications', 'engagements.applications');
+        }, 'engagements.applications', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             'x': 1,
@@ -1202,7 +1135,7 @@ describe('subfilter', () =>
                 { 'engagements.x': 2 },
                 { 'engagements.applications.x': 3 },
             ]
-        }, '', 'engagements');
+        }, '', 'engagements', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1218,7 +1151,7 @@ describe('subfilter', () =>
                 { 'engagements.x': 2 },
                 { 'engagements.applications.x': 3 },
             ]
-        }, 'engagements', 'engagements.applications');
+        }, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1235,7 +1168,7 @@ describe('subfilter', () =>
                 { 'engagements.x': 2 },
                 { 'engagements.applications.x': 3 },
             ]
-        }, 'engagements.applications', 'engagements.applications');
+        }, 'engagements.applications', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1256,7 +1189,7 @@ describe('subfilter', () =>
                         { 'engagements.applications.x': 3 },
                     ]},
             ]
-        }, '', 'engagements');
+        }, '', 'engagements', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1278,7 +1211,7 @@ describe('subfilter', () =>
                         { 'engagements.applications.x': 3 },
                     ]},
             ]
-        }, '', 'engagements');
+        }, '', 'engagements', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {});
     });
@@ -1293,7 +1226,7 @@ describe('subfilter', () =>
                     { 'engagements.applications.x': 3 },
                 ]},
             ]
-        }, 'engagements', 'engagements.applications');
+        }, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1315,7 +1248,7 @@ describe('subfilter', () =>
                 { 'engagements.x': 2 },
                 { 'engagements.applications.x': 3 },
             ]
-        }, '', 'engagements');
+        }, '', 'engagements', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {});
     })
@@ -1327,7 +1260,7 @@ describe('subfilter', () =>
                 { 'engagements.x': 2 },
                 { 'engagements.applications.x': 3 },
             ]
-        }, 'engagements', 'engagements.applications');
+        }, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {});
     })
@@ -1340,7 +1273,7 @@ describe('subfilter', () =>
                 { 'engagements.x': 2 },
             ]
         };
-        const sub = subfilter(filter, 'engagements', 'engagements.applications');
+        const sub = subfilter(filter, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(sub, filter);
     })
@@ -1353,7 +1286,7 @@ describe('subfilter', () =>
                 { 'engagements.applications.x': 3 },
             ]
         };
-        const sub = subfilter(filter, 'engagements.applications', 'engagements.applications');
+        const sub = subfilter(filter, 'engagements.applications', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(sub, filter);
     })
@@ -1368,7 +1301,7 @@ describe('subfilter', () =>
                     ]},
             ]
         };
-        const sub = subfilter(filter, 'engagements', 'engagements.applications');
+        const sub = subfilter(filter, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(sub, filter);
     })
@@ -1387,7 +1320,7 @@ describe('subfilter', () =>
                 { 'engagements.z': 5 },
                 { 'engagements.applications.z': 6 },
             ]
-        }, 'engagements', 'engagements.applications');
+        }, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1417,7 +1350,7 @@ describe('subfilter', () =>
                 { 'engagements.z': 5 },
                 { 'engagements.z': 6 },
             ]
-        }, 'engagements', 'engagements.applications');
+        }, 'engagements', 'engagements.applications', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {
             $and: [
@@ -1438,7 +1371,7 @@ describe('subfilter', () =>
                 { x: 1 },
                 { y: 2 }
             ]
-        }, '', 'engagements');
+        }, '', 'engagements', 'engagements.applications');
 
         assert.deepStrictEqual(filter, {});
     })
@@ -1450,7 +1383,46 @@ describe('subfilter', () =>
                 { y: 2 }
             ]
         }
-        const sub = subfilter( filter, 'engagements', 'engagements' );
+        const sub = subfilter( filter, 'engagements', 'engagements', 'engagements.applications');
         assert.deepStrictEqual( sub, filter );
+    })
+
+    it('should transform $in to $elemMatch', () => {
+        const filter = {
+            'engagements.applications.x': { $in: [1, 2, 3]}
+        }
+        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $in: [1, 2, 3] } } } });
+    })
+
+    it('should transform $nin to $elemMatch', () => {
+        const filter = {
+            'engagements.applications.x': { $nin: [1, 2, 3]}
+        }
+        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $nin: [1, 2, 3] } } } });
+    })
+
+    it('should transform $not $in to $elemMatch', () => {
+        const filter = {
+            'engagements.applications.x': { $not: {$in: [1, 2, 3]}}
+        }
+        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $nin: [1, 2, 3] } } } });
+    })
+})
+
+describe('transformToElemMatch', () =>
+{
+    it('should transform $in', () =>
+    {
+        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$in", 'engagements.applications');
+        assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$in: [1, 2, 3]}}}});
+    })
+
+    it('should transform $nin', () =>
+    {
+        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$nin", 'engagements.applications');
+        assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$nin: [1, 2, 3]}}}});
     })
 })

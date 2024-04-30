@@ -632,130 +632,6 @@ function extractRecursively( obj: any /* TODO: ignoredFields? */ ): Set<string>
     return result;
 }
 
-const COMPARISON_OPERATORS = ['$eq', '$ne', '$gt', '$gte', '$lt', '$lte', '$in', '$nin'];
-const LOGICAL_OPERATORS = ['$and', '$or', '$nor', '$not'];
-const ELEMENT_OPERATORS = ['$exists', '$type'];
-const EVALUATION_OPERATORS = ['$regex', '$expr', '$jsonSchema', '$mod', '$text', '$where'];
-const ARRAY_OPERATORS = ['$all', '$elemMatch', '$size'];
-
-export function filterUnwindedProperties(input: any, prefix: string ): any | undefined
-{
-    if ( typeof input === 'string' && isPrefixedField( input, prefix ) )
-    {
-        return input
-    }
-
-    if ( typeof input !== 'object' || Array.isArray( input ) )
-    {
-        throw new Error('Invalid input', input);
-    }
-
-    const result: any = {};
-
-    for ( const [key, value] of Object.entries(input) )
-    {
-        if ( !key.startsWith('$') && !isPrefixedField( key, prefix ) )
-        {
-            // TODO: if value is object, it can be a field or an operator
-            if ( typeof value === 'object' )
-            {
-                const resolved = filterUnwindedProperties(value, prefix);
-                if ( resolved )
-                {
-                    result[key] = resolved;
-                }
-            }
-            else
-            {
-                result[key] = value;
-            }
-            continue;
-        }
-
-        if ( COMPARISON_OPERATORS.includes( key ) )
-        {
-            if ( Array.isArray( value ) )
-            {
-                if ( value.length === 2 && Array.isArray(value[1]) )
-                {
-                    if ( typeof value[0] !== 'object' && !isPrefixedField(value[0], prefix ) )
-                    {
-                        result[key] = value;
-                    }
-                }
-                else if ( value.every( (item: any) => !isPrefixedField( item, prefix ) ) )
-                {
-                    if ( typeof value[0] !== 'object' ) // $lt: [{$cond: {...}, 2]
-                    {
-                        result[key] = value;
-                    }
-                }
-            }
-            else if ( typeof value !== 'object' )
-            {
-                if ( !isPrefixedField( value, prefix ) )
-                {
-                    result[key] = value;
-                }
-            }
-        }
-        else if ( LOGICAL_OPERATORS.includes( key ) )
-        {
-            if ( Array.isArray( value ) )
-            {
-                const partial = [];
-
-                for ( const item of value )
-                {
-                    const resolved = filterUnwindedProperties(item, prefix);
-                    if ( resolved )
-                    {
-                        partial.push(resolved);
-                    }
-                }
-                if ( partial.length )
-                {
-                    result[key] = partial;
-                }
-            }
-            else if ( typeof value === 'object' )
-            {
-                const resolved = filterUnwindedProperties(value, prefix);
-                if ( resolved )
-                {
-                    result[key] = resolved;
-                }
-            }
-        }
-        else if ( ELEMENT_OPERATORS.includes( key ) || ARRAY_OPERATORS.includes( key ) )
-        {
-            result[key] = value;
-        }
-        else if ( EVALUATION_OPERATORS.includes( key ) )
-        {
-            if ( key === '$expr' )
-            {
-                const resolved = filterUnwindedProperties(value, prefix);
-                if ( resolved )
-                {
-                    result[key] = resolved;
-                }
-            }
-            else
-            {
-                result[key] = value;
-            }
-        }
-        else if ( key === '$function' && (value as any).args.every( (arg: any) => !isPrefixedField(arg, prefix) ) )
-        {
-            result[key] = value;
-        }
-        // TODO: more complex combinations - $cond inside $lt: [$cond, [ ... ]] and other aggregation operators
-    }
-
-    return Object.keys(result).length ? result : undefined;
-}
-
 function isPrefixedField( field: any, prefix: string ): boolean
 {
     return typeof field === 'string' && (field.startsWith(prefix) || field.startsWith('$' + prefix));
@@ -776,7 +652,7 @@ export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, path: string
     {
         const stage = stages.slice(0, i).join('.');
         const nextStage = stages.slice(0, i + 1).join('.');
-        result.push( optimizeMatch( subfilter( filter, stage, nextStage ) ) as MongoFilter<DBE> );
+        result.push( optimizeMatch( subfilter( filter, stage, nextStage, path ) ) as MongoFilter<DBE> );
     }
 
     return result;
@@ -787,8 +663,9 @@ export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, path: string
  * @param filter
  * @param stage
  * @param nextStage
+ * @param fullPath
  */
-export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string )
+export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string, fullPath: string )
 {
     const result: MongoFilter<any> = {};
 
@@ -803,7 +680,7 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
         {
             for ( const andCondition of value as any[] )
             {
-                const sub = subfilter( andCondition, stage, nextStage );
+                const sub = subfilter( andCondition, stage, nextStage, fullPath );
                 if ( Object.keys(sub).length )
                 {
                     if ( !result.$and )
@@ -820,7 +697,7 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
             for ( const orCondition of value as any[] )
             {
                 // try to extract, if they're equal, add, otherwise skip
-                const sub = subfilter( orCondition, stage, nextStage );
+                const sub = subfilter( orCondition, stage, nextStage, fullPath );
                 if ( !tmpFilter.$or )
                 {
                     tmpFilter.$or = [];
@@ -833,13 +710,113 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
                 result.$or = tmpFilter.$or;
             }
         }
-        else if ( !key.startsWith('$') && ( !key.startsWith(stage) || ( key.startsWith(stage) && !key.startsWith( nextStage ))))
+        else if ( shouldBeAddedToStage( key, value, stage, nextStage ) )
         {
             result[key] = value;
+        }
+        else if ( typeof value === 'object' && Object.keys(value).length === 1 )
+        {
+            const operator = value.$in
+                ? '$in'
+                : (value.$nin || value.$not?.$in ? '$nin' : undefined);
+
+            if ( operator )
+            {
+                const elemMatch = transformToElemMatch( key, value.$in || value.$nin || value.$not.$in, operator, fullPath );
+                if ( elemMatch )
+                {
+                    result[elemMatch.key] = elemMatch.value;
+                }
+            }
         }
     }
 
     return result;
+}
+
+export function transformToElemMatch( key: string, value: any[], operator: '$in' | '$nin', fullPath: string ): {key: string, value: {$elemMatch: object}} | false
+{
+    const path = splitToSubPaths( key, fullPath );
+    return {
+        key: path.prefix,
+        value: { $elemMatch: { [path.property]: {[operator]: value} } }
+    }
+}
+
+/**
+ * Splits given path into prefix that is part of the full model path and the rest
+ * @param path - path to split
+ * @param fullPath - reference full path
+ */
+function splitToSubPaths( path: string, fullPath: string ): {prefix: string, property: string}
+{
+    let prefix = '';
+    let property = '';
+    for ( const subpath of path.split('.') )
+    {
+        if ( fullPath.startsWith(prefix + subpath) )
+        {
+            prefix += subpath + '.';
+        }
+        else {
+            property += subpath + '.';
+        }
+    }
+
+    return {
+        prefix: prefix.endsWith('.') ? prefix.substring(0, prefix.length - 1) : prefix,
+        property: property.endsWith('.') ? property.substring(0, property.length - 1) : property
+    };
+}
+
+const BREAKING_OPERATORS = ['$not', '$in', '$nin', '$expr', '$elemMatch', '$function'];
+function shouldBeAddedToStage( key: string, value: any, stage: string, nextStage: string ): boolean
+{
+    // if key is in previous stages or current stage
+    if ( !key.startsWith('$') && ( !key.startsWith(stage) || ( key.startsWith(stage) && !key.startsWith( nextStage ))))
+    {
+        return true;
+    }
+
+    // if key is in next stages, add it has non-breaking operator
+    if ( key.startsWith(nextStage) )
+    {
+        if ( typeof value !== 'object' || ( typeof value === 'object' && allOperationsAllowed( value ) ) )
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function allOperationsAllowed( obj: object )
+{
+    const operations = getOperations(obj);
+    return operations.every( operation => !BREAKING_OPERATORS.includes(operation));
+}
+
+/**
+ * Gets all operations in an object recursively
+ * @param obj
+ */
+function getOperations( obj: object )
+{
+    const operations: string[] = [];
+
+    for ( const [key, value] of Object.entries(obj) )
+    {
+        if ( key.startsWith('$') )
+        {
+            operations.push(key);
+        }
+        if ( typeof value === 'object' )
+        {
+            operations.push(...getOperations(value));
+        }
+    }
+
+    return operations;
 }
 
 export const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
