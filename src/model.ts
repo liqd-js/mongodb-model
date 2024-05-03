@@ -1,35 +1,10 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter, UpdateOptions, MongoClientOptions, Sort } from 'mongodb';
-import {flowGet, DUMP, flowSet, Arr, isSet} from './helpers';
-import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
-import {ModelConverterError, ModelError} from './helpers/errors';
-import {
-    AbstractConverters,
-    ModelAggregateOptions,
-    CreateOptions,
-    ModelListOptions,
-    MongoRootDocument,
-    WithTotal,
-    AbstractConverter
-} from "./types";
+import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
+import {flowGet, DUMP, flowSet, Arr, isSet, convert} from './helpers';
+import {projectionToProject, isUpdateOperator, getCursor, resolveBSONObject} from './helpers';
+import {ModelError} from './helpers/errors';
+import {AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal} from "./types";
 import QueryBuilder from "./helpers/query-builder";
 export const Aggregator = require('@liqd-js/aggregator');
-
-export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
-{
-    try
-    {
-        return await converter( dbe );
-    }
-    catch( e )
-    {
-        if( e instanceof ModelConverterError )
-        {
-            throw e;
-        }
-
-        throw new ModelConverterError( model, conversion.toString(), dbe._id ?? dbe.id, e as Error );
-    }
-}
 
 export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
 {
