@@ -1,5 +1,7 @@
 import {Document, FindOptions, ObjectId, Sort, UpdateFilter, Filter as MongoFilter} from 'mongodb';
 import crypto from 'crypto';
+import {AbstractConverter} from "../types";
+import {ModelConverterError} from "./errors";
 
 type Filter = Record<string, any>;
 
@@ -7,6 +9,23 @@ export const toBase64 = ( str: string ) => Buffer.from( str, 'utf8' ).toString('
 export const fromBase64 = ( str: string ) => Buffer.from( str, 'base64url' ).toString('utf8');
 
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
+
+export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
+{
+    try
+    {
+        return await converter( dbe );
+    }
+    catch( e )
+    {
+        if( e instanceof ModelConverterError )
+        {
+            throw e;
+        }
+
+        throw new ModelConverterError( model, conversion.toString(), dbe._id ?? dbe.id, e as Error );
+    }
+}
 
 function stableStringify( obj: any, sort: boolean ): string
 {

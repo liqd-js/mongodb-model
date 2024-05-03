@@ -1,8 +1,7 @@
-import {Collection, Document, Filter, FindOptions, MongoClient, MongoClientOptions, ObjectId, UpdateFilter, UpdateOptions} from "mongodb";
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, DUMP, flowGet, flowSet, flowStart, isUpdateOperator, LOG, optimizeMatch, projectionToProject, resolveBSONObject, splitFilterToStages} from "./helpers";
+import {Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from "mongodb";
+import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, convert, DUMP, flowGet, flowSet, isUpdateOperator, LOG, optimizeMatch, projectionToProject, resolveBSONObject, splitFilterToStages} from "./helpers";
 import {ModelError} from "./helpers/errors";
-import Cache from "./helpers/cache";
-import {Aggregator, convert} from "./model"
+import {Aggregator} from "./model"
 import {AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from "./types";
 import {isSet} from "node:util/types";
 
@@ -260,15 +259,14 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
 
-        let total = 0, entries = await this.collection.aggregate( await pipeline ).toArray();
+        const { cursor, ...withoutCursor } = list;
 
-        if( list.count )
-        {
-            const { cursor, ...rest } = list;
-            let totalPipeline = await this.pipeline({ ...resolveBSONObject( rest ), projection });
-
-            total = await this.collection.aggregate([ ...totalPipeline.filter( p => !['$skip','$limit'].includes(Object.keys(p)[0]) ), { $count: 'count' }]).toArray().then( r => r[0]?.count ?? 0 );
-        }
+        const [ entries, total ] = await Promise.all([
+            this.collection.aggregate( await pipeline ).toArray(),
+            list.count ? this.collection.aggregate([
+                ...( await this.pipeline({ ...resolveBSONObject( withoutCursor ), projection }) ).filter( p => ![ '$skip', '$limit' ].includes( Object.keys(p)[0] ) ),
+                { $count: 'count' }]).toArray().then( r => r[0]?.count ?? 0 ) : 0
+        ])
 
         flowGet( 'log' ) && LOG( await pipeline );
 

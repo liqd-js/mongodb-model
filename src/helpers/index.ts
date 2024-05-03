@@ -1,6 +1,7 @@
+import {AbstractConverter} from "../types";
+import { ObjectId, Document } from 'mongodb';
+import {ModelConverterError} from "./errors";
 const Flow = require('@liqd-js/flow');
-
-import { ObjectId } from 'mongodb'; 
 
 export * from './mongo';
 
@@ -17,6 +18,23 @@ export function flowGet<T>( key: string, fallback?: T ): T
 export function flowSet( key: string, value: any )
 {
     Flow.set( key, value );
+}
+
+export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
+{
+    try
+    {
+        return await converter( dbe );
+    }
+    catch( e )
+    {
+        if( e instanceof ModelConverterError )
+        {
+            throw e;
+        }
+
+        throw new ModelConverterError( model, conversion.toString(), dbe._id ?? dbe.id, e as Error );
+    }
 }
 
 export function i18n( i18n: { [key: string]: string } | string ): string
