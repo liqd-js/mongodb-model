@@ -5,9 +5,6 @@ import {
     AbstractModel,
     AbstractPropertyModel,
     ModelAggregateOptions,
-    filterUnwindedProperties,
-    LOG,
-    ModelListOptions
 } from "../src";
 
 type JobDBE = { _id: ObjectId, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };

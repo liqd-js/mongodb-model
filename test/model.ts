@@ -56,7 +56,9 @@ describe('AbstractPropertyModel - application', () =>
     it('should create pipeline with filter', async () => {
         const pipeline = await applicationModel.pipeline({ filter: { name: 'a' } });
         assert.deepStrictEqual( pipeline, [
+            { "$match": { 'engagements.applications.name': 'a' } },
             applicationPipeline[0],
+            { "$match": { 'engagements.applications.name': 'a' } },
             applicationPipeline[1],
             { "$match": { 'engagements.applications.name': 'a' } },
             applicationPipeline[2],
@@ -66,8 +68,12 @@ describe('AbstractPropertyModel - application', () =>
     it('should create pipeline with custom property filter', async () =>
     {
         const pipeline = await applicationModel.pipeline({ customFilter: { applicationStatus: ['a'] } });
+        const elemMatch = {'$match': {'engagements.applications': {'$elemMatch': { status: { '$in': [ 'a' ] } }}}
+        }
         assert.deepStrictEqual( pipeline, [
+            elemMatch,
             applicationPipeline[0],
+            elemMatch,
             applicationPipeline[1],
             { "$match": { 'engagements.applications.status': { $in: ['a'] } } },
             applicationPipeline[2],
@@ -128,12 +134,6 @@ describe('AbstractPropertyModel - application', () =>
                     // {'$root._id': { $in: [new ObjectId('65e703099c9f4de34fc18db2')] }}
                 ]
             },
-            sort: { name: -1 },
-            limit: 100,
-            projection: {
-                name: 1
-            },
-            pipeline: [{$lookup: 1}]
         });
         LOG(pipeline);
         // assert.deepStrictEqual( pipeline, applicationPipeline);

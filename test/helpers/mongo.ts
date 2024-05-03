@@ -1089,98 +1089,33 @@ describe('extractFields', () =>
 
 describe('subfilter', () =>
 {
-    it('should extract filters from basic filter - root', () => {
-        const filter = subfilter({
+    it('should extract filters from basic filter', () => {
+        const input = {
             'x': 1,
             'engagements.x': 2,
             'engagements.applications.x': 3,
-        }, '', 'engagements', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            'x': 1,
-        });
-    })
-
-    it('should extract filters from basic filter - first level', () => {
-        const filter = subfilter({
-            'x': 1,
-            'engagements.x': 2,
-            'engagements.applications.x': 3,
-        }, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            'x': 1,
-            'engagements.x': 2,
-        });
-    })
-
-    it('should extract filters from basic filter - last level', () => {
-        const filter = subfilter({
-            'x': 1,
-            'engagements.x': 2,
-            'engagements.applications.x': 3,
-        }, 'engagements.applications', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            'x': 1,
-            'engagements.x': 2,
-            'engagements.applications.x': 3,
-        });
+        }
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     })
 
     it('should extract filters from simple $and - root', () => {
-        const filter = subfilter({
+        const input = {
             $and: [
                 { 'x': 1 },
                 { 'engagements.x': 2 },
                 { 'engagements.applications.x': 3 },
             ]
-        }, '', 'engagements', 'engagements.applications');
+        }
 
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { 'x': 1 },
-            ]
-        });
-    })
-
-    it('should extract filters from simple $and - first level', () => {
-        const filter = subfilter({
-            $and: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-                { 'engagements.applications.x': 3 },
-            ]
-        }, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-            ]
-        });
-    })
-
-    it('should extract filters from simple $and - last level', () => {
-        const filter = subfilter({
-            $and: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-                { 'engagements.applications.x': 3 },
-            ]
-        }, 'engagements.applications', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-                { 'engagements.applications.x': 3 },
-            ]
-        });
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     })
 
     it('should extract filters from nested $and - root', () => {
-        const filter = subfilter({
+        const input = {
             $and: [
                 { 'x': 1 },
                 { $and: [
@@ -1189,125 +1124,29 @@ describe('subfilter', () =>
                         { 'engagements.applications.x': 3 },
                     ]},
             ]
-        }, '', 'engagements', 'engagements.applications');
+        }
 
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { 'x': 1 },
-                {
-                    $and: [
-                        { 'y': 2 },
-                    ]
-                }
-            ]
-        });
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     });
 
-    it('should extract filters from nested $and - root - empty', () => {
-        const filter = subfilter({
-            $and: [
-                { $and: [
-                        { 'engagements.x': 2 },
-                        { 'engagements.applications.x': 3 },
-                    ]},
-            ]
-        }, '', 'engagements', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {});
-    });
-
-    it('should extract filters from nested $and - first level', () => {
-        const filter = subfilter({
-            $and: [
-                { 'x': 1 },
-                { $and: [
-                    { 'y': 2 },
-                    { 'engagements.x': 2 },
-                    { 'engagements.applications.x': 3 },
-                ]},
-            ]
-        }, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { 'x': 1 },
-                {
-                    $and: [
-                        { 'y': 2 },
-                        { 'engagements.x': 2 },
-                    ]
-                }
-            ]
-        });
-    });
-
-    it('should not extract partial filters from basic $or - root', () => {
-        const filter = subfilter({
+    it('should extract partial filters from basic $or - root', () => {
+        const input = {
             $or: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-                { 'engagements.applications.x': 3 },
+                {'x': 1},
+                {'engagements.x': 2},
+                {'engagements.applications.x': 3},
             ]
-        }, '', 'engagements', 'engagements.applications');
+        }
 
-        assert.deepStrictEqual(filter, {});
-    })
-
-    it('should not extract partial filters from basic $or - first level', () => {
-        const filter = subfilter({
-            $or: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-                { 'engagements.applications.x': 3 },
-            ]
-        }, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {});
-    })
-
-
-    it('should extract filters from basic $or - first level', () => {
-        const filter = {
-            $or: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-            ]
-        };
-        const sub = subfilter(filter, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(sub, filter);
-    })
-
-    it('should extract filter from basic $or - last level', () => {
-        const filter = {
-            $or: [
-                { 'x': 1 },
-                { 'engagements.x': 2 },
-                { 'engagements.applications.x': 3 },
-            ]
-        };
-        const sub = subfilter(filter, 'engagements.applications', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(sub, filter);
-    })
-
-    it('should extract filter from nested $or - root', () => {
-        const filter = {
-            $or: [
-                { 'x': 1 },
-                { $or: [
-                        { 'y': 2 },
-                        { 'engagements.x': 2 },
-                    ]},
-            ]
-        };
-        const sub = subfilter(filter, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(sub, filter);
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     })
 
     it('should extract filter from combination of $and and $or - root', () => {
-        const filter = subfilter({
+        const input = {
             $and: [
                 { x: 1 },
                 { 'engagements.x': 2 },
@@ -1320,48 +1159,11 @@ describe('subfilter', () =>
                 { 'engagements.z': 5 },
                 { 'engagements.applications.z': 6 },
             ]
-        }, 'engagements', 'engagements.applications', 'engagements.applications');
+        }
 
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { x: 1 },
-                { 'engagements.x': 2 },
-                {
-                    $or: [
-                        { 'engagements.x': 3 },
-                        { 'engagements.y': 4 },
-                    ]
-                },
-            ]
-        });
-    })
-
-    it('should extract filter from combination of $and and $or - nested', () => {
-        const filter = subfilter({
-            $and: [
-                { x: 1 },
-                { 'engagements.x': 2 },
-                { $or: [
-                    { 'engagements.applications.x': 3 },
-                    { 'engagements.y': 4 },
-                ]},
-            ],
-            $or: [
-                { 'engagements.z': 5 },
-                { 'engagements.z': 6 },
-            ]
-        }, 'engagements', 'engagements.applications', 'engagements.applications');
-
-        assert.deepStrictEqual(filter, {
-            $and: [
-                { x: 1 },
-                { 'engagements.x': 2 },
-            ],
-            $or: [
-                { 'engagements.z': 5 },
-                { 'engagements.z': 6 },
-            ]
-        });
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     })
 
     it('should skip unsupported operator', () => {
