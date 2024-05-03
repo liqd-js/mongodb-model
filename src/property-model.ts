@@ -1,9 +1,10 @@
 import {Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from "mongodb";
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, convert, DUMP, flowGet, flowSet, isUpdateOperator, LOG, optimizeMatch, projectionToProject, resolveBSONObject, splitFilterToStages} from "./helpers";
+import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, convert, DUMP, flowGet, flowSet, isUpdateOperator, LOG, mergeFilters, optimizeMatch, projectionToProject, resolveBSONObject, splitFilterToStages} from "./helpers";
 import {ModelError} from "./helpers/errors";
 import {Aggregator} from "./model"
 import {AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from "./types";
 import {isSet} from "node:util/types";
+import QueryBuilder from "./helpers/query-builder";
 
 type MongoPropertyDocument = Document & { id: any };
 
@@ -64,39 +65,44 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
     {
         let { filter = {} as PropertyModelFilter<RootDBE, DBE>, ...options } = list;
+        const queryBuilder = new QueryBuilder<RootDBE>();
 
         let pipeline:  Document[] = [], prefix = '$';
 
         let accessFilter = await this.accessFilter();
-
         if( accessFilter )
         {
             pipeline.push({ $match: addPrefixToFilter( accessFilter, this.prefix ) });
         }
 
-        // add prefix to filter, projection, ...
         const custom = list.customFilter ? await this.resolveCustomFilter(list.customFilter) : undefined;
-        filter = addPrefixToFilter( optimizeMatch( { $and: [ filter, custom?.filter! ] } ) as Filter<DBE>, this.prefix );
 
-        const filterStages = splitFilterToStages( filter, this.prefix );
+        const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter ), this.prefix );
+        const stages = splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
 
-        const stages = this.prefix.split;
+        const subpaths = this.prefix.split('.');
 
-        // TODO: project after each stage - extend with fields used in the future stages
-        for ( let i = 0; i <= stages.length; i++ )
+        for ( let i = 0; i <= subpaths.length; i++ )
         {
             if ( i !== 0 )
             {
                 pipeline.push({$unwind: prefix = (prefix === '$' ? prefix : prefix + '.') + this.paths[i - 1].path});
             }
 
-            if ( filterStages[i] && Object.keys( filterStages[i] ).length )
+            if ( i < subpaths.length && stages[i] && Object.keys( stages[i] ).length )
             {
-                pipeline.push({ $match: filterStages[i] });
+                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i] }) );
             }
         }
 
-        //let $project: string | Filter<RootDBE> = '$' + this.prefix, $rootProject;
+        pipeline.push( ...await queryBuilder.pipeline({
+            filter: addPrefixToFilter( filter, this.prefix ),
+            customFilter: {
+                filter: custom?.filter ? addPrefixToFilter(custom?.filter, this.prefix) : {},
+                pipeline: custom?.pipeline ?? []
+            }
+        }));
+
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
         const {$root: rootProjection, ...propertyProjection} = options.projection ?? {}; // TODO add support for '$root.property' projection
@@ -124,32 +130,14 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             pipeline.push({ $replaceWith: $project });
         }
 
-        //TODO add support for '$root.property' projection if present in pipeline
-
-        if( custom?.pipeline )
-        {
-            pipeline.push( ...custom.pipeline );
-        }
-
-        if( options.pipeline )
-        {
-            pipeline.push( ...options.pipeline.map( resolveBSONObject ));
-
-            if( isSet( collectAddedFields( options.pipeline )))
-            {
-                pipeline.push({ $unset: collectAddedFields( options.pipeline )});
-            }
-        }
-
-        if( options.sort ){ pipeline.push({ $sort: options.sort }); }
-        if( options.skip ){ pipeline.push({ $skip: options.skip }); }
-        if( options.limit ){ pipeline.push({ $limit: options.limit }); }
-        // TODO rest of operators
-
-        if( accessFilter )
-        {
-            LOG( this.constructor.name, { pipeline });
-        }
+        // final stage
+        pipeline.push( ...await queryBuilder.pipeline({
+            sort: options.sort,
+            skip: options.skip,
+            limit: options.limit,
+            pipeline: options.pipeline,
+            projection: options.projection,
+        }) );
 
         return pipeline;
     }

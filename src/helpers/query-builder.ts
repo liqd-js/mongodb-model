@@ -1,35 +1,46 @@
 import {MongoRootDocument} from "../types";
-import {Document, Filter} from "mongodb";
-import {generateCursorCondition, isSet, optimizeMatch, resolveBSONObject, reverseSort} from "./mongo";
+import {Document, Filter, Sort} from "mongodb";
+import {collectAddedFields, generateCursorCondition, isSet, mergeFilters, optimizeMatch, resolveBSONObject, reverseSort} from "./mongo";
 
 export type ListParams<DBE extends MongoRootDocument> =
-    {
-        accessFilter?: () => Promise<Filter<DBE> | void>,
-        filter?: Filter<DBE>,
-        pipeline?: Document[],
-        // projection?: any,
-        sort?: any,
-        limit?: number,
-        cursor?: string
-    }
+{
+    accessFilter?: Filter<DBE>
+    filter?: Filter<DBE>
+    customFilter?: {filter: Filter<DBE>, pipeline: Document[]}
+    pipeline?: Document[]
+    projection?: Document,
+    skip?: number,
+    sort?: Sort
+    limit?: number
+    cursor?: string
+}
+
+const COUNT_IGNORE_STAGES = [ '$limit', '$skip', '$sort', '$project', '$addFields', '$unset' ];
 
 export default class QueryBuilder<DBE extends MongoRootDocument>
 {
-    async list( params: ListParams<DBE> )
+    async pipeline( params: ListParams<DBE> )
     {
-        let filter = params.filter || {};
+        const accessFilter = params.accessFilter
+        let filter = mergeFilters(
+            params.filter,
+            params.customFilter?.filter,
+            accessFilter,
+            params.cursor ? generateCursorCondition( params.cursor, params.sort || {} ) : undefined
+        );
 
-        const accessFilter = params.accessFilter && await params.accessFilter()
-
-        accessFilter && ( filter = isSet(filter) ? { $and: [ filter, accessFilter ] } : accessFilter );
-
-        params.cursor && ( filter = { $and: [ filter, generateCursorCondition( params.cursor, params.sort )]});
         let prev = params.cursor?.startsWith('prev:')
 
+        const addedFields = collectAddedFields( [...(params.pipeline || []), ...(params.customFilter?.pipeline || []) ] )
+
         return resolveBSONObject([
-            { $match: optimizeMatch( filter ) },
+            ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
+            ...( params.customFilter?.pipeline || [] ),
+            ...( params.projection ? [{ $project: params.projection }] : []),
             ...( params.pipeline || [] ),
+            ...( addedFields.length ? [{ $unset: addedFields }] : []),
             ...( params.sort ? [{ $sort: prev ? reverseSort( params.sort ) : params.sort }] : []),
+            ...( params.skip ? [{ $skip: params.skip }] : []),
             ...( params.limit ? [{ $limit: params.limit }] : []),
         ]) as Document[];
     }
@@ -37,10 +48,23 @@ export default class QueryBuilder<DBE extends MongoRootDocument>
     async count( params: ListParams<DBE> )
     {
         return [
-            ...await this.list( { ...params, cursor: undefined, sort: undefined, limit: undefined }),
+            ...this.clearCountPipeline( await this.pipeline({ ...params, cursor: undefined }) ),
             {
                 $count: 'count'
             }
         ]
+    }
+
+    /**
+     * Removes stages from the end of the pipeline that don't affect the count
+     */
+    private clearCountPipeline( stages: Document[] )
+    {
+        while ( stages.length > 0 && COUNT_IGNORE_STAGES.includes( Object.keys( stages[stages.length - 1] )[0] ))
+        {
+            stages = stages.slice( 0, -1 );
+        }
+
+        return stages;
     }
 }

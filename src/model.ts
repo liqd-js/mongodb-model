@@ -132,27 +132,17 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
         let prev = cursor?.startsWith('prev:'), last = true;
 
-        if( list.customFilter )
-        {
-            const custom = await this.resolveCustomFilter( list.customFilter );
-
-            if( custom.filter )
-            {
-                filter = { $and: [ filter, custom.filter ]};
-            }
-
-            if( custom.pipeline )
-            {
-                list.pipeline = list.pipeline ? [ ...custom.pipeline, ...list.pipeline ] : custom.pipeline;
-            }
-        }
-
-        const params = { filter, sort, accessFilter: this.accessFilter, cursor, pipeline: list.pipeline };
+        const customFilter = list.customFilter && await this.resolveCustomFilter( list.customFilter );
+        const params = {
+            filter, sort, customFilter, cursor,
+            accessFilter: await this.accessFilter() || undefined,
+            pipeline: list.pipeline
+        };
         const queryBuilder = new QueryBuilder<DBE>();
 
         let [ entries, total ] = await Promise.all(
             [
-                this.collection.aggregate( await queryBuilder.list( params )).toArray(),
+                this.collection.aggregate( await queryBuilder.pipeline( params )).toArray(),
                 list.count ? this.collection.aggregate( await queryBuilder.count( params ) ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
             ]);
 

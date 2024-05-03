@@ -139,6 +139,41 @@ describe('AbstractPropertyModel - application', () =>
         // assert.deepStrictEqual( pipeline, applicationPipeline);
     });
 
+    it('tmp2', async () => {
+        const options = {
+            filter: {
+                $and: [
+                    { 'id': new ObjectId('65e7053f3c67bebc2e959378')},
+                    { '$root.jobID': 123 },
+                    { '$root.engagements.recruiterID': { $not: {$in: [new ObjectId('65e7053f3c67bebc2e959378'), new ObjectId('65e7053f3c67bebc2e959378')]} } },
+                    { '$root.engagements.recruiterID': { $not: {$in: [new ObjectId('65e7053f3c67bebc2e959379'), new ObjectId('65e7053f3c67bebc2e959379')]} } },
+                    { 'candidateID': { $not: {$in: [new ObjectId('65e7053f3c67bebc2e959378'), new ObjectId('65e7053f3c67bebc2e959378')]} } },
+                    {
+                        $or: [
+                            { 'candidateID': new ObjectId('65e7053f3c67bebc2e959378')},
+                            {
+                                $expr: {
+                                    $function: {
+                                        body: 'function(candidateID, recruiterID) { return this.engagements.applications.candidateID === this.engagements.applications.recruiterID; }',
+                                        args: ['candidateID', 'recruiterID'],
+                                        lang: 'js'
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            sort: { name: 1 },
+            limit: 10,
+        }
+        const pipeline = await applicationModel.pipeline(options)
+        const newPipeline = await applicationModel.newPipeline(options)
+        LOG(pipeline);
+        LOG(newPipeline);
+        assert.deepStrictEqual( pipeline, newPipeline);
+    })
+
     it('should combine application and job custom filters - property + property');
 
     it('should combine application and position custom filters - property + property');
