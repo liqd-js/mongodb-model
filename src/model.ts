@@ -73,15 +73,12 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         const params = { filter, sort, accessFilter: this.accessFilter, cursor, pipeline: list.pipeline };
         const queryBuilder = new QueryBuilder<DBE>();
-        const pipe = await queryBuilder.list( params );
-        let promises = [ this.collection.aggregate( pipe ).toArray() ];
-
-        if ( list.count )
-        {
-            promises.push( this.collection.aggregate( await queryBuilder.count( params ) ).toArray().then( r => r[0]?.count ?? 0 ));
-        }
-
-        let [ entries, total ] = await Promise.all( promises );
+        
+        let [ entries, total ] = await Promise.all(
+        [
+            this.collection.aggregate( await queryBuilder.list( params )).toArray(),
+            list.count ? this.collection.aggregate( await queryBuilder.count( params ) ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
+        ]);
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
