@@ -67,7 +67,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
             if( custom.pipeline )
             {
-                list.pipeline = list.pipeline ? [ ...list.pipeline, ...custom.pipeline ] : custom.pipeline;
+                list.pipeline = list.pipeline ? [ ...custom.pipeline, ...list.pipeline ] : custom.pipeline;
             }
         }
 
