@@ -246,12 +246,12 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
 
-        const { cursor, ...withoutCursor } = list;
+        const { cursor, sort, limit, skip, ...countOptions } = list;
 
         const [ entries, total ] = await Promise.all([
             this.collection.aggregate( await pipeline ).toArray(),
             list.count ? this.collection.aggregate([
-                ...( await this.pipeline({ ...resolveBSONObject( withoutCursor ), projection }) ).filter( p => ![ '$skip', '$limit' ].includes( Object.keys(p)[0] ) ),
+                ...( await this.pipeline({ ...resolveBSONObject( countOptions ), projection }) ).filter( p => ![ '$skip', '$limit' ].includes( Object.keys(p)[0] ) ),
                 { $count: 'count' }]).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
