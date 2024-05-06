@@ -87,7 +87,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
             if ( i < subpaths.length && stages[i] && Object.keys( stages[i] ).length )
             {
-                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i], cursor: list.cursor, sort: list.sort }, false) );
+                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i], cursor: list.cursor, sort: list.sort }) );
             }
             else
             {
