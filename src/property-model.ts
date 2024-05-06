@@ -1,5 +1,5 @@
 import {Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from "mongodb";
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, collectAddedFields, convert, DUMP, flowGet, flowSet, isUpdateOperator, LOG, mergeFilters, optimizeMatch, projectionToProject, resolveBSONObject, splitFilterToStages} from "./helpers";
+import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, isUpdateOperator, LOG, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages} from "./helpers";
 import {ModelError} from "./helpers/errors";
 import {Aggregator} from "./model"
 import {AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from "./types";
@@ -62,22 +62,18 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
+    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {}, count: boolean = false ): Promise<Document[]>
     {
         let { filter = {} as PropertyModelFilter<RootDBE, DBE>, ...options } = list;
         const queryBuilder = new QueryBuilder<RootDBE>();
 
         let pipeline:  Document[] = [], prefix = '$';
 
-        let accessFilter = await this.accessFilter();
-        if( accessFilter )
-        {
-            pipeline.push({ $match: addPrefixToFilter( accessFilter, this.prefix ) });
-        }
-
+        const accessFilter = await this.accessFilter();
         const custom = list.customFilter ? await this.resolveCustomFilter(list.customFilter) : undefined;
+        const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, list.sort ?? {} ) : undefined;
 
-        const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter ), this.prefix );
+        const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
         const stages = splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
 
         const subpaths = this.prefix.split('.');
@@ -91,17 +87,19 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
             if ( i < subpaths.length && stages[i] && Object.keys( stages[i] ).length )
             {
-                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i] }) );
+                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i], cursor: list.cursor, sort: list.sort }, false) );
+            }
+            else
+            {
+                pipeline.push( ...await queryBuilder.pipeline({
+                    filter: stages[i],
+                    customFilter: {
+                        filter: {},
+                        pipeline: custom?.pipeline ?? []
+                    },
+                }));
             }
         }
-
-        pipeline.push( ...await queryBuilder.pipeline({
-            filter: addPrefixToFilter( filter, this.prefix ),
-            customFilter: {
-                filter: custom?.filter ? addPrefixToFilter(custom?.filter, this.prefix) : {},
-                pipeline: custom?.pipeline ?? []
-            }
-        }));
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
@@ -130,9 +128,10 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             pipeline.push({ $replaceWith: $project });
         }
 
-        // final stage
+        const prev = list.cursor?.startsWith('prev:');
+
         pipeline.push( ...await queryBuilder.pipeline({
-            sort: options.sort,
+            sort: options.sort && prev ? reverseSort( options.sort ) : options.sort,
             skip: options.skip,
             limit: options.limit,
             pipeline: options.pipeline,

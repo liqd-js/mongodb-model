@@ -119,11 +119,6 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
         return super.pipeline( options );
     }
 
-    public newPipeline( options: ModelAggregateOptions<EngagementDBE> )
-    {
-        return super.newPipeline( options );
-    }
-
     public async resolveCustomFilter( customFilter: any )
     {
         const filter: any = {};
@@ -169,11 +164,6 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
     public pipeline( options: ModelAggregateOptions<ApplicationDBE> )
     {
         return super.pipeline( options );
-    }
-
-    public newPipeline( options: ModelAggregateOptions<ApplicationDBE> )
-    {
-        return super.newPipeline( options );
     }
 
     public async resolveCustomFilter( customFilter: any )

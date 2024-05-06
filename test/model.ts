@@ -168,10 +168,7 @@ describe('AbstractPropertyModel - application', () =>
             limit: 10,
         }
         const pipeline = await applicationModel.pipeline(options)
-        const newPipeline = await applicationModel.newPipeline(options)
         LOG(pipeline);
-        LOG(newPipeline);
-        assert.deepStrictEqual( pipeline, newPipeline);
     })
 
     it('should combine application and job custom filters - property + property');
