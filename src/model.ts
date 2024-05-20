@@ -1,9 +1,9 @@
-import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
-import {flowGet, DUMP, flowSet, Arr, isSet, convert} from './helpers';
-import {projectionToProject, isUpdateOperator, getCursor, resolveBSONObject} from './helpers';
-import {ModelError} from './helpers/errors';
-import {AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal} from "./types";
-import QueryBuilder from "./helpers/query-builder";
+import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
+import { flowGet, DUMP, flowSet, Arr, isSet, convert } from './helpers';
+import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
+import { ModelError } from './helpers/errors';
+import { AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal } from './types';
+import QueryBuilder from './helpers/query-builder';
 export const Aggregator = require('@liqd-js/aggregator');
 
 export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
@@ -33,6 +33,10 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         });
     }
 
+    protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
+    public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
+    public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
+
     protected async pipeline( options: ModelAggregateOptions<DBE> ): Promise<Document[]>
     {
         let { filter, projection } = options;
@@ -55,10 +59,6 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         return pipeline;
     }
-
-    protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
-    public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
-    public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: CreateOptions ): Promise<DTO['id']>
     {

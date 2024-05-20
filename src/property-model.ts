@@ -1,12 +1,12 @@
-import {Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from "mongodb";
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, isUpdateOperator, LOG, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages} from "./helpers";
-import {ModelError} from "./helpers/errors";
-import {Aggregator} from "./model"
-import {AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from "./types";
-import {isSet} from "node:util/types";
-import QueryBuilder from "./helpers/query-builder";
+import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
+import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
+import { ModelError } from './helpers/errors';
+import { Aggregator } from './model'
+import { AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from './types';
+import { isSet } from 'node:util/types';
+import QueryBuilder from './helpers/query-builder';
 
-type MongoPropertyDocument = Document & { id: any };
+type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 
 export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
 {
@@ -14,7 +14,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     private paths;
     private prefix;
 
-    protected constructor( public collection: Collection<RootDBE>, private path: string, public converters: Converters )
+    protected constructor( public collection: Collection<RootDBE>, path: string, public converters: Converters )
     {
         this.paths = [...path.matchAll(/[^\[\]]+(\[\])?/g)].map( m => ({ path: m[0].replace(/^\./,'').replace(/\[\]$/,''), array: m[0].endsWith('[]')}));
         this.prefix = this.paths.map( p => p.path ).join('.');
@@ -23,31 +23,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             try
             {
-                let perf = new Benchmark();
+                let pipeline = await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: this.converters[conversion].projection });
 
-                const { converter, projection } = this.converters[conversion];
+                flowGet('log') && ( console.log( this.constructor.name + '::get', ids ), DUMP( pipeline ));
 
-                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find aggregator (${ids.length})` );
-
-                const entries = await this.collection.aggregate( await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection })).toArray();
-
-                let find = perf.step();
-
-                //const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe.id ?? dbe._id ), convert( this, converter, dbe as DBE, conversion )), i ), new Map());
-                const index = entries.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe.id ?? dbe._id ), dbe as DBE ), i ), new Map());
-
-                const result = Promise.all( ids.map( id => index.get( id ) ?? null ));
-
-                /*for( let i = 0; i < ids.length; ++i )
-                {
-                    this.models.set( ids[i], result[i] );
-                }*/
-
-                let convetor = perf.step();
-
-                flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
-
-                return result;
+                return map( ids, await this.collection.aggregate( pipeline ).toArray() as DBE[], ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id ));
             }
             catch( e )
             {
@@ -61,6 +41,10 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         });
     }
 
+    protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
+    public dbeID( id: DTO['id'] | DBE['id'] ): DBE['id']{ return id as DBE['id']; }
+    public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
+
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
     protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {}, count: boolean = false ): Promise<Document[]>
     {
@@ -70,7 +54,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         let pipeline:  Document[] = [], prefix = '$';
 
         const accessFilter = await this.accessFilter();
-        const custom = list.customFilter ? await this.resolveCustomFilter(list.customFilter) : undefined;
+        const custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
         const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, list.sort ?? {} ) : undefined;
 
         const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
@@ -82,16 +66,17 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             if ( i !== 0 )
             {
-                pipeline.push({$unwind: prefix = (prefix === '$' ? prefix : prefix + '.') + this.paths[i - 1].path});
+                pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + this.paths[i - 1].path });
             }
 
             if ( i < subpaths.length && stages[i] && Object.keys( stages[i] ).length )
             {
-                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i], cursor: list.cursor, sort: list.sort }) );
+                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i], cursor: list.cursor, sort: list.sort }));
             }
             else
             {
-                pipeline.push( ...await queryBuilder.pipeline({
+                pipeline.push( ...await queryBuilder.pipeline(
+                {
                     filter: stages[i],
                     customFilter: {
                         filter: {},
@@ -103,15 +88,15 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
-        const {$root: rootProjection, ...propertyProjection} = options.projection ?? {}; // TODO add support for '$root.property' projection
+        const { $root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
 
-        if (isSet(propertyProjection))
+        if( isSet( propertyProjection ))
         {
-            $project = addPrefixToFilter(projectionToProject({id: 1, ...propertyProjection}), this.prefix, false)
+            $project = addPrefixToFilter( projectionToProject({ id: 1, ...propertyProjection }), this.prefix, false )
         }
-        if (isSet(rootProjection))
+        if( isSet( rootProjection ))
         {
-            $rootProject = typeof rootProjection === 'object' ? addPrefixToFilter(projectionToProject(rootProjection), '$$ROOT', false) : '$$ROOT'
+            $rootProject = typeof rootProjection === 'object' ? addPrefixToFilter( projectionToProject( rootProjection ), '$$ROOT', false ) : '$$ROOT'
         }
 
         if( $rootProject )
@@ -140,10 +125,6 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         return pipeline;
     }
-
-    protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
-    public dbeID( id: DTO['id'] | DBE['id'] ): DBE['id']{ return id as DBE['id']; }
-    public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     /*public async create(  parentID<> dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
     {
@@ -183,7 +164,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet('log') && LOG({res});
 
-        return {matchedCount: res.matchedCount, modifiedCount: res.modifiedCount}
+        return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
     }
 
     public async get( id: DTO['id'] | DBE['id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
@@ -194,44 +175,25 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
     public async get<K extends keyof Converters>( id: DTO['id'] | DBE['id'] | Array<DTO['id'] | DBE['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
-        //let perf = new Benchmark();
-        //let find = perf.step();
-        //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
-
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
         const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
+
+        console.log( entries );
 
         if( filtered ){ entries.filter( Boolean )}
 
         return Array.isArray( id ) ? entries : entries[0] ?? null as any;
-
-        /*
-
-        const { converter, projection } = this.converters[conversion];
-
-        if( !Array.isArray( id ))
-        {
-            const entry = await this.abstractFindAggregator.call( id, conversion ) as DBE | null;
-
-            return entry ? convert( this, converter, entry as DBE, conversion ) : null;
-        }
-
-        let entries: any = await this.abstractFindAggregator.call( id, conversion ) as Array<Awaited<DBE|null>>;
-
-        entries = await Promise.all( entries.map(( entry: any ) => entry ? convert( this, converter, entry as DBE, conversion ) : null ));
-
-        return filtered ? entries.filter( Boolean ) : entries;*/
     }
 
-    public async find<K extends keyof Converters>(filter: PropertyModelFilter<RootDBE,DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
+    public async find<K extends keyof Converters>( filter: PropertyModelFilter<RootDBE,DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
-        let cursor = this.collection.aggregate( await this.pipeline({ filter, projection }));
+        const pipeline = await this.pipeline({ filter, projection, sort, limit: 1 });
 
-        if( sort ){ cursor = cursor.sort( sort )}
+        flowGet('log') && ( console.log( this.constructor.name + '::find', filter ), DUMP( pipeline ));
 
-        const dbe = ( await cursor.limit(1).toArray())[0];
+        const dbe = ( await this.collection.aggregate( pipeline ).toArray())[0];
 
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
     }

@@ -1,6 +1,6 @@
-import {MongoClient, MongoClientOptions} from "mongodb";
-import Cache from "./helpers/cache";
-import {flowStart} from "./helpers";
+import { MongoClient, MongoClientOptions } from 'mongodb';
+import Cache from './helpers/cache';
+import { flowStart } from './helpers';
 
 export * from 'mongodb';
 export * from './types';

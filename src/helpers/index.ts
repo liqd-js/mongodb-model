@@ -37,6 +37,15 @@ export async function convert<DBE extends Document>( model: object, converter: A
     }
 }
 
+export function map<T,E>( ids: T[], entries: E[], getID: ( e: E ) => T ): Array<E | null>
+{
+    console.log({ entries });
+
+    const index = new Map<T,E>( entries.map( e => [ getID( e ), e ] ));
+
+    return ids.map( id => index.get( id ) ?? null );
+}
+
 export function i18n( i18n: { [key: string]: string } | string ): string
 {
     if( typeof i18n === 'string' ){ return i18n }
