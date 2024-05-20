@@ -56,3 +56,5 @@ export type AbstractConverters<DBE extends Document> =
     {
         [key: string]: AbstractConverterOptions<DBE>
     }
+
+export type UpdateResponse = { matchedCount: number, modifiedCount: number };

@@ -2,7 +2,15 @@ import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, Upda
 import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, getCursor, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
-import { AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from './types';
+import {
+    AbstractConverters,
+    MongoRootDocument,
+    PropertyModelAggregateOptions,
+    PropertyModelFilter,
+    PropertyModelListOptions,
+    UpdateResponse,
+    WithTotal
+} from './types';
 import { isSet } from 'node:util/types';
 import QueryBuilder from './helpers/query-builder';
 
@@ -130,7 +138,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         return _id;
     }*/
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<{matchedCount: number, modifiedCount: number}>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<UpdateResponse>
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};

@@ -1,8 +1,8 @@
-import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
+import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
 import {flowGet, DUMP, flowSet, Arr, isSet, convert, LOG} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
 import { ModelError } from './helpers/errors';
-import { AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal } from './types';
+import { AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse } from './types';
 import QueryBuilder from './helpers/query-builder';
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -91,7 +91,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         throw new Error('Method not implemented.');
     }
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<{matchedCount: number, modifiedCount: number}>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<UpdateResponse>
     {
         const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
         return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
