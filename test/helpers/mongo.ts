@@ -894,6 +894,48 @@ describe('optimizeMatch', () =>
         const optimized = optimizeMatch(match);
         assert.deepStrictEqual(optimized, match);
     });
+
+    it('should optimize $elemMatch with single condition', () => {
+        const match = {
+            $and: [
+                { $or: [ { a: { $elemMatch: { b: 1 } } } ] },
+                { $or: [ { a: { $elemMatch: { c: 2 } } } ] },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: { b: 1, c: 2 } });
+    })
+
+    it('should not optimize $elemMatch with multiple conditions', () => {
+        const match = {
+            $and: [
+                { a: { $elemMatch: { b: 1, c: 2 } } },
+                { a: { $elemMatch: { d: 2 } } }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: { $elemMatch: { b: 1, c: 2 }, d: 2 } });
+    });
+
+    it('should optimize $in, $nin, $not $in with single condition', () => {
+        const match = {
+            a: { $in: [1] },
+            b: { $nin: [3] },
+            c: { $not: { $in: [5] } },
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: 1, b: { $ne: 3 }, c: { $ne: 5 } });
+    })
+
+    it('should not optimize $in, $nin, $not $in with multiple conditions', () => {
+        const match = {
+            a: { $in: [1, 2] } ,
+            b: { $nin: [3, 4] } ,
+            c: { $not: { $in: [5, 6] } },
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
 })
 
 describe('mergeProperties', () => {

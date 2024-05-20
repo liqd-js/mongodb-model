@@ -405,7 +405,35 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
         }
         else
         {
-            result[key] = value;
+            if ( value.$in && value.$in.length === 1 )
+            {
+                result[key] = value.$in[0];
+            }
+            else if ( value.$nin && value.$nin.length === 1 )
+            {
+                result[key] = { $ne: value.$nin[0] };
+            }
+            else if ( value.$not && value.$not.$in && value.$not.$in.length === 1 )
+            {
+                result[key] = { $ne: value.$not.$in[0] };
+            }
+            else if ( value.$elemMatch )
+            {
+                const elemMatch = optimizeMatch(value.$elemMatch);
+                if ( elemMatch && Object.keys(elemMatch).length === 1 && !Object.keys(elemMatch).every( key => key.startsWith('$')) )
+                {
+                    const [elemMatchKey, elemMatchValue] = Object.entries(elemMatch)[0];
+                    result[key + '.' + elemMatchKey] = elemMatchValue;
+                }
+                else
+                {
+                    result[key] = value;
+                }
+            }
+            else
+            {
+                result[key] = value;
+            }
         }
     }
 
