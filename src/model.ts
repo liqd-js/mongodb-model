@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, flowSet, Arr, isSet, convert } from './helpers';
+import {flowGet, DUMP, flowSet, Arr, isSet, convert, LOG} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
 import { ModelError } from './helpers/errors';
 import { AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal } from './types';
@@ -129,12 +129,12 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     public async list<K extends keyof Converters>(list: ModelListOptions<DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, projection, cache } = this.converters[conversion];
-        let { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
-        let prev = cursor?.startsWith('prev:'), last = true;
+        const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
+        const prev = cursor?.startsWith('prev:');
 
         const customFilter = list.customFilter && await this.resolveCustomFilter( list.customFilter );
         const params = {
-            filter, sort, customFilter, cursor,
+            filter, sort, customFilter, cursor, limit, ...options,
             accessFilter: await this.accessFilter() || undefined,
             pipeline: list.pipeline
         };
@@ -149,12 +149,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
             const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
-
-            if(( limit && ( i > 0 || ( cursor && ( !prev || !last ))) && !( last && !prev && i === entries.length - 1 )))
-            {
-                dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
-            }
-
+            dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
         }));
 
@@ -163,7 +158,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
             Object.defineProperty(result, 'total', { value: total ?? 0, writable: false });
         }
 
-        return result;
+        return prev ? result.reverse() : result;
     }
 
     public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE> ): Promise<T[]>

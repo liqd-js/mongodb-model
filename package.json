@@ -15,7 +15,7 @@
     "coverage": "nyc npm run test",
     "build": "rm -rf ./dist/* && tsc",
     "version": "rm -rf ./dist/* && tsc && npm publish",
-    "tmp": "ts-node test/test"
+    "tmp": "ts-node test/test-model"
   },
   "repository": {
     "type": "git",

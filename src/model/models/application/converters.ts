@@ -1,4 +1,4 @@
-import {AccountBasicDTO, AccountDbID, AccountID, ApplicationBasicDTO, ApplicationCreateDTO, ApplicationDBE, ApplicationDTO, ApplicationHistoryDTO, ApplicationListItemDTO, CDNUrl, CommercialsID, DocumentType, EngagementID, JobDbID, MediaCreateDTO, OrganizationID, ProgrammeDbID, ProgrammeLocationDbID, SalaryDTO} from '@ramp-global/types';
+import {AccountBasicDTO, AccountDbID, AccountID, ApplicationBasicDTO, ApplicationCreateDTO, ApplicationDBE, ApplicationDTO, ApplicationHistoryDTO, ApplicationID, ApplicationListItemDTO, CDNUrl, CommercialsID, DocumentType, EngagementID, JobDbID, MediaCreateDTO, OrganizationID, ProgrammeDbID, ProgrammeLocationDbID, SalaryDTO} from '@ramp-global/types';
 import Models from '../../index';
 
 export default class ApplicationConverters

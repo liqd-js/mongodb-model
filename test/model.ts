@@ -171,7 +171,12 @@ describe('AbstractPropertyModel - application', () =>
         LOG(pipeline);
     })
 
-    it('should combine application and job custom filters - property + property');
+    it('should combine application and job custom filters - property + property', async () => {
+        const res = await jobModel.list({limit: 5, sort: {title:1}, count: true})
+        const res2 = await jobModel.list({limit: 5, sort: {title:1}, count: true, cursor: 'prev:WyIoTmV0d29yayAmIFNlY3VyaXR5IEVuZ2luZWVyKSJd'})
+        LOG(res, res.total);
+        LOG(res2, res2.total);
+    });
 
     it('should combine application and position custom filters - property + property');
 

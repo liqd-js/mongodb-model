@@ -47,24 +47,22 @@ export default class QueryBuilder<DBE extends MongoRootDocument>
 
     async count( params: ListParams<DBE> )
     {
-        return [
-            ...this.clearCountPipeline( await this.pipeline({ ...params, cursor: undefined }) ),
-            {
-                $count: 'count'
-            }
-        ]
+        const { cursor, ...options } = params;
+        return this.buildCountPipeline(await this.pipeline({ ...options }));
     }
 
     /**
-     * Removes stages from the end of the pipeline that don't affect the count
+     * Removes stages from the end of the pipeline that don't affect the count, adds $count stage
      */
-    private clearCountPipeline( stages: Document[] )
+    buildCountPipeline( pipeline: Document[] )
     {
-        while ( stages.length > 0 && COUNT_IGNORE_STAGES.includes( Object.keys( stages[stages.length - 1] )[0] ))
+        while ( pipeline.length > 0 && COUNT_IGNORE_STAGES.includes( Object.keys( pipeline[pipeline.length - 1] )[0] ))
         {
-            stages = stages.slice( 0, -1 );
+            pipeline = pipeline.slice( 0, -1 );
         }
 
-        return stages;
+        pipeline.push({ $count: 'count' })
+
+        return pipeline;
     }
 }

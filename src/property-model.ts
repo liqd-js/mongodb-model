@@ -1,5 +1,5 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
+import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, getCursor, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
 import { AbstractConverters, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, WithTotal} from './types';
@@ -46,16 +46,16 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {}, count: boolean = false ): Promise<Document[]>
+    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
     {
-        let { filter = {} as PropertyModelFilter<RootDBE, DBE>, ...options } = list;
+        let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...options } = list;
         const queryBuilder = new QueryBuilder<RootDBE>();
 
         let pipeline:  Document[] = [], prefix = '$';
 
         const accessFilter = await this.accessFilter();
         const custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
-        const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, list.sort ?? {} ) : undefined;
+        const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
 
         const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
         const stages = splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
@@ -69,21 +69,14 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
                 pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + this.paths[i - 1].path });
             }
 
-            if ( i < subpaths.length && stages[i] && Object.keys( stages[i] ).length )
+            pipeline.push( ...await queryBuilder.pipeline(
             {
-                pipeline.push( ...await queryBuilder.pipeline({ filter: stages[i], cursor: list.cursor, sort: list.sort }));
-            }
-            else
-            {
-                pipeline.push( ...await queryBuilder.pipeline(
-                {
-                    filter: stages[i],
-                    customFilter: {
-                        filter: {},
-                        pipeline: custom?.pipeline ?? []
-                    },
-                }));
-            }
+                filter: stages[i],
+                customFilter: {
+                    filter: {},
+                    pipeline: custom?.pipeline ?? []
+                },
+            }));
         }
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
@@ -116,7 +109,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         const prev = list.cursor?.startsWith('prev:');
 
         pipeline.push( ...await queryBuilder.pipeline({
-            sort: options.sort && prev ? reverseSort( options.sort ) : options.sort,
+            sort: sort && prev ? reverseSort( sort ) : sort,
             skip: options.skip,
             limit: options.limit,
             pipeline: options.pipeline,
@@ -201,6 +194,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     public async list<K extends keyof Converters>(list: PropertyModelListOptions<RootDBE, DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Converters[K]['converter']>>>>>
     {
         const { converter, projection } = this.converters[conversion];
+        const prev = list.cursor?.startsWith('prev:');
+        const queryBuilder = new QueryBuilder();
 
         const pipeline = this.pipeline({ ...resolveBSONObject( list ), projection });
 
@@ -208,20 +203,25 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
 
-        const { cursor, sort, limit, skip, ...countOptions } = list;
+        const { cursor, sort = { id: 1 }, limit, skip, ...countOptions } = list;
 
         const [ entries, total ] = await Promise.all([
             this.collection.aggregate( await pipeline ).toArray(),
-            list.count ? this.collection.aggregate([
-                ...( await this.pipeline({ ...resolveBSONObject( countOptions ), projection }) ).filter( p => ![ '$skip', '$limit' ].includes( Object.keys(p)[0] ) ),
-                { $count: 'count' }]).toArray().then( r => r[0]?.count ?? 0 ) : 0
+            list.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...resolveBSONObject( countOptions ), projection }) ) ).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
-        flowGet( 'log' ) && LOG( await pipeline );
+        flowGet( 'log' ) && LOG( {
+            list: await pipeline,
+            total: list.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...resolveBSONObject( countOptions ), projection }) ) : undefined
+        } );
 
         let find = perf.step();
 
-        const result = Promise.all( entries.map( dbe => convert( this, converter, dbe as DBE, conversion ) as ReturnType<Converters[K]['converter']> ));
+        const result = await Promise.all( entries.map( (async (dbe, i) => {
+            const dto = await convert( this, converter, dbe as DBE, conversion ) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
+            dto.$cursor = getCursor( dbe, sort );
+            return dto;
+        } )));
 
         let convetor = perf.step();
 
@@ -232,7 +232,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             Object.defineProperty( result, 'total', { value: total ?? 0, writable: false });
         }
 
-        return result;
+        return prev ? result.reverse() : result;
     }
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE,DBE> ): Promise<T[]>

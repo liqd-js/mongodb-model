@@ -7,8 +7,8 @@ import {
     ModelAggregateOptions,
 } from "../src";
 
-type JobDBE = { _id: ObjectId, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
-type JobDTO = { _id: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
+type JobDBE = { _id: ObjectId, title: string, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
+type JobDTO = { _id: string, title: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
 
 type EngagementDBE = { id: ObjectId, agencyID: ObjectId, recruiterID: ObjectId, date: Date, applications: ApplicationDBE[] };
 type EngagementDTO = { id: string, agencyID: string, recruiterID: string, date: Date, applications: ApplicationDTO[] };
@@ -19,7 +19,7 @@ type ApplicationDTO = { id: string, date: Date, status: string };
 type PositionDBE = { id: ObjectId, events: { opened: Date, closed?: Date } };
 type PositionDTO = { id: string, events: { opened: Date, closed?: Date } };
 
-export const accessFilter = { $and: [{name: { $in: ['Test job 1 - all applications created after 2024-01-01'] } }, {}] };
+export const accessFilter = { $and: [] };
 
 /**
  * Pipelines
@@ -40,9 +40,10 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
                 dto: {
                     converter: ( dbe: JobDBE ) => ({
                         _id: dbe._id.toString(),
-                        name: dbe.name,
-                        positions: dbe.positions.map( position => positionModel.converters.dto.converter( position ) ),
-                        engagements: dbe.engagements.map( engagement => engagementModel.converters.dto.converter( engagement ) )
+                        title: dbe.title,
+                        // name: dbe.name,
+                        // positions: dbe.positions.map( position => positionModel.converters.dto.converter( position ) ),
+                        // engagements: dbe.engagements.map( engagement => engagementModel.converters.dto.converter( engagement ) )
                     }),
                 }
             }

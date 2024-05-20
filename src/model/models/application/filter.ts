@@ -42,8 +42,7 @@ export class ApplicationFilter
     {
         return [
             {
-                $project: {
-                    stages: 1,
+                $addFields: {
                     statusAt: {
                         $function: {
                             body: applicationStatusAt.toString(),
@@ -54,8 +53,8 @@ export class ApplicationFilter
                 }
             },
             {
-                $project: {
-                    stages: {
+                $addFields: {
+                    stagesAt: {
                         $function: {
                             body: function( stages: string[], statusAt: string )
                             {
