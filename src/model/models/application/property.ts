@@ -25,6 +25,8 @@ export default class ApplicationProperty
  */
 export function applicationStatusAt( history: any, date: Date, between?: DateInterval )
 {
+    if( !history ){ return "unknown"; }
+
     const filteredHistory = between
         ? history.filter( (event: any) => event.events.created <= date && event.events.created >= between.from )
         : history.filter( (event: any) => event.events.created <= date );

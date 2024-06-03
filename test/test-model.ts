@@ -18,8 +18,35 @@ async function test( )
         },
         limit: 3,
         sort: {
+            id: -1,
+        },
+        /*pipeline: [
+            ...ApplicationFilter.stagesAt( new Date('2024-01-01') ),
+            {
+                $match: {
+                    statusAt: 'hired'
+                }
+            }
+        ],*/
+    }, 'dto' );
+
+    console.log( res );
+
+    //@ts-ignore
+    console.log( res.map( r => ({ id: r.id, cursor: r.$cursor })));
+    /*
+
+    const res2 = await model.applications.list({
+        count: true,
+        filter: {
+            '$root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
+        },
+        limit: 3,
+        sort: {
             candidateApplicationID: -1,
         },
+        //@ts-ignore
+        cursor: 'prev:' + res[2].$cursor,
         pipeline: [
             ...ApplicationFilter.stagesAt( new Date('2024-01-01') ),
             {
@@ -30,8 +57,39 @@ async function test( )
         ],
     })
 
+    //@ts-ignore
+    console.log( res2.map( r => ({ id: r.candidateApplicationID, cursor: r.$cursor })));
 
-    const res2 = await model.applications.list({
+    const res3 = await model.applications.list({
+        count: true,
+        filter: {
+            '$root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
+        },
+        limit: 3,
+        sort: {
+            candidateApplicationID: -1,
+        },
+        //@ts-ignore
+        cursor: 'next:' + res[0].$cursor,
+        pipeline: [
+            ...ApplicationFilter.stagesAt( new Date('2024-01-01') ),
+            {
+                $match: {
+                    statusAt: 'hired'
+                }
+            }
+        ],
+    })
+
+    //@ts-ignore
+    console.log( res3.map( r => ({ id: r.candidateApplicationID, cursor: r.$cursor })));
+
+    return ;
+
+    return ;
+
+
+    const res22 = await model.applications.list({
         count: true,
         filter: {
             '$root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
@@ -51,7 +109,7 @@ async function test( )
         ],
     })
 
-    const res3 = await model.applications.list({
+    const res33 = await model.applications.list({
         count: true,
         filter: {
             '$root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
@@ -69,13 +127,13 @@ async function test( )
                 }
             }
         ],
-    }, 'test')
+    }, 'dbe')
 
     LOG(res, res.total);
     LOG(res2, res2.total);
     LOG(res3, res3.total);
 
-    // console.log( res );
+    // console.log( res );*/
 }
 
 model.scope( test, { log: true });

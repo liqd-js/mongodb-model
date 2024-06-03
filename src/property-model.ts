@@ -1,5 +1,5 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, getCursor, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, getCursor, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
 import {
@@ -11,7 +11,6 @@ import {
     UpdateResponse,
     WithTotal
 } from './types';
-import { isSet } from 'node:util/types';
 import QueryBuilder from './helpers/query-builder';
 
 type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
@@ -89,7 +88,9 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
-        const { $root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
+        const { _root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
+
+        console.log( 'ROOT PROJECTION SET', { rootProjection, propertyProjection });
 
         if( isSet( propertyProjection ))
         {
@@ -104,10 +105,16 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         {
             pipeline.push
             (
-                { $replaceWith: { $mergeObjects: [ $project, { _root: $rootProject }]}},
-                { $replaceWith: { $setField: { field: { $literal: '$root' }, input: '$$ROOT', value: '$_root' }}},
-                { $unset: '_root' }
+                { $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject }]}},
+                //{ $replaceWith: { $setField: { field: { $literal: '$root' }, input: '$$ROOT', value: '$@root' }}},
+                //{ $unset: '_root' }
             );
+            /*pipeline.push
+            (
+                { $replaceWith: { $mergeObjects: [ $project, { '$ROOT': $rootProject }]}},
+                { $replaceWith: { $setField: { field: { $literal: '$root' }, input: '$$ROOT', value: '$@root' }}},
+                { $unset: '_root' }
+            );*/
         }
         else
         {
@@ -121,8 +128,10 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             skip: options.skip,
             limit: options.limit,
             pipeline: options.pipeline,
-            projection: options.projection,
+            //projection: options.projection,
         }) );
+
+        DUMP( pipeline );
 
         return pipeline;
     }

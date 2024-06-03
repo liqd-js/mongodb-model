@@ -1,6 +1,6 @@
-import {MongoRootDocument} from "../types";
-import {Document, Filter, Sort} from "mongodb";
-import {collectAddedFields, generateCursorCondition, isSet, mergeFilters, optimizeMatch, resolveBSONObject, reverseSort} from "./mongo";
+import { MongoRootDocument } from '../types';
+import { Document, Filter, Sort } from 'mongodb';
+import { collectAddedFields, generateCursorCondition, isSet, mergeFilters, optimizeMatch, resolveBSONObject, reverseSort } from './mongo';
 
 export type ListParams<DBE extends MongoRootDocument> =
 {
