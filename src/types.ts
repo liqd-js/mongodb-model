@@ -4,7 +4,7 @@ export type CreateOptions = { duplicateIgnore?: boolean };
 export type MongoRootDocument = Document & { _id: any };
 export type WithTotal<T> = T & { total?: number };
 
-export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { $root?: Filter<RootDBE> };
+export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { _root?: Filter<RootDBE> };
 export type ModelListOptions<DBE extends Document> = FindOptions<DBE> &
     {
         filter? : Filter<DBE>,
@@ -19,7 +19,7 @@ export type PropertyModelListOptions<RootDBE extends Document, DBE extends Docum
         filter? : PropertyModelFilter<RootDBE, DBE>
         customFilter?: any,
         cursor?: string
-        projection? : FindOptions<DBE>['projection'] & { $root?: FindOptions<RootDBE>['projection'] },
+        projection? : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?: Document[],
         count?: boolean
     };
@@ -34,7 +34,7 @@ export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends 
     {
         filter? : PropertyModelFilter<RootDBE, DBE>
         customFilter?   : any,
-        projection? : FindOptions<DBE & { $root: RootDBE }>['projection']
+        projection? : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 
 export type AbstractConverter<DBE extends Document> = ( dbe: DBE ) => unknown | Promise<unknown>;

@@ -1,7 +1,6 @@
 import Model from '../src/model/index';
 import {ApplicationFilter} from "../src/model/models/application/filter";
 import {ObjectId} from "mongodb";
-import {LOG} from "../src";
 
 const model = new Model( 'mongodb://ramp-sandbox-admin:N9zWDpYbLQ8rr5fJCw8zE4hz@sandbox.ramp.global:27017/?authMechanism=DEFAULT' );
 
@@ -14,7 +13,7 @@ async function test( )
     const res = await model.applications.list({
         count: true,
         filter: {
-            '$root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
+            '_root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
         },
         limit: 3,
         sort: {

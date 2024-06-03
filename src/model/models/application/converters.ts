@@ -16,7 +16,7 @@ export default class ApplicationConverters
             },
             dto:
             {
-                projection: { id: 1, candidateID: 'idcko', '$root': { programmeID: 1 }},
+                projection: { id: 1, candidateID: 'idcko', '_root': { programmeID: 1 }},
                 converter: async( dbe: ApplicationDBE ): Promise<ApplicationDTO> =>
                 {
                     //@ts-ignore

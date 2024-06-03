@@ -72,7 +72,7 @@ export function sortProjection( sort: Sort, id: string ): Record<string, 1>
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
 {
     if( typeof filter === 'string' && filter.match(/^\$$ROOT\./) ){ return filter; }
-    if( typeof filter === 'string' && filter.match(/^\$root\./) ){ return '$' + filter.substring(6); }
+    if( typeof filter === 'string' && filter.match(/^_root\./) ){ return '$' + filter.substring(6); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
     if( typeof filter === 'object' &&
@@ -154,11 +154,11 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
     {
         if( filter.hasOwnProperty( key ))
         {
-            if( key === '$root' )
+            if( key === '_root' )
             {
                 Object.assign( newFilter, addPrefixToValue( filter[key], prefix, false ));
             }
-            else if(  key.startsWith('$root.') )
+            else if(  key.startsWith('_root' + '.') )
             {
                 newFilter[key.substring(6)] = addPrefixToValue( filter[key], prefix, false );
             }
@@ -241,7 +241,7 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
 
     for( let [ path, property ] of Object.entries( projection! ))
     {
-        objectSet( project, path.split('.'), typeof property === 'string' ? ( property.startsWith('$root.') ? property.replace(/^\$root/, '$$$ROOT') : '$' + property ) : '$' + path );
+        objectSet( project, path.split('.'), typeof property === 'string' ? ( property.startsWith('_root.') ? property.replace(/^_root/, '$$$ROOT') : '$' + property ) : '$' + path );
     }
 
     return project;

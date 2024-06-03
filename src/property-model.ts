@@ -103,18 +103,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         if( $rootProject )
         {
-            pipeline.push
-            (
-                { $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject }]}},
-                //{ $replaceWith: { $setField: { field: { $literal: '$root' }, input: '$$ROOT', value: '$@root' }}},
-                //{ $unset: '_root' }
-            );
-            /*pipeline.push
-            (
-                { $replaceWith: { $mergeObjects: [ $project, { '$ROOT': $rootProject }]}},
-                { $replaceWith: { $setField: { field: { $literal: '$root' }, input: '$$ROOT', value: '$@root' }}},
-                { $unset: '_root' }
-            );*/
+            pipeline.push({ $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject }]}});
         }
         else
         {
