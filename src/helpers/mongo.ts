@@ -72,7 +72,7 @@ export function sortProjection( sort: Sort, id: string ): Record<string, 1>
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
 {
     if( typeof filter === 'string' && filter.match(/^\$$ROOT\./) ){ return filter; }
-    if( typeof filter === 'string' && filter.match(/^_root\./) ){ return '$' + filter.substring(6); }
+    if( typeof filter === 'string' && filter.match(/^\$_root\./) ){ return '$' + filter.substring('$_root.'.length); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
     if( typeof filter === 'object' &&
@@ -158,9 +158,9 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
             {
                 Object.assign( newFilter, addPrefixToValue( filter[key], prefix, false ));
             }
-            else if(  key.startsWith('_root' + '.') )
+            else if(  key.startsWith('_root.') )
             {
-                newFilter[key.substring(6)] = addPrefixToValue( filter[key], prefix, false );
+                newFilter[key.substring('_root.'.length)] = addPrefixToValue( filter[key], prefix, false );
             }
             else if( !prefixKeys || key.startsWith('$') )
             {

@@ -10,14 +10,9 @@ async function test( )
 {
     // const app = await model.applications.get( 'b1cf05542624a700493074de' );
 
-    const res = await model.applications.list({
-        count: true,
+    const res = await model.applications.aggregate([], {
         filter: {
             '_root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
-        },
-        limit: 3,
-        sort: {
-            id: -1,
         },
         /*pipeline: [
             ...ApplicationFilter.stagesAt( new Date('2024-01-01') ),
@@ -27,7 +22,14 @@ async function test( )
                 }
             }
         ],*/
-    }, 'dto' );
+        // customFilter: {
+        //     applicationCreatedBetween: {
+        //         from: new Date('2024-01-01'),
+        //         to: new Date('2024-01-02'),
+        //     }
+        // }
+        projection: { id: 1, '_root.status': 1, '_root.engagements.status': 1 }
+    } );
 
     console.log( res );
 

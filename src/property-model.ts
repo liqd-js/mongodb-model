@@ -88,7 +88,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
-        const { _root: rootProjection, ...propertyProjection } = options.projection ?? {}; // TODO add support for '$root.property' projection
+        const { rootProjection, propertyProjection } = this.splitProjection(options.projection ?? {});
 
         console.log( 'ROOT PROJECTION SET', { rootProjection, propertyProjection });
 
@@ -273,5 +273,28 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
 
         return this;
+    }
+
+    private splitProjection( projection: PropertyModelListOptions<RootDBE, DBE>['projection'] ): {rootProjection?: any, propertyProjection?: any}
+    {
+        if ( !projection ) { return {}; }
+
+        let { _root: rootProjection, ...propertyProjection } = projection; // TODO add support for '$root.property' projection
+
+        // add to _root all properties from propertyProjection starting with _root
+        for ( let key in propertyProjection )
+        {
+            if( key.startsWith('_root.') )
+            {
+                if ( !rootProjection )
+                {
+                    rootProjection = {};
+                }
+                rootProjection[key.replace('_root.', '')] = propertyProjection[key];
+                delete propertyProjection[key];
+            }
+        }
+
+        return { rootProjection, propertyProjection };
     }
 }
