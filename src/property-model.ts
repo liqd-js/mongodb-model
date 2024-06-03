@@ -1,5 +1,26 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, getCursor, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
+import {
+    addPrefixToFilter,
+    addPrefixToUpdate,
+    Arr,
+    Benchmark,
+    convert,
+    DUMP,
+    flowGet,
+    flowSet,
+    generateCursorCondition,
+    getCursor,
+    getUsedFields,
+    isSet,
+    isUpdateOperator,
+    LOG,
+    map,
+    mergeFilters,
+    projectionToProject,
+    resolveBSONObject,
+    reverseSort,
+    splitFilterToStages
+} from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
 import {
@@ -67,23 +88,27 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
         const stages = splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
 
+        const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
         const subpaths = this.prefix.split('.');
 
         for ( let i = 0; i <= subpaths.length; i++ )
         {
+            const last = i === subpaths.length;
             if ( i !== 0 )
             {
                 pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + this.paths[i - 1].path });
             }
 
+            needRoot && last && pipeline.push({ $addFields: { _root: '$$ROOT' }});
             pipeline.push( ...await queryBuilder.pipeline(
             {
                 filter: stages[i],
-                customFilter: {
+                customFilter: last ? {
                     filter: {},
                     pipeline: custom?.pipeline ?? []
-                },
+                } : undefined,
             }));
+            needRoot && last && pipeline.push({ $unset: '_root' });
         }
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;

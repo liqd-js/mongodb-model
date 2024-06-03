@@ -22,12 +22,12 @@ async function test( )
                 }
             }
         ],*/
-        // customFilter: {
-        //     applicationCreatedBetween: {
-        //         from: new Date('2024-01-01'),
-        //         to: new Date('2024-01-02'),
-        //     }
-        // }
+        customFilter: {
+            applicationCreatedBetween: {
+                from: new Date('2024-01-01'),
+                to: new Date('2024-01-02'),
+            }
+        },
         projection: { id: 1, '_root.status': 1, '_root.engagements.status': 1 }
     } );
 

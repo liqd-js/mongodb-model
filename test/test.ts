@@ -25,7 +25,7 @@ export const accessFilter = { $and: [] };
  * Pipelines
  */
 export const jobCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
-export const applicationCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { '_root.programmeLocationID': new ObjectId(), 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
+export const applicationCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 
 export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<JobDBE>>
 {
