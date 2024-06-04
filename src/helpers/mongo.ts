@@ -235,16 +235,94 @@ export function objectGet( obj: Record<string, unknown>, path: string[] ): any
     }
 }
 
-export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection']): Record<string, unknown>
+export function isExclusionProjection<DBE extends Document>( projection: FindOptions<DBE>['projection'] ): boolean
 {
-    const project: Record<string, unknown> = {};
-
-    for( let [ path, property ] of Object.entries( projection! ))
+    if ( typeof projection !== 'object' || projection === null )
     {
-        objectSet( project, path.split('.'), typeof property === 'string' ? ( property.startsWith('_root.') ? property.replace(/^_root/, '$$$ROOT') : '$' + property ) : '$' + path );
+        return false;
     }
 
-    return project;
+    let isExclusion = undefined;
+    for( const value of Object.values( projection ))
+    {
+        if ( typeof value === 'number' && value === 0 )
+        {
+            if ( isExclusion === false )
+            {
+                throw new Error('Projection cannot contain both exclusion and inclusion');
+            }
+
+            isExclusion = true;
+        }
+        else if ( typeof value === 'object' && Object.keys( value ).every( key => !key.startsWith('$') ) )
+        {
+            const res = isExclusionProjection( value );
+            if ( isExclusion !== undefined && isExclusion !== res )
+            {
+                throw new Error('Projection cannot contain both exclusion and inclusion');
+            }
+
+            isExclusion = res;
+        }
+        else
+        {
+            if ( isExclusion === true )
+            {
+                throw new Error('Projection cannot contain both exclusion and inclusion');
+            }
+
+            isExclusion = false;
+        }
+    }
+
+    return isExclusion ?? false;
+}
+
+export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '' ): Record<string, unknown>
+{
+    const result: Document = {};
+
+    for ( const [ key, value ] of Object.entries( projection ))
+    {
+        if ( key.startsWith('$') )
+        {
+            result[key] = value;
+            continue;
+        }
+
+        switch ( typeof value )
+        {
+            case 'number':
+                if (value === 0)
+                {
+                    objectSet( result, key.split('.'), 0 );
+                }
+                else {
+                    objectSet( result, key.split('.'), '$' + prefixField(key, prefix) );
+                }
+                break;
+
+            case 'string':
+                objectSet( result, key.split('.'), value );
+                break;
+
+            case 'object':
+                objectSet( result, key.split('.'), projectionToProject( value, prefixField(key, prefix) ));
+                break;
+
+            default:
+                throw new Error('Unsupported projection value type');
+        }
+    }
+
+    return result;
+}
+
+function prefixField( field: string, prefix: string ): string
+{
+    if ( prefix === '' ) { return field; }
+
+    return prefix + '.' + field;
 }
 
 export function bsonValue( value: any )

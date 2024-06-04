@@ -10,7 +10,7 @@ import {
     flowSet,
     generateCursorCondition,
     getCursor,
-    getUsedFields,
+    getUsedFields, isExclusionProjection,
     isSet,
     isUpdateOperator,
     LOG,
@@ -81,16 +81,11 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         let pipeline:  Document[] = [], prefix = '$';
 
-        const accessFilter = await this.accessFilter();
         const custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
-        const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
-
-        const stageFilter = addPrefixToFilter( mergeFilters( filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
-        const stages = splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
-
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
-        const subpaths = this.prefix.split('.');
 
+        const stages = await this.filterStages( list );
+        const subpaths = this.prefix.split('.');
         for ( let i = 0; i <= subpaths.length; i++ )
         {
             const last = i === subpaths.length;
@@ -115,6 +110,9 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         const { rootProjection, propertyProjection } = this.splitProjection(options.projection ?? {});
 
+        const unsetFieldsRoot = isExclusionProjection( rootProjection ) && getUsedFields( [{$match: rootProjection}] ).used.map(el => ('_root.' + el)) || [];
+        const unsetFieldsProperty = isExclusionProjection( propertyProjection ) && getUsedFields( [{$match: propertyProjection}] ).used || [];
+
         console.log( 'ROOT PROJECTION SET', { rootProjection, propertyProjection });
 
         if( isSet( propertyProjection ))
@@ -123,7 +121,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         }
         if( isSet( rootProjection ))
         {
-            $rootProject = typeof rootProjection === 'object' ? addPrefixToFilter( projectionToProject( rootProjection ), '$$ROOT', false ) : '$$ROOT'
+            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? addPrefixToFilter( projectionToProject( rootProjection ), '$$ROOT', false ) : '$$ROOT'
         }
 
         if( $rootProject )
@@ -135,10 +133,15 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
             pipeline.push({ $replaceWith: $project });
         }
 
-        const prev = list.cursor?.startsWith('prev:');
+        const unsetFields = [...unsetFieldsProperty, ...unsetFieldsRoot];
+        if ( unsetFields.length )
+        {
+            pipeline.push({ $unset: unsetFields });
+        }
 
+        const prev = list.cursor?.startsWith('prev:');
         pipeline.push( ...await queryBuilder.pipeline({
-            sort: sort && prev ? reverseSort( sort ) : sort,
+            sort: prev ? reverseSort( sort ) : sort,
             skip: options.skip,
             limit: options.limit,
             pipeline: options.pipeline,
@@ -298,6 +301,18 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
 
         return this;
+    }
+
+    private async filterStages( list: PropertyModelListOptions<RootDBE, DBE> )
+    {
+        const sort = list.sort ?? { id: -1 };
+
+        const accessFilter = await this.accessFilter();
+        const custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
+        const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
+
+        const stageFilter = addPrefixToFilter( mergeFilters( list.filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
+        return splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
     }
 
     private splitProjection( projection: PropertyModelListOptions<RootDBE, DBE>['projection'] ): {rootProjection?: any, propertyProjection?: any}

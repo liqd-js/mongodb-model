@@ -1,5 +1,28 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, LOG, subfilter, transformToElemMatch} from '../../src/helpers';
+import {
+    addPrefixToFilter,
+    addPrefixToUpdate,
+    bsonValue,
+    collectAddedFields,
+    getUsedFields,
+    generateCursorCondition,
+    getCursor,
+    isUpdateOperator,
+    objectGet,
+    objectHash,
+    objectHashID,
+    objectSet,
+    optimizeMatch,
+    projectionToProject,
+    resolveBSONValue,
+    reverseSort,
+    sortProjection,
+    mergeProperties,
+    LOG,
+    subfilter,
+    transformToElemMatch,
+    isExclusionProjection
+} from '../../src/helpers';
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
@@ -323,21 +346,44 @@ describe('addPrefixToFilter', () =>
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix, false), expected, 'prefix added to keys when prefixKeys is false');
     });
 
-    it('should handle $root key correctly as nested object', () =>
+    it('should handle _root key correctly as nested object', () =>
     {
-        const filter = { $root: { a: { b: 1 } }, b: 2 };
+        const filter = { _root: { a: { b: 1 } }, b: 2 };
         const prefix = 'prefix';
         const expected = { a: { b: 1 }, 'prefix.b': 2 };
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
     });
 
-    it('should handle $root key correctly as concatenated string', () =>
+    it('should handle nested object', () =>
     {
-        const filter = { '$root.a.b': 1, b: 2 };
+        const filter = { a: { b: 1 }, b: 2 };
+        const prefix = 'prefix';
+        const expected = { 'prefix.a': { b: 1 }, 'prefix.b': 2 };
+        assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
+    });
+
+    it('should handle nested object with function', () =>
+    {
+        const filter = { a: { b: {$dateToString: {format: '%Y-%m-%d', date: '$model.date'} }}, b: 2 };
+        const prefix = 'prefix';
+        const expected = { 'prefix.a': { b: {$dateToString: {format: '%Y-%m-%d', date: '$prefix.model.date'} } }, 'prefix.b': 2 };
+        assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
+    });
+
+    it('should handle _root key correctly as concatenated string', () =>
+    {
+        const filter = { '_root.a.b': 1, b: 2 };
         const prefix = 'prefix';
         const expected = { 'a.b': 1, 'prefix.b': 2 };
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
     });
+
+    it('should prefix property inside $dateToString', () => {
+        const filter = { '_root.a': {$dateToString: {format: '%Y-%m-%d', date: '$_root.model.date'}} }
+        const prefix = 'prefix';
+        const expected = { 'a': { $dateToString: { format: '%Y-%m-%d', date: '$model.date' } } }
+        assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected);
+    })
 });
 
 describe('addPrefixToUpdate', () =>
@@ -451,14 +497,7 @@ describe('projectionToProject', () =>
     it('should handle projection with string property', () =>
     {
         const projection = { 'a.b': 'c' };
-        const expected = { 'a': { 'b': '$c' } };
-        assert.deepStrictEqual(projectionToProject(projection), expected);
-    });
-
-    it('should handle projection with string property starting with $root', () =>
-    {
-        const projection = { 'a.b': '$root.c' };
-        const expected = { 'a': { 'b': '$$ROOT.c' } };
+        const expected = { 'a': { 'b': 'c' } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
@@ -482,6 +521,50 @@ describe('projectionToProject', () =>
         const expected = { 'a': { 'b': { 'c': '$a.b.c', 'd': '$a.b.d' }}, 'c': '$c' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
+
+    it('should handle projection with nested properties - object style', () =>
+    {
+        const projection = { a: { b: {c: 1}, d: 1} };
+        const expected = { 'a': { 'b': { 'c': '$a.b.c' }, 'd': '$a.d' } };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    });
+
+    it('should handle projection with 0', () => {
+        const projection = { 'a.b': 0, 'a.c': 1 };
+        const expected = { 'a': { 'b': 0, 'c': '$a.c' } };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle $dateToString', () => {
+        const projection = { date: {$dateToString: {format: '%Y-%m-%d', date: '$_root.date'}} };
+        const expected = { date: { $dateToString: { format: '%Y-%m-%d', date: '$_root.date' } } };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle basic projection', () => {
+        const projection = { a: 1, b: 1 };
+        const expected = { a: '$a', b: '$b' };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle exclusion projection', () => {
+        const projection = { a: 0, b: 0 };
+        const expected = { a: 0, b: 0 };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle nested projection', () => {
+        const projection = { a: {b: 0, c: 1} };
+        const expected = { a: {b: 0, c: '$a.c'} };
+
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle nested projection 2', () => {
+        const projection = { a: {b: {c: 1}, d: 1} };
+        const expected = { a: {b: {c: '$a.b.c'}, d: '$a.d'} };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
 });
 
 describe('bsonValue', () =>
@@ -1268,5 +1351,37 @@ describe('transformToElemMatch', () =>
     {
         const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$nin", 'engagements.applications');
         assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$nin: [1, 2, 3]}}}});
+    })
+})
+
+describe('isExclusionProjection', () => {
+    it('should return true for projection with 0', () => {
+        const projection = { 'a.b': 0, 'a.c': 0 };
+        assert.strictEqual(isExclusionProjection(projection), true);
+    })
+
+    it('should return false for projection without 0', () => {
+        const projection = { 'a.b': 1, 'a.c': 1 };
+        assert.strictEqual(isExclusionProjection(projection), false);
+    })
+
+    it('should throw error for mixed projection', () => {
+        const projection = { 'a.b': 0, 'a.c': 1 };
+        assert.throws(() => isExclusionProjection(projection));
+    })
+
+    it('should return true for nested properties with 0', () => {
+        const projection = { a: { b: {c: 0, d: {e: 0}}} };
+        assert.strictEqual(isExclusionProjection(projection), true);
+    })
+
+    it('should return false for nested properties with 1', () => {
+        const projection = { a: { b: {c: 1, d: {e: 1}}} };
+        assert.strictEqual(isExclusionProjection(projection), false);
+    })
+
+    it('should throw error for mixed nested properties', () => {
+        const projection = { a: { b: {c: 1, d: {e: 0}}} };
+        assert.throws(() => isExclusionProjection(projection));
     })
 })

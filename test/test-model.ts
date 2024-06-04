@@ -28,7 +28,14 @@ async function test( )
                 to: new Date('2024-01-02'),
             }
         },
-        projection: { id: 1, '_root.status': 1, '_root.engagements.status': 1 }
+        projection: {
+            id: 1,
+            title: 1,
+            '_root.status': 0,
+            '_root.engagements': 0,
+            test: '$_root.test',
+            date: {$dateToString: {format: '%Y-%m-%d', date: '$_root.events.created'}},
+        }
     } );
 
     console.log( res );

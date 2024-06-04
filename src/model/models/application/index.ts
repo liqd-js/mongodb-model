@@ -27,10 +27,10 @@ export default class ApplicationModel extends AbstractPropertyModel<JobDBE, Appl
 
         // TODO: prefix?
 
-        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
-
-        customFilter.applicationStatus && (filter['status'] = { $in: customFilter.applicationStatus });
-        customFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(customFilter.applicationCreatedBetween));
+        // customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
+        //
+        // customFilter.applicationStatus && (filter['status'] = { $in: customFilter.applicationStatus });
+        // customFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(customFilter.applicationCreatedBetween));
 
         return { filter, pipeline: [{$match: {'_root.engagements.status': 'active'}}] };
     }
