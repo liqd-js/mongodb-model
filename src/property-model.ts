@@ -76,7 +76,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
     protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
     {
-        let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...options } = list;
+        let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...options } = resolveBSONObject(list);
         const queryBuilder = new QueryBuilder<RootDBE>();
 
         let pipeline:  Document[] = [], prefix = '$';
@@ -231,7 +231,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         const prev = list.cursor?.startsWith('prev:');
         const queryBuilder = new QueryBuilder();
 
-        const pipeline = this.pipeline({ ...resolveBSONObject( list ), projection });
+        const pipeline = this.pipeline({ ...list, projection });
 
         let perf = new Benchmark();
 
@@ -241,12 +241,12 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         const [ entries, total ] = await Promise.all([
             this.collection.aggregate( await pipeline ).toArray(),
-            list.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...resolveBSONObject( countOptions ), projection }) ) ).toArray().then( r => r[0]?.count ?? 0 ) : 0
+            list.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) ).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
         flowGet( 'log' ) && LOG( {
             list: await pipeline,
-            total: list.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...resolveBSONObject( countOptions ), projection }) ) : undefined
+            total: list.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) : undefined
         } );
 
         let find = perf.step();

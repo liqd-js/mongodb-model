@@ -9,7 +9,7 @@ async function test( )
 {
     // const app = await model.applications.get( 'b1cf05542624a700493074de' );
 
-    const res = await model.applications.aggregate([], 
+    const res = await model.applications.aggregate([],
     {
         filter: {
             '_root.programmeID': new ObjectId('63e29c4cdcc1dceb68cdeb8c'),
