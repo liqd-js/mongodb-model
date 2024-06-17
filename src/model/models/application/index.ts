@@ -5,7 +5,6 @@ import ApplicationConverters from './converters';
 
 import aggregations from "./aggregations";
 import {UpdateFilter} from "mongodb";
-import {applicationCreatedBetween, jobCreatedBetween} from "../../../../test/test";
 
 export default class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, ReturnType<typeof ApplicationConverters['create']>>
 {
