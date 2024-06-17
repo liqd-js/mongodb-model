@@ -1,5 +1,4 @@
 import Model from '../src/model/index';
-import {ApplicationFilter} from "../src/model/models/application/filter";
 import {ObjectId} from "mongodb";
 
 const model = new Model( 'mongodb://ramp-sandbox-admin:N9zWDpYbLQ8rr5fJCw8zE4hz@sandbox.ramp.global:27017/?authMechanism=DEFAULT' );
@@ -42,7 +41,7 @@ async function test( )
     console.log( res );
 
     //@ts-ignore
-    console.log( res.map( r => ({ id: r.id, cursor: r.$cursor })));
+    // console.log( res.map( r => ({ id: r.id, cursor: r.$cursor })));
     /*
 
     const res2 = await model.applications.list({

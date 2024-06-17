@@ -915,10 +915,11 @@ function shouldBeAddedToStage( key: string, value: any, stage: string, nextStage
     return false;
 }
 
-function allOperationsAllowed( obj: object )
+function allOperationsAllowed( obj: any )
 {
     const operations = getOperations(obj);
-    return operations.every( operation => !BREAKING_OPERATORS.includes(operation));
+    return operations.every( operation => !BREAKING_OPERATORS.includes(operation))
+        && ( obj['$exists'] === undefined || obj['$exists'] === true );
 }
 
 /**

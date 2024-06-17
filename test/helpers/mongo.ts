@@ -1303,6 +1303,15 @@ describe('subfilter', () =>
         assert.deepStrictEqual(filter, {});
     })
 
+    it('should skip {$exists: false}', () => {
+        const filter = {
+            'engagements.applications.events.submitted': {$exists: false}
+        };
+
+        assert.deepStrictEqual(subfilter(filter, '', 'engagements', 'engagements.applications'), {});
+        assert.deepStrictEqual(subfilter(filter, 'engagements.applications', 'engagements.applications', 'engagements.applications'), filter);
+    })
+
     it('should add unsupported operators at the last level', () => {
         const filter = {
             $unsupported: [
