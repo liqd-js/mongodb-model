@@ -231,22 +231,24 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
         const prev = list.cursor?.startsWith('prev:');
         const queryBuilder = new QueryBuilder();
 
-        const pipeline = this.pipeline({ ...list, projection });
+        const resolvedList = resolveBSONObject( list );
+
+        const pipeline = this.pipeline({ ...resolvedList, projection });
 
         let perf = new Benchmark();
 
         flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
 
-        const { cursor, sort = { id: 1 }, limit, skip, ...countOptions } = list;
+        const { cursor, sort = { id: 1 }, limit, skip, ...countOptions } = resolvedList;
 
         const [ entries, total ] = await Promise.all([
             this.collection.aggregate( await pipeline ).toArray(),
-            list.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) ).toArray().then( r => r[0]?.count ?? 0 ) : 0
+            resolvedList.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) ).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
         flowGet( 'log' ) && LOG( {
             list: await pipeline,
-            total: list.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) : undefined
+            total: resolvedList.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) : undefined
         } );
 
         let find = perf.step();
@@ -261,7 +263,7 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
         flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
 
-        if( list.count )
+        if( resolvedList.count )
         {
             Object.defineProperty( result, 'total', { value: total ?? 0, writable: false });
         }
