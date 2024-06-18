@@ -930,7 +930,7 @@ function getOperations( obj: object )
 {
     const operations: string[] = [];
 
-    for ( const [key, value] of Object.entries(obj) )
+    for ( const [key, value] of Object.entries(obj || {}) )
     {
         if ( key.startsWith('$') )
         {
