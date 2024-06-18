@@ -39,7 +39,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     protected async pipeline( options: ModelAggregateOptions<DBE> ): Promise<Document[]>
     {
-        let { filter, projection } = options;
+        let { filter, projection, ...rest } = resolveBSONObject( options );
 
         let pipeline: Document[] = [];
 
@@ -47,13 +47,13 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         if( accessFilter )
         {
-            pipeline.push({ $match: resolveBSONObject( accessFilter! )});
+            pipeline.push({ $match: accessFilter!});
         }
 
-        let custom = options.customFilter ? await this.resolveCustomFilter( options.customFilter ) : undefined;
+        let custom = rest.customFilter ? await this.resolveCustomFilter( rest.customFilter ) : undefined;
 
-        isSet( filter ) && pipeline.push({ $match: resolveBSONObject( filter! )});
-        isSet( custom?.filter ) && pipeline.push({ $match: resolveBSONObject( custom?.filter! )});
+        isSet( filter ) && pipeline.push({ $match: filter});
+        isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});
         isSet( custom?.pipeline ) && pipeline.push( ...custom?.pipeline! );
         isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
 
@@ -129,7 +129,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     public async list<K extends keyof Converters>(list: ModelListOptions<DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, projection, cache } = this.converters[conversion];
-        const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = list;
+        const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = resolveBSONObject(list);
         const prev = cursor?.startsWith('prev:');
 
         const customFilter = list.customFilter && await this.resolveCustomFilter( list.customFilter );

@@ -26,6 +26,7 @@ import {
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
+import {resolveBSONObject} from "../../dist";
 
 
 describe('objectHash', () =>

@@ -21,27 +21,28 @@ export default class QueryBuilder<DBE extends MongoRootDocument>
 {
     async pipeline( params: ListParams<DBE> )
     {
-        const accessFilter = params.accessFilter
+        const options = resolveBSONObject( params );
+        const accessFilter = options.accessFilter
         let filter = mergeFilters(
-            params.filter,
-            params.customFilter?.filter,
+            options.filter,
+            options.customFilter?.filter,
             accessFilter,
-            params.cursor ? generateCursorCondition( params.cursor, params.sort || {} ) : undefined
+            options.cursor ? generateCursorCondition( options.cursor, options.sort || {} ) : undefined
         );
 
-        let prev = params.cursor?.startsWith('prev:')
+        let prev = options.cursor?.startsWith('prev:')
 
-        const addedFields = collectAddedFields( [...(params.pipeline || []), ...(params.customFilter?.pipeline || []) ] )
+        const addedFields = collectAddedFields( [...(options.pipeline || []), ...(options.customFilter?.pipeline || []) ] )
 
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
-            ...( params.customFilter?.pipeline || [] ),
-            ...( params.projection ? [{ $project: params.projection }] : []),
-            ...( params.pipeline || [] ),
+            ...( options.customFilter?.pipeline || [] ),
+            ...( options.projection ? [{ $project: options.projection }] : []),
+            ...( options.pipeline || [] ),
             ...( addedFields.length ? [{ $unset: addedFields }] : []),
-            ...( params.sort ? [{ $sort: prev ? reverseSort( params.sort ) : params.sort }] : []),
-            ...( params.skip ? [{ $skip: params.skip }] : []),
-            ...( params.limit ? [{ $limit: params.limit }] : []),
+            ...( options.sort ? [{ $sort: prev ? reverseSort( options.sort ) : options.sort }] : []),
+            ...( options.skip ? [{ $skip: options.skip }] : []),
+            ...( options.limit ? [{ $limit: options.limit }] : []),
         ]) as Document[];
     }
 
