@@ -7,11 +7,11 @@ import QueryBuilder from './helpers/query-builder';
 import {AbstractModels} from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
-export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters> = never>
+export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters> = never, Models extends AbstractModels = never>
 {
     private abstractFindAggregator;
 
-    protected constructor( protected models: AbstractModels, public collection: Collection<DBE>, public converters: Converters, public filters?: Filters )
+    protected constructor( protected models: Models, public collection: Collection<DBE>, public converters: Converters, public filters?: Filters )
     {
         this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Converters ) =>
         {

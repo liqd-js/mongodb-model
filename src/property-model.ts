@@ -8,13 +8,13 @@ import {AbstractModels} from "./index";
 
 type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 
-export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters> = never>
+export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters> = never, Models extends AbstractModels = never>
 {
     private abstractFindAggregator;
     private paths;
     private prefix;
 
-    protected constructor( protected models: AbstractModels, public collection: Collection<RootDBE>, path: string, public converters: Converters, public filters?: Filters )
+    protected constructor( protected models: Models, public collection: Collection<RootDBE>, path: string, public converters: Converters, public filters?: Filters )
     {
         this.paths = [...path.matchAll(/[^\[\]]+(\[\])?/g)].map( m => ({ path: m[0].replace(/^\./,'').replace(/\[\]$/,''), array: m[0].endsWith('[]')}));
         this.prefix = this.paths.map( p => p.path ).join('.');

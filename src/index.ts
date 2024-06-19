@@ -11,7 +11,7 @@ export * from './model';
 export * from './property-model';
 
 const Clients = new Map<string, MongoClient>();
-type ModelInstance = AbstractModel<any, any, any, any> | AbstractPropertyModel<any, any, any, any, any>;
+type ModelInstance = AbstractModel<any, any, any, any, any> | AbstractPropertyModel<any, any, any, any, any, any>;
 
 export class AbstractModels
 {
