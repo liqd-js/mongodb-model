@@ -17,7 +17,7 @@ export abstract class AbstractModel<
     public converters: Params['converters'];
     public filters?: Params['filters'];
 
-    protected constructor( private models: AbstractModels, public collection: Collection<DBE>, params: Params )
+    protected constructor( protected models: AbstractModels, public collection: Collection<DBE>, params: Params )
     {
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
         this.filters = params.filters;
