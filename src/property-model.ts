@@ -18,9 +18,11 @@ export abstract class AbstractPropertyModel<
     private prefix;
     public converters: Params['converters'];
     public filters?: Params['filters'];
+    readonly #models: AbstractModels;
 
-    protected constructor( protected models: AbstractModels, public collection: Collection<RootDBE>, path: string, params: Params )
+    protected constructor( models: AbstractModels, public collection: Collection<RootDBE>, path: string, params: Params )
     {
+        this.#models = models;
         this.paths = [...path.matchAll(/[^\[\]]+(\[\])?/g)].map( m => ({ path: m[0].replace(/^\./,'').replace(/\[\]$/,''), array: m[0].endsWith('[]')}));
         this.prefix = this.paths.map( p => p.path ).join('.');
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
@@ -294,7 +296,7 @@ export abstract class AbstractPropertyModel<
             }
         }
 
-        const parentModel = this.models[GET_PARENT]( this.collection.collectionName, this.prefix );
+        const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
             const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveCustomFilter( extraFilters );

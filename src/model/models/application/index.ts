@@ -1,4 +1,4 @@
-import {AbstractFilters, AbstractPropertyModel, Db, ModelParams, ObjectId} from '../../..';
+import {AbstractFilters, AbstractModels, AbstractPropertyModel, Db, ModelParams, ObjectId} from '../../..';
 import {JobDBE, ApplicationDBE, ApplicationDTO} from '@ramp-global/types';
 import Models from '../../index';
 import ApplicationConverters from './converters';
@@ -9,7 +9,7 @@ export default class ApplicationModel extends AbstractPropertyModel<JobDBE, Appl
     filters?: ApplicationFilters;
 }>
 {
-    constructor( protected models: Models, db: Db )
+    constructor( private models: Models, db: Db )
     {
         super( models, db.collection('jobs'), 'engagements[].applications[]', { converters: ApplicationConverters.create( models ), filters: new ApplicationFilters() });
     }

@@ -16,11 +16,14 @@ export abstract class AbstractModel<
     private abstractFindAggregator;
     public converters: Params['converters'];
     public filters?: Params['filters'];
+    readonly #models: AbstractModels;
 
-    protected constructor( protected models: AbstractModels, public collection: Collection<DBE>, params: Params )
+    protected constructor( models: AbstractModels, public collection: Collection<DBE>, params: Params )
     {
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
         this.filters = params.filters;
+
+        this.#models = models;
 
         models[REGISTER_MODEL]( this, collection.collectionName );
         this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Params['converters'] ) =>
