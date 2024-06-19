@@ -3,6 +3,9 @@ import { ObjectId, Document } from 'mongodb';
 import {ModelConverterError} from "./errors";
 const Flow = require('@liqd-js/flow');
 
+export const REGISTER_MODEL = Symbol('REGISTER_MODEL');
+export const GET_PARENT = Symbol('GET_PARENT');
+
 export * from './mongo';
 
 export function flowStart( callback: Function, scope: object )
@@ -126,6 +129,11 @@ function stringify(value: any, indentation: string = ''): string
         return '{\n' + properties.join(',\n') + '\n' + indentation + '}';
     }
     return '';
+}
+
+export function hasPublicMethod( obj: any, method: string ): boolean
+{
+    return method in obj && typeof (obj as any)[method] === 'function';
 }
 
 export function DUMP( obj: object )

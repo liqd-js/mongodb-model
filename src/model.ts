@@ -1,16 +1,17 @@
 import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
-import {flowGet, DUMP, flowSet, Arr, isSet, convert, LOG} from './helpers';
+import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
 import { ModelError } from './helpers/errors';
-import { AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse } from './types';
+import {AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractFilters, PublicMethodNames, FilterMethod} from './types';
 import QueryBuilder from './helpers/query-builder';
+import {AbstractModels} from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
-export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
+export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters>>
 {
     private abstractFindAggregator;
 
-    protected constructor( public collection: Collection<DBE>, public converters: Converters )
+    protected constructor( protected models: AbstractModels, public collection: Collection<DBE>, public converters: Converters, public filters?: Filters )
     {
         this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Converters ) =>
         {
@@ -31,6 +32,8 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
                 throw new ModelError( this, e!.toString() );
             }
         });
+
+        models[REGISTER_MODEL]( this, collection.collectionName );
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
@@ -117,6 +120,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return Array.isArray( id ) ? entries : entries[0] ?? null as any;
     }
 
+    // TODO: customfilters tutaj
     public async find<K extends keyof Converters>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
@@ -177,9 +181,37 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     protected async accessFilter(): Promise<Filter<DBE> | void>{}
 
-    protected async resolveCustomFilter( customFilter: any ): Promise<{ filter?: Filter<DBE>, pipeline: Document[] }>
+    public async resolveCustomFilter( customFilter: {[key in PublicMethodNames<Filters>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
-        throw new Error('Method not implemented.');
+        if ( !this.filters )
+        {
+            throw new Error( 'Custom filter is not supported' );
+        }
+
+        const pipeline: any[] = [];
+        const filter: any = {};
+        const extraFilters: any = {};
+
+        for ( const [key, value] of Object.entries( customFilter ) )
+        {
+            if ( hasPublicMethod( this.filters, key ) )
+            {
+                const result = (( this.filters as any )[key] as FilterMethod)( value );
+                result.pipeline && pipeline.push( ...result.pipeline );
+                result.filter && (filter[ key ] = result.filter);
+            }
+            else
+            {
+                extraFilters[key] = value;
+            }
+        }
+
+        if ( Object.keys( extraFilters ).length > 0 )
+        {
+            throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
+        }
+
+        return { filter, pipeline };
     }
 
     public async delete( id: DTO['id'] ): Promise<Boolean>

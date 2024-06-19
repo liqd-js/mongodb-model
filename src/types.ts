@@ -57,4 +57,9 @@ export type AbstractConverters<DBE extends Document> =
         [key: string]: AbstractConverterOptions<DBE>
     }
 
+export type FilterMethod = ( params: any ) => { pipeline?: Document[], filter?: Document };
+export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
+
+export type AbstractFilters<T> = { [K in keyof T]: T[K] extends Function ? FilterMethod : T[K] }
+
 export type UpdateResponse = { matchedCount: number, modifiedCount: number };

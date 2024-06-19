@@ -1,48 +1,20 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import {
-    addPrefixToFilter,
-    addPrefixToUpdate,
-    Arr,
-    Benchmark,
-    convert,
-    DUMP,
-    flowGet,
-    flowSet,
-    generateCursorCondition,
-    getCursor,
-    getUsedFields, isExclusionProjection,
-    isSet,
-    isUpdateOperator,
-    LOG,
-    map,
-    mergeFilters,
-    projectionToProject,
-    resolveBSONObject,
-    reverseSort,
-    splitFilterToStages
-} from './helpers';
+import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
-import {
-    AbstractConverters,
-    MongoRootDocument,
-    PropertyModelAggregateOptions,
-    PropertyModelFilter,
-    PropertyModelListOptions,
-    UpdateResponse,
-    WithTotal
-} from './types';
+import {AbstractConverters, AbstractFilters, FilterMethod, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal} from './types';
 import QueryBuilder from './helpers/query-builder';
+import {AbstractModels} from "./index";
 
 type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 
-export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>>
+export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, DBE extends MongoPropertyDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters>>
 {
     private abstractFindAggregator;
     private paths;
     private prefix;
 
-    protected constructor( public collection: Collection<RootDBE>, path: string, public converters: Converters )
+    protected constructor( protected models: AbstractModels, public collection: Collection<RootDBE>, path: string, public converters: Converters, public filters: Filters )
     {
         this.paths = [...path.matchAll(/[^\[\]]+(\[\])?/g)].map( m => ({ path: m[0].replace(/^\./,'').replace(/\[\]$/,''), array: m[0].endsWith('[]')}));
         this.prefix = this.paths.map( p => p.path ).join('.');
@@ -67,6 +39,8 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
                 throw new ModelError( this, e!.toString() );
             }
         });
+
+        models[REGISTER_MODEL]( this, collection.collectionName, this.prefix );
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
@@ -293,9 +267,46 @@ export abstract class AbstractPropertyModel<RootDBE extends MongoRootDocument, D
 
     protected async accessFilter(): Promise<PropertyModelFilter<RootDBE,DBE> | void>{}
 
-    protected async resolveCustomFilter( customFilter: any ): Promise<{ filter?: Filter<DBE>, pipeline: Document[] }>
+    public async resolveCustomFilter( customFilter: {[key in PublicMethodNames<Filters>]: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
-        throw new Error('Method not implemented.');
+        const pipeline: any[] = [];
+        let filter: any = {};
+        const extraFilters: any = {};
+
+        for ( const [key, value] of Object.entries( customFilter ) )
+        {
+            if ( hasPublicMethod( this.filters, key ) )
+            {
+                const result = (( this.filters as any )[key] as FilterMethod)( value );
+                result.pipeline && pipeline.push( ...result.pipeline );
+                result.filter && (filter[ key ] = result.filter);
+            }
+            else
+            {
+                extraFilters[key] = value;
+            }
+        }
+
+        const parentModel = this.models[GET_PARENT]( this.collection.collectionName, this.prefix );
+        if ( parentModel )
+        {
+            const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveCustomFilter( extraFilters );
+
+            if ( parentFilter && Object.keys( parentFilter ).length > 0 )
+            {
+                filter = { $and: [ {...filter}, parentFilter ].filter( f => Object.keys( f ).length > 0 ) };
+            }
+            if ( parentPipeline && parentPipeline.length > 0 )
+            {
+                pipeline.push( ...parentPipeline )
+            }
+        }
+        else if ( Object.keys( extraFilters ).length > 0 )
+        {
+            throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
+        }
+
+        return { filter, pipeline };
     }
 
     public scope( scope: object )

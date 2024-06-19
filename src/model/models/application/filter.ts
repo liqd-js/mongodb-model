@@ -1,13 +1,9 @@
 import {DateInterval} from "@ramp-global/types";
 import {applicationStatusAt} from "./property";
+import {AbstractFilters} from "../../../types";
 
-export class ApplicationFilter
+export class ApplicationFilters implements AbstractFilters<ApplicationFilters>
 {
-    static createdBetween(from: Date, to: Date)
-    {
-        return [{ 'events.created': { $gte: from, $lt: to } }];
-    }
-
     static activeBetweenAggregation( between: DateInterval )
     {
         return [
