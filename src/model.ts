@@ -2,24 +2,34 @@ import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnl
 import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
 import { ModelError } from './helpers/errors';
-import {AbstractConverters, ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractFilters, PublicMethodNames, FilterMethod} from './types';
+import {ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractFilters, PublicMethodNames, FilterMethod, ModelParams} from './types';
 import QueryBuilder from './helpers/query-builder';
 import {AbstractModels} from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
-export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends Document, Converters extends AbstractConverters<DBE>, Filters extends AbstractFilters<Filters> = never, Models extends AbstractModels = never>
+export abstract class AbstractModel<
+    DBE extends MongoRootDocument,
+    DTO extends Document,
+    Params extends ModelParams<DBE, AbstractFilters<any>>
+>
 {
     private abstractFindAggregator;
+    public converters: Params['converters'];
+    public filters?: Params['filters'];
 
-    protected constructor( protected models: Models, public collection: Collection<DBE>, public converters: Converters, public filters?: Filters )
+    protected constructor( private models: AbstractModels, public collection: Collection<DBE>, params: Params )
     {
-        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Converters ) =>
+        this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
+        this.filters = params.filters;
+
+        models[REGISTER_MODEL]( this, collection.collectionName );
+        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Params['converters'] ) =>
         {
             try
             {
                 const documents = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection }).toArray();
                 const index = documents.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
-                
+
                 return ids.map( id => index.get( id ) ?? null );
             }
             catch( e )
@@ -32,8 +42,6 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
                 throw new ModelError( this, e!.toString() );
             }
         });
-
-        models[REGISTER_MODEL]( this, collection.collectionName );
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
@@ -100,20 +108,20 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
         return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
     }
 
-    public async get( id: DTO['id'] | DBE['_id'] ): Promise<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
-    public async get<K extends keyof Converters>( id: DTO['id'] | DBE['_id'], conversion: K ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>;
-    public async get( id: Array<DTO['id'] | DBE['_id']> ): Promise<Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>>;
-    public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['_id']>, conversion: K ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
-    public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: true ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>>>>;
-    public async get<K extends keyof Converters>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Converters[K]['converter']>> | null>>;
-    public async get<K extends keyof Converters>( id: DTO['id'] | DBE['_id'] | Array<DTO['id'] | DBE['_id']>, conversion: K = 'dto' as K, filtered: boolean = false )
+    public async get( id: DTO['id'] | DBE['_id'] ): Promise<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>;
+    public async get<K extends keyof Params['converters']>( id: DTO['id'] | DBE['_id'], conversion: K ): Promise<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>;
+    public async get( id: Array<DTO['id'] | DBE['_id']> ): Promise<Array<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>>;
+    public async get<K extends keyof Params['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K ): Promise<Array<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>>;
+    public async get<K extends keyof Params['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: true ): Promise<Array<Awaited<ReturnType<Params['converters'][K]['converter']>>>>;
+    public async get<K extends keyof Params['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>>;
+    public async get<K extends keyof Params['converters']>( id: DTO['id'] | DBE['_id'] | Array<DTO['id'] | DBE['_id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
         //let perf = new Benchmark();
         //let find = perf.step();
         //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
 
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
-        const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Converters['dto']['converter']>> | null>;
+        const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>;
 
         if( filtered ){ entries.filter( Boolean )}
 
@@ -121,16 +129,16 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
     }
 
     // TODO: customfilters tutaj
-    public async find<K extends keyof Converters>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Converters[K]['converter']>> | null>
+    public async find<K extends keyof Params['converters']>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
         const dbe = await this.collection.findOne( resolveBSONObject( filter ), { projection, sort });
 
-        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Converters[K]['converter']>> : null;
+        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Params['converters'][K]['converter']>> : null;
     }
 
-    public async list<K extends keyof Converters>(list: ModelListOptions<DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Converters[K]['converter']>> & { $cursor?: string }>>>
+    public async list<K extends keyof Params['converters']>(list: ModelListOptions<DBE>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Params['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, projection, cache } = this.converters[conversion];
         const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = resolveBSONObject(list);
@@ -152,7 +160,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
-            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Converters[K]['converter']> & { $cursor?: string };
+            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Params['converters'][K]['converter']> & { $cursor?: string };
             dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
         }));
@@ -181,7 +189,7 @@ export abstract class AbstractModel<DBE extends MongoRootDocument, DTO extends D
 
     protected async accessFilter(): Promise<Filter<DBE> | void>{}
 
-    public async resolveCustomFilter( customFilter: {[key in PublicMethodNames<Filters>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveCustomFilter( customFilter: {[key in PublicMethodNames<Params['filters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
         if ( !this.filters )
         {

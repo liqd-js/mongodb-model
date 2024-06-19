@@ -2,6 +2,7 @@ import {Document, Filter, FindOptions} from "mongodb";
 
 export type CreateOptions = { duplicateIgnore?: boolean };
 export type MongoRootDocument = Document & { _id: any };
+export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
 
 export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { _root?: Filter<RootDBE> };
@@ -61,5 +62,10 @@ export type FilterMethod = ( params: any ) => { pipeline?: Document[], filter?: 
 export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
 
 export type AbstractFilters<T> = { [K in keyof T]: T[K] extends Function ? FilterMethod : T[K] }
+
+export type ModelParams<DBE extends MongoRootDocument | MongoPropertyDocument, Filters extends AbstractFilters<Filters> = never> = {
+    converters: AbstractConverters<DBE>,
+    filters?: Filters
+}
 
 export type UpdateResponse = { matchedCount: number, modifiedCount: number };
