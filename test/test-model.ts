@@ -22,7 +22,7 @@ async function test( )
                 }
             }
         ],*/
-        customFilter: {
+        smartFilter: {
             applicationCreatedBetween: {
                 from: new Date('2024-01-01'),
                 to: new Date('2024-01-02'),

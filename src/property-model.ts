@@ -71,7 +71,7 @@ export abstract class AbstractPropertyModel<
 
         let pipeline:  Document[] = [], prefix = '$';
 
-        const custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
+        const custom = list.smartFilter ? await this.resolveSmartFilter( list.smartFilter ) : undefined;
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
         const stages = await this.filterStages( list );
@@ -88,7 +88,7 @@ export abstract class AbstractPropertyModel<
             pipeline.push( ...await queryBuilder.pipeline(
                 {
                     filter: stages[i],
-                    customFilter: last ? {
+                    smartFilter: last ? {
                         filter: {},
                         pipeline: custom?.pipeline ?? []
                     } : undefined,
@@ -283,13 +283,13 @@ export abstract class AbstractPropertyModel<
 
     protected async accessFilter(): Promise<PropertyModelFilter<RootDBE,DBE> | void>{}
 
-    public async resolveCustomFilter( customFilter: {[key in PublicMethodNames<Params['filters']>]: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Params['filters']>]: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
         const pipeline: any[] = [];
         let filter: any = {};
         const extraFilters: any = {};
 
-        for ( const [key, value] of Object.entries( customFilter ) )
+        for ( const [key, value] of Object.entries( smartFilter ) )
         {
             if ( hasPublicMethod( this.filters, key ) )
             {
@@ -306,12 +306,12 @@ export abstract class AbstractPropertyModel<
         const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
-            const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveCustomFilter( extraFilters )
+            const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveSmartFilter( extraFilters )
                 .then( r => ({
                     filter: r.filter && addPrefixToFilter( r.filter, this.prefix ),
                     pipeline: r.pipeline && r.pipeline.map( el => addPrefixToFilter( el, this.prefix ) ),
                 }));
-            
+
             if ( parentFilter && Object.keys( parentFilter ).length > 0 )
             {
                 filter = { $and: [ {...filter}, parentFilter ].filter( f => Object.keys( f ).length > 0 ) };
@@ -341,7 +341,7 @@ export abstract class AbstractPropertyModel<
         const sort = list.sort ?? { id: -1 };
 
         const accessFilter = await this.accessFilter();
-        const custom = list.customFilter ? await this.resolveCustomFilter( list.customFilter ) : undefined;
+        const custom = list.smartFilter ? await this.resolveSmartFilter( list.smartFilter ) : undefined;
         const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
 
         const stageFilter = addPrefixToFilter( mergeFilters( list.filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );

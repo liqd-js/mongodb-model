@@ -71,7 +71,7 @@ export abstract class AbstractModel<
             pipeline.push({ $match: accessFilter!});
         }
 
-        let custom = rest.customFilter ? await this.resolveCustomFilter( rest.customFilter ) : undefined;
+        let custom = rest.smartFilter ? await this.resolveSmartFilter( rest.smartFilter ) : undefined;
 
         isSet( filter ) && pipeline.push({ $match: filter});
         isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});
@@ -138,7 +138,7 @@ export abstract class AbstractModel<
         return Array.isArray( id ) ? entries : entries[0] ?? null as any;
     }
 
-    // TODO: customfilters tutaj
+    // TODO: smartfilter tutaj
     public async find<K extends keyof Params['converters']>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
@@ -154,9 +154,9 @@ export abstract class AbstractModel<
         const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = resolveBSONObject(list);
         const prev = cursor?.startsWith('prev:');
 
-        const customFilter = list.customFilter && await this.resolveCustomFilter( list.customFilter );
+        const smartFilter = list.smartFilter && await this.resolveSmartFilter( list.smartFilter );
         const params = {
-            filter, sort, customFilter, cursor, limit, ...options,
+            filter, sort, smartFilter, cursor, limit, ...options,
             accessFilter: await this.accessFilter() || undefined,
             pipeline: list.pipeline
         };
@@ -199,7 +199,7 @@ export abstract class AbstractModel<
 
     protected async accessFilter(): Promise<Filter<DBE> | void>{}
 
-    public async resolveCustomFilter( customFilter: {[key in PublicMethodNames<Params['filters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Params['filters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
         if ( !this.filters )
         {
@@ -210,7 +210,7 @@ export abstract class AbstractModel<
         const filter: any = {};
         const extraFilters: any = {};
 
-        for ( const [key, value] of Object.entries( customFilter ) )
+        for ( const [key, value] of Object.entries( smartFilter ) )
         {
             if ( hasPublicMethod( this.filters, key ) )
             {

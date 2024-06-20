@@ -6,7 +6,7 @@ export type ListParams<DBE extends MongoRootDocument> =
 {
     accessFilter?: Filter<DBE>
     filter?: Filter<DBE>
-    customFilter?: {filter: Filter<DBE>, pipeline: Document[]}
+    smartFilter?: {filter: Filter<DBE>, pipeline: Document[]}
     pipeline?: Document[]
     projection?: Document,
     skip?: number,
@@ -25,18 +25,18 @@ export default class QueryBuilder<DBE extends MongoRootDocument>
         const accessFilter = options.accessFilter
         let filter = mergeFilters(
             options.filter,
-            options.customFilter?.filter,
+            options.smartFilter?.filter,
             accessFilter,
             options.cursor ? generateCursorCondition( options.cursor, options.sort || {} ) : undefined
         );
 
         let prev = options.cursor?.startsWith('prev:')
 
-        const addedFields = collectAddedFields( [...(options.pipeline || []), ...(options.customFilter?.pipeline || []) ] )
+        const addedFields = collectAddedFields( [...(options.pipeline || []), ...(options.smartFilter?.pipeline || []) ] )
 
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
-            ...( options.customFilter?.pipeline || [] ),
+            ...( options.smartFilter?.pipeline || [] ),
             ...( options.projection ? [{ $project: options.projection }] : []),
             ...( options.pipeline || [] ),
             ...( addedFields.length ? [{ $unset: addedFields }] : []),

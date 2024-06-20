@@ -33,13 +33,13 @@ describe('AbstractModel - job', () =>
 
     it('should create pipeline with custom filter', async () =>
     {
-        const pipeline = await jobModel.pipeline({ customFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
+        const pipeline = await jobModel.pipeline({ smartFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
         assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { 'events.created': { $gte: new Date('2024-01-01'), $lt: new Date('2024-12-01') } } }]);
     });
 
     it('should combine all options', async () =>
     {
-        const pipeline = await jobModel.pipeline({ filter: { name: 'a' }, customFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
+        const pipeline = await jobModel.pipeline({ filter: { name: 'a' }, smartFilter: { jobCreatedBetween: { between: { from: new Date('2024-01-01'), to: new Date('2024-12-01') } } } });
         assert.deepStrictEqual( pipeline, [ ...accessFilterPipeline, { $match: { name: 'a' } }, { $match: { 'events.created': { $gte: new Date('2024-01-01'), $lt: new Date('2024-12-01') } } }]);
     });
 })
@@ -67,7 +67,7 @@ describe('AbstractPropertyModel - application', () =>
 
     it('should create pipeline with custom property filter', async () =>
     {
-        const pipeline = await applicationModel.pipeline({ customFilter: { applicationStatus: ['a'] } });
+        const pipeline = await applicationModel.pipeline({ smartFilter: { applicationStatus: ['a'] } });
         const elemMatch = {'$match': {'engagements.applications': {'$elemMatch': { status: { '$in': [ 'a' ] } }}}
         }
         assert.deepStrictEqual( pipeline, [
@@ -82,7 +82,7 @@ describe('AbstractPropertyModel - application', () =>
 
     it('should create pipeline with custom pipeline filter', async () =>
     {
-        const pipeline = await applicationModel.pipeline({ customFilter: { applicationCreatedBetween: betweenFilter } });
+        const pipeline = await applicationModel.pipeline({ smartFilter: { applicationCreatedBetween: betweenFilter } });
         assert.deepStrictEqual( pipeline, [
             applicationPipeline[0],
             applicationPipeline[1],
@@ -93,7 +93,7 @@ describe('AbstractPropertyModel - application', () =>
 
     it('should combine application and job custom filters', async () =>
     {
-        const pipeline = await applicationModel.pipeline({ customFilter: { applicationCreatedBetween: betweenFilter, jobCreatedBetween: betweenFilter }, filter: { name: 'a', '$root.engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378'), status: 'dropout' } });
+        const pipeline = await applicationModel.pipeline({ smartFilter: { applicationCreatedBetween: betweenFilter, jobCreatedBetween: betweenFilter }, filter: { name: 'a', '$root.engagements.agencyID': new ObjectId('65e7053f3c67bebc2e959378'), status: 'dropout' } });
         LOG(pipeline);
         assert.deepStrictEqual( pipeline, [
             applicationPipeline[0],

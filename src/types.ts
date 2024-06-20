@@ -9,7 +9,7 @@ export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> 
 export type ModelListOptions<DBE extends Document> = FindOptions<DBE> &
     {
         filter? : Filter<DBE>,
-        customFilter?: any,
+        smartFilter?: any,
         cursor?: string,
         pipeline?: Document[],
         count?: boolean
@@ -18,7 +18,7 @@ export type ModelListOptions<DBE extends Document> = FindOptions<DBE> &
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter? : PropertyModelFilter<RootDBE, DBE>
-        customFilter?: any,
+        smartFilter?: any,
         cursor?: string
         projection? : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?: Document[],
@@ -28,13 +28,13 @@ export type PropertyModelListOptions<RootDBE extends Document, DBE extends Docum
 export type ModelAggregateOptions<DBE extends Document> =
     {
         filter?         : Filter<DBE>
-        customFilter?   : any,
+        smartFilter?   : any,
         projection?     : FindOptions<DBE>['projection']
     };
 export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document> =
     {
         filter? : PropertyModelFilter<RootDBE, DBE>
-        customFilter?   : any,
+        smartFilter?   : any,
         projection? : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 

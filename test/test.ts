@@ -65,12 +65,12 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
         return accessFilter;
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
 
-        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
+        smartFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(smartFilter.jobCreatedBetween));
 
         return { filter, pipeline };
     }
@@ -120,7 +120,7 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
         return super.pipeline( options );
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
@@ -167,15 +167,15 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         return super.pipeline( options );
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
 
-        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
+        smartFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(smartFilter.jobCreatedBetween));
 
-        customFilter.applicationStatus  && (filter['status'] = { $in: customFilter.applicationStatus });
-        customFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(customFilter.applicationCreatedBetween));
+        smartFilter.applicationStatus  && (filter['status'] = { $in: smartFilter.applicationStatus });
+        smartFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(smartFilter.applicationCreatedBetween));
 
         return { filter, pipeline };
     }
@@ -207,7 +207,7 @@ export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, Po
         return super.pipeline( options );
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
