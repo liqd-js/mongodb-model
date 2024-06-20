@@ -1,4 +1,4 @@
-import {AbstractConverter} from "../types/types";
+import {AbstractConverter} from "../types";
 import { ObjectId, Document } from 'mongodb';
 import {ModelConverterError} from "./errors";
 const Flow = require('@liqd-js/flow');

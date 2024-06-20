@@ -2,7 +2,7 @@ import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, Upda
 import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
-import {AbstractSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal, PropertyModelFindOptions} from './types/types';
+import {AbstractSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal, PropertyModelFindOptions} from './types';
 import QueryBuilder from './helpers/query-builder';
 import { AbstractModels } from "./index";
 

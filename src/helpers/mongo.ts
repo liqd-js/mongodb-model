@@ -1,6 +1,6 @@
 import {Document, FindOptions, ObjectId, Sort, UpdateFilter, Filter as MongoFilter} from 'mongodb';
 import crypto from 'crypto';
-import {AbstractConverter} from "../types/types";
+import {AbstractConverter} from "../types";
 import {ModelConverterError} from "./errors";
 
 type Filter = Record<string, any>;
