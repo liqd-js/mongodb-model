@@ -2,7 +2,7 @@ import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnl
 import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
 import { ModelError } from './helpers/errors';
-import {ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractFilters, PublicMethodNames, FilterMethod, ModelParams} from './types';
+import {ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions} from './types';
 import QueryBuilder from './helpers/query-builder';
 import {AbstractModels} from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
@@ -11,29 +11,29 @@ export const Aggregator = require('@liqd-js/aggregator');
  * Abstract model class
  * @template DBE - Database entity
  * @template DTO - Data transfer object
- * @template Params - Model parameters
+ * @template Extensions - Model parameters
  * @class
  */
 export abstract class AbstractModel<
     DBE extends MongoRootDocument,
     DTO extends Document,
-    Params extends ModelParams<DBE, AbstractFilters<any>>
+    Extensions extends ModelExtensions<DBE, AbstractSmartFilters<Extensions['smartFilters']>>
 >
 {
     private abstractFindAggregator;
-    public converters: Params['converters'];
-    public filters?: Params['filters'];
+    public converters: Extensions['converters'];
+    public smartFilters?: Extensions['smartFilters'];
     readonly #models: AbstractModels;
 
-    protected constructor( models: AbstractModels, public collection: Collection<DBE>, params: Params )
+    protected constructor( models: AbstractModels, public collection: Collection<DBE>, params: Extensions )
     {
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
-        this.filters = params.filters;
+        this.smartFilters = params.smartFilters as any;
 
         this.#models = models;
 
         models[REGISTER_MODEL]( this, collection.collectionName );
-        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Params['converters'] ) =>
+        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'] ) =>
         {
             try
             {
@@ -58,7 +58,7 @@ export abstract class AbstractModel<
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    protected async pipeline( options: ModelAggregateOptions<DBE, Params['filters']> ): Promise<Document[]>
+    protected async pipeline( options: ModelAggregateOptions<DBE, Extensions['smartFilter']> ): Promise<Document[]>
     {
         let { filter, projection, ...rest } = resolveBSONObject( options );
 
@@ -118,20 +118,20 @@ export abstract class AbstractModel<
         return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
     }
 
-    public async get( id: DTO['id'] | DBE['_id'] ): Promise<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>;
-    public async get<K extends keyof Params['converters']>( id: DTO['id'] | DBE['_id'], conversion: K ): Promise<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>;
-    public async get( id: Array<DTO['id'] | DBE['_id']> ): Promise<Array<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>>;
-    public async get<K extends keyof Params['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K ): Promise<Array<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>>;
-    public async get<K extends keyof Params['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: true ): Promise<Array<Awaited<ReturnType<Params['converters'][K]['converter']>>>>;
-    public async get<K extends keyof Params['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>>;
-    public async get<K extends keyof Params['converters']>( id: DTO['id'] | DBE['_id'] | Array<DTO['id'] | DBE['_id']>, conversion: K = 'dto' as K, filtered: boolean = false )
+    public async get( id: DTO['id'] | DBE['_id'] ): Promise<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
+    public async get<K extends keyof Extensions['converters']>( id: DTO['id'] | DBE['_id'], conversion: K ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>;
+    public async get( id: Array<DTO['id'] | DBE['_id']> ): Promise<Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>>;
+    public async get<K extends keyof Extensions['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K ): Promise<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>>;
+    public async get<K extends keyof Extensions['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: true ): Promise<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>>>>;
+    public async get<K extends keyof Extensions['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>>;
+    public async get<K extends keyof Extensions['converters']>( id: DTO['id'] | DBE['_id'] | Array<DTO['id'] | DBE['_id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
         //let perf = new Benchmark();
         //let find = perf.step();
         //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
 
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
-        const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>;
+        const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
 
         if( filtered ){ entries.filter( Boolean )}
 
@@ -139,16 +139,16 @@ export abstract class AbstractModel<
     }
 
     // TODO: smartfilter tutaj
-    public async find<K extends keyof Params['converters']>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Params['converters'][K]['converter']>> | null>
+    public async find<K extends keyof Extensions['converters']>( filter: Filter<DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
         const dbe = await this.collection.findOne( resolveBSONObject( filter ), { projection, sort });
 
-        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Params['converters'][K]['converter']>> : null;
+        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
     }
 
-    public async list<K extends keyof Params['converters']>(list: ModelListOptions<DBE, Params['filters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Params['converters'][K]['converter']>> & { $cursor?: string }>>>
+    public async list<K extends keyof Extensions['converters']>(list: ModelListOptions<DBE, Extensions['smartFilter']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, projection, cache } = this.converters[conversion];
         const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = resolveBSONObject(list);
@@ -170,7 +170,7 @@ export abstract class AbstractModel<
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
-            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Params['converters'][K]['converter']> & { $cursor?: string };
+            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Extensions['converters'][K]['converter']> & { $cursor?: string };
             dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
         }));
@@ -183,7 +183,7 @@ export abstract class AbstractModel<
         return prev ? result.reverse() : result;
     }
 
-    public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Params['filters']> ): Promise<T[]>
+    public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilter']> ): Promise<T[]>
     {
         const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
@@ -192,16 +192,16 @@ export abstract class AbstractModel<
         return this.collection.aggregate( aggregationPipeline ).toArray() as Promise<T[]>;
     }
 
-    public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Params['filters']> ): Promise<number>
+    public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilter']> ): Promise<number>
     {
         return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
 
     protected async accessFilter(): Promise<Filter<DBE> | void>{}
 
-    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Params['filters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Extensions['smartFilter']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
-        if ( !this.filters )
+        if ( !this.smartFilters )
         {
             throw new Error( 'Custom filter is not supported' );
         }
@@ -212,9 +212,9 @@ export abstract class AbstractModel<
 
         for ( const [key, value] of Object.entries( smartFilter ) )
         {
-            if ( hasPublicMethod( this.filters, key ) )
+            if ( hasPublicMethod( this.smartFilters, key ) )
             {
-                const result = (( this.filters as any )[key] as FilterMethod)( value );
+                const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
                 result.pipeline && pipeline.push( ...result.pipeline );
                 result.filter && (filter[ key ] = result.filter);
             }

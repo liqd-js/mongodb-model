@@ -1,4 +1,4 @@
-import {AbstractFilters, AbstractModels, AbstractPropertyModel, Db, ModelParams, ObjectId} from '../../..';
+import {AbstractSmartFilters, AbstractModels, AbstractPropertyModel, Db, ModelParams, ObjectId} from '../../..';
 import {JobDBE, ApplicationDBE, ApplicationDTO} from '@ramp-global/types';
 import Models from '../../index';
 import ApplicationConverters from './converters';

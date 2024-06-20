@@ -6,7 +6,7 @@ export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
 
 export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { _root?: Filter<RootDBE> };
-export type ModelListOptions<DBE extends Document, Filters extends AbstractFilters<Filters> = never> = FindOptions<DBE> &
+export type ModelListOptions<DBE extends Document, Filters extends AbstractSmartFilters<Filters> = never> = FindOptions<DBE> &
     {
         filter?         : Filter<DBE>,
         smartFilter?    : Filters extends never ? never : PublicMethodNames<Filters>,
@@ -15,7 +15,7 @@ export type ModelListOptions<DBE extends Document, Filters extends AbstractFilte
         count?          : boolean
     };
 
-export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractFilters<Filters> = never> = Omit<FindOptions<DBE>, 'projection'> &
+export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractSmartFilters<Filters> = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
         smartFilter?    : Filters extends never ? never : PublicMethodNames<Filters>,
@@ -25,13 +25,13 @@ export type PropertyModelListOptions<RootDBE extends Document, DBE extends Docum
         count?          : boolean
     };
 
-export type ModelAggregateOptions<DBE extends Document, Filters extends AbstractFilters<Filters> = never> =
+export type ModelAggregateOptions<DBE extends Document, Filters extends AbstractSmartFilters<Filters> = never> =
     {
         filter?         : Filter<DBE>
         smartFilter?    : Filters extends never ? never : PublicMethodNames<Filters>,
         projection?     : FindOptions<DBE>['projection']
     };
-export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractFilters<Filters> = never> =
+export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractSmartFilters<Filters> = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
         smartFilter?    : Filters extends never ? never : PublicMethodNames<Filters>,
@@ -60,12 +60,17 @@ export type AbstractConverters<DBE extends Document> =
 
 export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
 
-export type FilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null };
-export type AbstractFilters<T> = { [K in keyof T]: T[K] extends Function ? FilterMethod : T[K] }
+export type SmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null };
+export type AbstractSmartFilters<T> = { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
 
-export type ModelParams<DBE extends MongoRootDocument | MongoPropertyDocument, Filters extends AbstractFilters<Filters> = never> = {
+/*export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractSmartFilters<SmartFilters> = never> = {
     converters  : AbstractConverters<DBE>,
-    filters?    : Filters
+    smartFilters?    : SmartFilters
+}*/
+
+export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters = never> = {
+    converters  : AbstractConverters<DBE>,
+    smartFilters?    : SmartFilters
 }
 
 export type UpdateResponse = { matchedCount: number, modifiedCount: number };
