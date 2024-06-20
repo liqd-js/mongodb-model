@@ -16,7 +16,7 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
     };
 
     type FirstParameter<T> = T extends (arg: infer P) => any ? P : never;
-    type TypSmartFiltera<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
+    type TypSmartFiltera<T> = T extends never ? undefined : { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
 
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
@@ -64,9 +64,9 @@ export type AbstractConverters<DBE extends Document> =
 export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
 
 export type SmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null };
-export type AbstractSmartFilters<T> = { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
+export type AbstractSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
 
-export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractSmartFilters<SmartFilters> = never> = {
+export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractSmartFilters<any> = never> = {
     converters  : AbstractConverters<DBE>,
     smartFilters?    : SmartFilters
 }

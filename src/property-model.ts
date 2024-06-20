@@ -17,7 +17,7 @@ export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,
     DTO extends Document,
-    Extensions extends ModelExtensions<DBE, AbstractSmartFilters<any>>
+    Extensions extends ModelExtensions<DBE, AbstractSmartFilters<Extensions['smartFilters']>>
 >
 {
     private abstractFindAggregator;
