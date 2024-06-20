@@ -2,7 +2,7 @@ import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, Upda
 import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
-import { AbstractSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal } from './types';
+import {AbstractSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal, PropertyModelFindOptions} from './types/types';
 import QueryBuilder from './helpers/query-builder';
 import { AbstractModels } from "./index";
 
@@ -83,17 +83,17 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']> = {} ): Promise<Document[]>
+    protected async pipeline( options: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']> = {} ): Promise<Document[]>
     {
-        let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...options } = resolveBSONObject(list);
+        let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...rest } = resolveBSONObject(options);
         const queryBuilder = new QueryBuilder<RootDBE>();
 
         let pipeline:  Document[] = [], prefix = '$';
 
-        const custom = list.smartFilter ? await this.resolveSmartFilter( list.smartFilter as any ) : undefined;
+        const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
-        const stages = await this.filterStages( list );
+        const stages = await this.filterStages( options );
         const subpaths = this.prefix.split('.');
         for ( let i = 0; i <= subpaths.length; i++ )
         {
@@ -117,7 +117,7 @@ export abstract class AbstractPropertyModel<
 
         let $project: string | Record<string, unknown> = '$' + this.prefix, $rootProject;
 
-        const { rootProjection, propertyProjection } = this.splitProjection(options.projection ?? {});
+        const { rootProjection, propertyProjection } = this.splitProjection(rest.projection ?? {});
 
         const unsetFieldsRoot = isExclusionProjection( rootProjection ) && getUsedFields( [{$match: rootProjection}] ).used.map(el => ('_root.' + el)) || [];
         const unsetFieldsProperty = isExclusionProjection( propertyProjection ) && getUsedFields( [{$match: propertyProjection}] ).used || [];
@@ -148,12 +148,12 @@ export abstract class AbstractPropertyModel<
             pipeline.push({ $unset: unsetFields });
         }
 
-        const prev = list.cursor?.startsWith('prev:');
+        const prev = options.cursor?.startsWith('prev:');
         pipeline.push( ...await queryBuilder.pipeline({
             sort: prev ? reverseSort( sort ) : sort,
-            skip: options.skip,
-            limit: options.limit,
-            pipeline: options.pipeline,
+            skip: rest.skip,
+            limit: rest.limit,
+            pipeline: rest.pipeline,
             //projection: options.projection,
         }) );
 
@@ -219,26 +219,26 @@ export abstract class AbstractPropertyModel<
         return Array.isArray( id ) ? entries : entries[0] ?? null as any;
     }
 
-    public async find<K extends keyof Extensions['converters']>( filter: PropertyModelFilter<RootDBE,DBE>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
+    public async find<K extends keyof Extensions['converters']>( options: PropertyModelFindOptions<RootDBE, DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
-        const pipeline = await this.pipeline({ filter, projection, sort, limit: 1 });
+        const pipeline = await this.pipeline({ filter: options.filter, smartFilter: options.smartFilter, projection, sort, limit: 1 });
 
-        flowGet('log') && ( console.log( this.constructor.name + '::find', filter ), DUMP( pipeline ));
+        flowGet('log') && ( console.log( this.constructor.name + '::find', options.filter ), DUMP( pipeline ));
 
         const dbe = ( await this.collection.aggregate( pipeline ).toArray())[0];
 
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
     }
 
-    public async list<K extends keyof Extensions['converters']>(list: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>>>>>
+    public async list<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>>>>>
     {
         const { converter, projection } = this.converters[conversion];
-        const prev = list.cursor?.startsWith('prev:');
+        const prev = options.cursor?.startsWith('prev:');
         const queryBuilder = new QueryBuilder();
 
-        const resolvedList = resolveBSONObject( list );
+        const resolvedList = resolveBSONObject( options );
 
         const pipeline = this.pipeline({ ...resolvedList, projection });
 

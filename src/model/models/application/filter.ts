@@ -1,30 +1,25 @@
 import {DateInterval} from "@ramp-global/types";
 import {applicationStatusAt} from "./property";
-import {AbstractSmartFilters} from "../../../types";
-import { pipeline } from "stream";
+import {AbstractSmartFilters} from "../../../types/external";
+import {ApplicationFilters} from "../../../../dist/model/models/application/filter";
 
-export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilters>
+export class ApplicationFilters1 implements AbstractSmartFilters<ApplicationFilters>
 {
-    filterDvojka( a: 'b' | 'c' | 3 )
-    {
-        return { pipeline: null, filter: null };
-    }
-
     activeBetweenAggregation( between: DateInterval )
     {
         return { pipeline: [
-            {
-                $match: {
-                    $expr: {
-                        $function: {
-                            body: applicationActiveBetween.toString(),
-                            args: [ '$events', between ],
-                            lang: "js",
+                {
+                    $match: {
+                        $expr: {
+                            $function: {
+                                body: applicationActiveBetween.toString(),
+                                args: [ '$events', between ],
+                                lang: "js",
+                            }
                         }
                     }
                 }
-            }
-        ],
+            ],
             filter: null }
     }
 
@@ -77,6 +72,14 @@ export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilte
                 }
             }
         ];
+    }
+}
+
+export class ApplicationFilters2 implements AbstractSmartFilters<ApplicationFilters>
+{
+    filterDvojka( a: 'b' | 'c' | 3 )
+    {
+        return { pipeline: null, filter: null };
     }
 }
 

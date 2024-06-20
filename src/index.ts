@@ -5,7 +5,7 @@ import {AbstractPropertyModel} from "./property-model";
 import {AbstractModel} from "./model";
 
 export * from 'mongodb';
-export * from './types';
+export * from './types/internal';
 export * from './helpers';
 export * from './model';
 export * from './property-model';
