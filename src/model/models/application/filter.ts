@@ -1,12 +1,13 @@
 import {DateInterval} from "@ramp-global/types";
 import {applicationStatusAt} from "./property";
 import {AbstractSmartFilters} from "../../../types";
+import { pipeline } from "stream";
 
 export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilters>
 {
-    static activeBetweenAggregation( between: DateInterval )
+    activeBetweenAggregation( between: DateInterval )
     {
-        return [
+        return {pipeline: [
             {
                 $match: {
                     $expr: {
@@ -18,7 +19,7 @@ export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilte
                     }
                 }
             }
-        ]
+        ], filter: null };
     }
 
     static closedBetween(from: Date, to: Date)

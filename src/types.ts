@@ -15,10 +15,13 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
         count?          : boolean
     };
 
+    type FirstParameter<T> = T extends (arg: infer P) => any ? P : never;
+    type TypSmartFiltera<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
+
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : {[key in PublicMethodNames<Filters>]?: any},
+        smartFilter?    : TypSmartFiltera<Filters>,
         cursor?         : string
         projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?       : Document[],
@@ -63,14 +66,15 @@ export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K :
 export type SmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null };
 export type AbstractSmartFilters<T> = { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
 
-/*export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractSmartFilters<SmartFilters> = never> = {
-    converters  : AbstractConverters<DBE>,
-    smartFilters?    : SmartFilters
-}*/
-
-export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters = never> = {
+export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractSmartFilters<SmartFilters> = never> = {
     converters  : AbstractConverters<DBE>,
     smartFilters?    : SmartFilters
 }
+
+/** /export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters = never> = {
+    converters  : AbstractConverters<DBE>,
+    smartFilters?    : SmartFilters
+}
+/**/
 
 export type UpdateResponse = { matchedCount: number, modifiedCount: number };

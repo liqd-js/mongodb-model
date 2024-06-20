@@ -1,10 +1,15 @@
-import {AbstractSmartFilters, AbstractModels, AbstractPropertyModel, Db, ModelParams, ObjectId} from '../../..';
+import {AbstractSmartFilters, AbstractModels, AbstractPropertyModel, Db, ModelParams, ObjectId, PublicMethodNames} from '../../..';
 import {JobDBE, ApplicationDBE, ApplicationDTO} from '@ramp-global/types';
 import Models from '../../index';
 import ApplicationConverters from './converters';
 import {ApplicationFilters} from "./filter";
 
-export default class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, {
+type FirstParameter<T> = T extends (arg: infer P) => any ? P : never;
+type TypSmartFiltera<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
+
+type Y = TypSmartFiltera<ApplicationFilters>;
+
+export default class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, ApplicationFilters, {
     converters: ReturnType<typeof ApplicationConverters['create']>;
     filters?: ApplicationFilters;
 }>
@@ -19,9 +24,10 @@ export default class ApplicationModel extends AbstractPropertyModel<JobDBE, Appl
 
     async accessFilter()
     {
-        this.list({smartFilter: {
-            activeBetweenAggregation: 3,
-        }})
+        
+        const b: Y = { activeBetweenAggregation: { from: new Date(), to: new Date() } }
+
+        this.list({smartFilter: { 'activeBetweenAggregation': { from: new Date(), to: new Date() }}})
        return {
         //foo: 'bar'
        };
