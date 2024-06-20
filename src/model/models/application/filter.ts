@@ -7,7 +7,7 @@ export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilte
 {
     activeBetweenAggregation( between: DateInterval )
     {
-        return {pipeline: [
+        return { pipeline: [
             {
                 $match: {
                     $expr: {
@@ -19,7 +19,8 @@ export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilte
                     }
                 }
             }
-        ], filter: null };
+        ],
+            filter: null }
     }
 
     static closedBetween(from: Date, to: Date)

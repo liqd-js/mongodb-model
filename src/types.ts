@@ -9,7 +9,7 @@ export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> 
 export type ModelListOptions<DBE extends Document, Filters = never> = FindOptions<DBE> &
     {
         filter?         : Filter<DBE>,
-        smartFilter?    : {[key in PublicMethodNames<Filters>]?: any},
+        smartFilter?    : TypSmartFiltera<Filters>,
         cursor?         : string,
         pipeline?       : Document[],
         count?          : boolean
@@ -31,13 +31,13 @@ export type PropertyModelListOptions<RootDBE extends Document, DBE extends Docum
 export type ModelAggregateOptions<DBE extends Document, Filters = never> =
     {
         filter?         : Filter<DBE>
-        smartFilter?    : {[key in PublicMethodNames<Filters>]?: any},
+        smartFilter?    : TypSmartFiltera<Filters>,
         projection?     : FindOptions<DBE>['projection']
     };
 export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : {[key in PublicMethodNames<Filters>]?: any},
+        smartFilter?    : TypSmartFiltera<Filters>,
         projection?     : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 

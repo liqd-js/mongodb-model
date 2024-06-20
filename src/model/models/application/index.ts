@@ -1,4 +1,4 @@
-import {AbstractSmartFilters, AbstractModels, AbstractPropertyModel, Db, ModelParams, ObjectId, PublicMethodNames} from '../../..';
+import {AbstractPropertyModel, Db, ObjectId, PublicMethodNames} from '../../..';
 import {JobDBE, ApplicationDBE, ApplicationDTO} from '@ramp-global/types';
 import Models from '../../index';
 import ApplicationConverters from './converters';
@@ -24,12 +24,12 @@ export default class ApplicationModel extends AbstractPropertyModel<JobDBE, Appl
 
     async accessFilter()
     {
-        
+
         const b: Y = { activeBetweenAggregation: { from: new Date(), to: new Date() } }
 
         this.list({smartFilter: { 'activeBetweenAggregation': { from: new Date(), to: new Date() }}})
        return {
         //foo: 'bar'
-       };
+        };
     }
 }
