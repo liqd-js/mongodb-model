@@ -1,10 +1,10 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import {addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import { addPrefixToFilter, addPrefixToUpdate, Arr, Benchmark, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError } from './helpers/errors';
 import { Aggregator } from './model'
-import {AbstractFilters, FilterMethod, ModelParams, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal} from './types';
+import { AbstractFilters, FilterMethod, ModelParams, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal } from './types';
 import QueryBuilder from './helpers/query-builder';
-import {AbstractModels} from "./index";
+import { AbstractModels } from "./index";
 
 /**
  * Abstract class for property models
@@ -27,6 +27,13 @@ export abstract class AbstractPropertyModel<
     public filters?: Params['filters'];
     readonly #models: AbstractModels;
 
+    /**
+     * 
+     * @param models \{AbstractModels\} - Models instance
+     * @param collection 
+     * @param path 
+     * @param params 
+     */
     protected constructor( models: AbstractModels, public collection: Collection<RootDBE>, path: string, params: Params )
     {
         this.#models = models;
@@ -60,7 +67,19 @@ export abstract class AbstractPropertyModel<
     }
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
+
+    /**
+     * Converts DTO['id'] to DBE['id']
+     * @param id {DTO['id'] | DBE['id']} - DTO or DBE id
+     * @returns {DBE['id']} - DBE id
+     */
     public dbeID( id: DTO['id'] | DBE['id'] ): DBE['id']{ return id as DBE['id']; }
+
+    /**
+     * Converts DBE['id'] to DTO['id']
+     * @param dbeID {DBE['id']} - DBE id
+     * @returns {DTO['id']} - DTO id
+     */
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
@@ -194,8 +213,6 @@ export abstract class AbstractPropertyModel<
     {
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
         const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Params['converters']['dto']['converter']>> | null>;
-
-        console.log( entries );
 
         if( filtered ){ entries.filter( Boolean )}
 
