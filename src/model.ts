@@ -58,7 +58,7 @@ export abstract class AbstractModel<
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    protected async pipeline( options: ModelAggregateOptions<DBE, Extensions['smartFilter']> ): Promise<Document[]>
+    protected async pipeline( options: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<Document[]>
     {
         let { filter, projection, ...rest } = resolveBSONObject( options );
 
@@ -148,7 +148,7 @@ export abstract class AbstractModel<
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
     }
 
-    public async list<K extends keyof Extensions['converters']>(list: ModelListOptions<DBE, Extensions['smartFilter']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
+    public async list<K extends keyof Extensions['converters']>(list: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, projection, cache } = this.converters[conversion];
         const { filter = {}, sort = { _id: 1 }, cursor, limit, ...options } = resolveBSONObject(list);
@@ -183,7 +183,7 @@ export abstract class AbstractModel<
         return prev ? result.reverse() : result;
     }
 
-    public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilter']> ): Promise<T[]>
+    public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<T[]>
     {
         const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
@@ -192,14 +192,14 @@ export abstract class AbstractModel<
         return this.collection.aggregate( aggregationPipeline ).toArray() as Promise<T[]>;
     }
 
-    public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilter']> ): Promise<number>
+    public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<number>
     {
         return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
 
     protected async accessFilter(): Promise<Filter<DBE> | void>{}
 
-    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Extensions['smartFilter']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Extensions['smartFilters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
         if ( !this.smartFilters )
         {
