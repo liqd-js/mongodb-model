@@ -6,6 +6,13 @@ import {AbstractFilters, FilterMethod, ModelParams, MongoPropertyDocument, Mongo
 import QueryBuilder from './helpers/query-builder';
 import {AbstractModels} from "./index";
 
+/**
+ * Abstract class for property models
+ * @template RootDBE - Root Database entity
+ * @template DBE - Database entity
+ * @template DTO - Data transfer object
+ * @template Params - Model parameters
+ */
 export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,

@@ -7,6 +7,13 @@ import QueryBuilder from './helpers/query-builder';
 import {AbstractModels} from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
+/**
+ * Abstract model class
+ * @template DBE - Database entity
+ * @template DTO - Data transfer object
+ * @template Params - Model parameters
+ * @class
+ */
 export abstract class AbstractModel<
     DBE extends MongoRootDocument,
     DTO extends Document,
