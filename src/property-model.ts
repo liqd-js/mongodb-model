@@ -299,8 +299,12 @@ export abstract class AbstractPropertyModel<
         const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
-            const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveCustomFilter( extraFilters );
-
+            const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveCustomFilter( extraFilters )
+                .then( r => ({
+                    filter: r.filter && addPrefixToFilter( r.filter, this.prefix ),
+                    pipeline: r.pipeline && r.pipeline.map( el => addPrefixToFilter( el, this.prefix ) ),
+                }));
+            
             if ( parentFilter && Object.keys( parentFilter ).length > 0 )
             {
                 filter = { $and: [ {...filter}, parentFilter ].filter( f => Object.keys( f ).length > 0 ) };
