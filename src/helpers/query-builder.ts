@@ -6,7 +6,7 @@ export type ListParams<DBE extends MongoRootDocument> =
 {
     accessFilter?: Filter<DBE>
     filter?: Filter<DBE>
-    smartFilter?: {filter: Filter<DBE>, pipeline: Document[]}
+    smartFilter?: {filter?: Filter<DBE>, pipeline?: Document[]}
     pipeline?: Document[]
     projection?: Document,
     skip?: number,

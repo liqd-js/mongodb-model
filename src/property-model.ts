@@ -83,7 +83,7 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE, Params['filters']> = {} ): Promise<Document[]>
+    protected async pipeline( list: PropertyModelListOptions<RootDBE, DBE> = {} ): Promise<Document[]>
     {
         let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...options } = resolveBSONObject(list);
         const queryBuilder = new QueryBuilder<RootDBE>();
