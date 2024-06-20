@@ -9,7 +9,7 @@ type TypSmartFiltera<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
 
 type Y = TypSmartFiltera<ApplicationFilters>;
 
-export default class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, ApplicationFilters, {
+export default class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, {
     converters: ReturnType<typeof ApplicationConverters['create']>;
     filters?: ApplicationFilters;
 }>
@@ -25,7 +25,11 @@ export default class ApplicationModel extends AbstractPropertyModel<JobDBE, Appl
     async accessFilter()
     {
 
-        const b: Y = { activeBetweenAggregation: { from: new Date(), to: new Date() } }
+        const b: Y = 
+        { 
+            activeBetweenAggregation: { from: new Date(), to: new Date() },
+            filterDvojka: 3
+        }
 
         this.list({smartFilter: { 'activeBetweenAggregation': { from: new Date(), to: new Date() }}})
        return {

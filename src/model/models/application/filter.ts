@@ -5,6 +5,11 @@ import { pipeline } from "stream";
 
 export class ApplicationFilters implements AbstractSmartFilters<ApplicationFilters>
 {
+    filterDvojka( a: 'b' | 'c' | 3 )
+    {
+        return { pipeline: null, filter: null };
+    }
+
     activeBetweenAggregation( between: DateInterval )
     {
         return { pipeline: [
