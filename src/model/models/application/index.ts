@@ -19,7 +19,9 @@ export default class ApplicationModel extends AbstractPropertyModel<JobDBE, Appl
 
     async accessFilter()
     {
-        this.list({smartFilter: {}})
+        this.list({smartFilter: {
+            activeBetweenAggregation: 3,
+        }})
        return {
         //foo: 'bar'
        };
