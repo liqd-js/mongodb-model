@@ -6,7 +6,7 @@ export type MongoRootDocument = Document & { _id: any };
 export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
 
-export type ModelSmartFilter<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
+export type ModelSmartFilter<T> = { [K in PublicMethodNames<T>]?: FirstParameter<T[K]> }
 
 export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { _root?: Filter<RootDBE> };
 
