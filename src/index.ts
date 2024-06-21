@@ -5,7 +5,7 @@ import {AbstractModel} from "./model";
 
 export * from 'mongodb';
 export * from './types/external';
-export * from './helpers';
+export * from './helpers/external';
 export * from './model';
 export * from './property-model';
 
