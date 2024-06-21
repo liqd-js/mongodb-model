@@ -1,4 +1,4 @@
-import { MongoRootDocument } from '../types';
+import { MongoRootDocument } from '../../types';
 import { Document, Filter, Sort } from 'mongodb';
 import { collectAddedFields, generateCursorCondition, isSet, mergeFilters, optimizeMatch, resolveBSONObject, reverseSort } from './mongo';
 
@@ -17,7 +17,7 @@ export type ListParams<DBE extends MongoRootDocument> =
 
 const COUNT_IGNORE_STAGES = [ '$limit', '$skip', '$sort', '$project', '$addFields', '$unset' ];
 
-export default class QueryBuilder<DBE extends MongoRootDocument>
+export class QueryBuilder<DBE extends MongoRootDocument>
 {
     async pipeline( params: ListParams<DBE> )
     {

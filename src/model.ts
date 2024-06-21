@@ -1,9 +1,7 @@
 import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
 import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
-import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject } from './helpers';
-import { ModelError } from './helpers/errors';
+import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions } from './types';
-import QueryBuilder from './helpers/query-builder';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 

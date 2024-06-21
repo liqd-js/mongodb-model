@@ -1,63 +1,8 @@
-import {Document, FindOptions, ObjectId, Sort, UpdateFilter, Filter as MongoFilter} from 'mongodb';
-import crypto from 'crypto';
-import {AbstractConverter} from "../types";
-import {ModelConverterError} from "./errors";
+import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter} from "mongodb";
+import {fromBase64, objectGet, objectHash, objectSet, toBase64} from "../external";
 
 type Filter = Record<string, any>;
-
-export const toBase64 = ( str: string ) => Buffer.from( str, 'utf8' ).toString('base64url');
-export const fromBase64 = ( str: string ) => Buffer.from( str, 'base64url' ).toString('utf8');
-
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
-
-export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
-{
-    try
-    {
-        return await converter( dbe );
-    }
-    catch( e )
-    {
-        if( e instanceof ModelConverterError )
-        {
-            throw e;
-        }
-
-        throw new ModelConverterError( model, conversion.toString(), dbe._id ?? dbe.id, e as Error );
-    }
-}
-
-function stableStringify( obj: any, sort: boolean ): string
-{
-    if( obj instanceof ObjectId ){ return stableStringify( obj.toString(), sort )}
-    if( obj instanceof Date ){ return stableStringify( obj.toISOString(), sort )}
-    if( obj instanceof RegExp ){ return stableStringify( obj.toString(), sort )}
-    if( obj instanceof Set ){ return stableStringify([...obj], sort )}
-    if( obj instanceof Map ){ return stableStringify( Object.fromEntries([...obj.entries()]), sort )}
-    if( typeof obj !== 'object' || obj === null ){ return JSON.stringify( obj ); }
-    if( Array.isArray( obj ))
-    {
-        const arr = obj.map( v => stableStringify( v, sort )); sort && arr.sort();
-
-        return `[${ arr.join(',') }]`;
-    }
-
-    const pairs = Object.keys( obj ).sort().map( key => `${ JSON.stringify( key ) }:${ stableStringify( obj[key], sort )}`);
-
-    return `{${ pairs.join(',') }}`;
-}
-
-export function objectHash( obj: any, options: { sort?: boolean, alg?: 'plain' | 'sha1' | 'sha256' } = {})
-{
-    const value = stableStringify( obj, options.sort ?? true );
-
-    return options.alg !== 'plain' ? crypto.createHash( options.alg ?? 'sha1' ).update( value ).digest('hex') : value;
-}
-
-export function objectHashID( obj: any, options: { sort?: boolean, alg?: 'sha1' | 'sha256'  } = {})
-{
-    return new ObjectId( crypto.createHash( options.alg ?? 'sha1' ).update( stableStringify( obj, options.sort ?? true )).digest('hex').substring(0, 24));
-}
 
 export function reverseSort( sort: Sort ): Sort
 {
@@ -76,15 +21,15 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
     if( typeof filter === 'object' &&
-    (
-        ( filter instanceof ObjectId ) ||
-        ( filter instanceof Date )  ||
-        ( filter instanceof RegExp ) // TODO is basic object alternative?
-    ))
+        (
+            ( filter instanceof ObjectId ) ||
+            ( filter instanceof Date )  ||
+            ( filter instanceof RegExp ) // TODO is basic object alternative?
+        ))
     {
         return filter;
     }
-    
+
     return addPrefixToFilter( filter, prefix, prefixKeys );
 }
 
@@ -94,11 +39,11 @@ export function resolveBSONValue( value: any ): any
     if( typeof value === 'string' ){ return value; }
     if( typeof value !== 'object' || value === null ){ return value; }
     if( typeof value === 'object' &&
-    (
-        ( value instanceof ObjectId ) ||
-        ( value instanceof Date )  ||
-        ( value instanceof RegExp ) // TODO is basic object alternative?
-    ))
+        (
+            ( value instanceof ObjectId ) ||
+            ( value instanceof Date )  ||
+            ( value instanceof RegExp ) // TODO is basic object alternative?
+        ))
     {
         return value;
     }
@@ -116,7 +61,7 @@ export function resolveBSONValue( value: any ): any
             return value;
         }
     }
-    
+
     return resolveBSONObject( value );
 }
 
@@ -193,46 +138,6 @@ export function addPrefixToUpdate<RootDBE,DBE>( update: Partial<DBE> | UpdateFil
     }
 
     return newUpdate;
-}
-
-export function objectSet( obj: Record<string, unknown>, path: string[], value: unknown )
-{
-    if ( !path.length )
-    {
-        throw new Error('Path is empty');
-    }
-
-    if( path.length === 1 )
-    {
-        obj[ path[0] ] = value;
-    }
-    else
-    {
-        if( !obj[ path[0] ]){ obj[ path[0] ] = {}}
-
-        objectSet( obj[ path[0] ] as Record<string, unknown>, path.slice(1), value );
-    }
-
-    return obj;
-}
-
-export function objectGet( obj: Record<string, unknown>, path: string[] ): any
-{
-    if ( !path.length )
-    {
-        throw new Error('Path is empty');
-    }
-
-    if( path.length === 1 )
-    {
-        return obj[ path[0] ];
-    }
-    else
-    {
-        if( !obj[ path[0] ]){ return undefined }
-
-        return objectGet( obj[ path[0] ] as Record<string, unknown>, path.slice(1));
-    }
 }
 
 export function isExclusionProjection<DBE extends Document>( projection: FindOptions<DBE>['projection'] ): boolean
@@ -361,14 +266,14 @@ export function generateCursorCondition( cursor: string, sort: Sort ): Filter
     }
 
     const filter: Filter[] = [];
-    
+
     for( let i = 0; i < properties.length; i++ )
     {
         const condition: Filter = {}; filter.push( condition );
 
         for( let j = 0; j <= i; j++ )
         {
-            condition[properties[j]] = {[( j < i ? '$eq' : directions[j] === 1 ? '$gt' : '$lt' ) + ( j === properties.length - 1 && !direction ? 'e' : '' )]: values[j] }; 
+            condition[properties[j]] = {[( j < i ? '$eq' : directions[j] === 1 ? '$gt' : '$lt' ) + ( j === properties.length - 1 && !direction ? 'e' : '' )]: values[j] };
         }
     }
 

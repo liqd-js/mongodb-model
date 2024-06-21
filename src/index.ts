@@ -1,5 +1,4 @@
-import {Collection, MongoClient, MongoClientOptions} from 'mongodb';
-import Cache from './helpers/cache';
+import {MongoClient, MongoClientOptions} from 'mongodb';
 import {flowStart, GET_PARENT, REGISTER_MODEL} from './helpers';
 import {AbstractPropertyModel} from "./property-model";
 import {AbstractModel} from "./model";
@@ -16,7 +15,6 @@ type ModelInstance = AbstractModel<any, any, any> | AbstractPropertyModel<any, a
 export class AbstractModels
 {
     protected client: MongoClient;
-    public cache = new Cache();
     private models = new Map<string, ModelInstance>();
 
     protected constructor( connectionString: string, options: MongoClientOptions = {} )

@@ -1,33 +1,9 @@
 import * as assert from 'assert';
-import {
-    addPrefixToFilter,
-    addPrefixToUpdate,
-    bsonValue,
-    collectAddedFields,
-    getUsedFields,
-    generateCursorCondition,
-    getCursor,
-    isUpdateOperator,
-    objectGet,
-    objectHash,
-    objectHashID,
-    objectSet,
-    optimizeMatch,
-    projectionToProject,
-    resolveBSONValue,
-    reverseSort,
-    sortProjection,
-    mergeProperties,
-    LOG,
-    subfilter,
-    transformToElemMatch,
-    isExclusionProjection
-} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten} from '../../src/helpers';
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
-import {resolveBSONObject} from "../../dist";
-
+import {LOG} from "../../dist";
 
 describe('objectHash', () =>
 {
@@ -41,35 +17,35 @@ describe('objectHash', () =>
     it('should stringify ObjectId', () =>
     {
         const obj = new ObjectId('5f4d6f9e6f0a4d001f9a2a4d');
-        const expected = JSON.stringify('5f4d6f9e6f0a4d001f9a2a4d');
+        const expected = 'ObjectId("5f4d6f9e6f0a4d001f9a2a4d")';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'ObjectId not correctly stringified' );
     });
 
     it('should stringify Date', () =>
     {
         const obj = new Date('2020-08-31T14:00:00.000Z');
-        const expected = JSON.stringify(obj);
+        const expected = '2020-08-31T14:00:00.000Z';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'Date not correctly stringified' );
     });
 
     it('should stringify RegExp', () =>
     {
         const obj = new RegExp('tes.*t', 'i');
-        const expected = JSON.stringify('/tes.*t/i');
+        const expected = '/tes.*t/i';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'RegExp not correctly stringified' );
     });
 
     it('should stringify Set', () =>
     {
         const obj = new Set([3, 1, 2]);
-        const expected = '[1,2,3]';
+        const expected = 'Set(1,2,3)';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'Set not correctly stringified' );
     });
 
     it('should stringify Map', () =>
     {
         const obj = new Map([['a', 1], ['b', 2]]);
-        const expected = '{"a":1,"b":2}';
+        const expected = 'Map("a":1,"b":2)';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'Map not correctly stringified' );
     });
 
@@ -180,6 +156,34 @@ describe('objectHashId', () =>
         const expected = crypto.createHash('sha256').update('{"a":1,"b":2}').digest('hex').substring(0, 24);
         assert.equal( objectHashID( obj, { sort: true, alg: 'sha256' }), expected, 'incorrect object hash ID' );
     });
+});
+
+describe('objectFlatten', () =>
+{
+    it('should flatten simple object', () => {
+        const obj = { a: 1, b: 2 };
+        const expected = { a: 1, b: 2 };
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'simple object not correctly flattened');
+    });
+
+    it('should flatten nested object', () => {
+        const obj = { a: { b: 1, c: { d: 2 } } };
+        const expected = { 'a.b': 1, 'a.c.d': 2 };
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'nested object not correctly flattened');
+    });
+
+    it('should flatten nested object with array', () => {
+        const obj = { a: { b: [1, 2], c: 3 } };
+        const expected = { 'a.b.0': 1, 'a.b.1': 2, 'a.c': 3 };
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'nested object with array not correctly flattened');
+    });
+
+    it('should flatten nested object with array of objects', () => {
+        const obj = { a: { b: [{ c: 1 }, { d: { e: 2 } }], f: 3 } };
+        const expected = { 'a.b.0.c': 1, 'a.b.1.d.e': 2, 'a.f': 3 };
+        LOG(objectFlatten(obj));
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'nested object with array of objects not correctly flattened');
+    })
 });
 
 describe('reverseSort', () =>
@@ -987,7 +991,7 @@ describe('optimizeMatch', () =>
             ]
         }
         const optimized = optimizeMatch(match);
-        assert.deepStrictEqual(optimized, { a: { b: 1, c: 2 } });
+        assert.deepStrictEqual(optimized, { 'a.b': 1, 'a.c': 2 });
     })
 
     it('should not optimize $elemMatch with multiple conditions', () => {

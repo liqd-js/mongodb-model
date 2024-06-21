@@ -6,14 +6,14 @@ export type MongoRootDocument = Document & { _id: any };
 export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
 
-export type SmartFilter<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
+export type ModelSmartFilter<T> = { [K in PublicMethodNames<T>]: FirstParameter<T[K]> }
 
 export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { _root?: Filter<RootDBE> };
 
 export type ModelListOptions<DBE extends Document, Filters = never> = FindOptions<DBE> &
     {
         filter?         : Filter<DBE>,
-        smartFilter?    : SmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>,
         cursor?         : string,
         pipeline?       : Document[],
         count?          : boolean
@@ -21,7 +21,7 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : SmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>,
         cursor?         : string
         projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?       : Document[],
@@ -31,24 +31,24 @@ export type PropertyModelListOptions<RootDBE extends Document, DBE extends Docum
 export type ModelFindOptions<DBE extends Document, Filters = never> =
     {
         filter?         : Filter<DBE>
-        smartFilter?    : SmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>,
     }
 export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : SmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>,
     }
 
 export type ModelAggregateOptions<DBE extends Document, Filters = never> =
     {
         filter?         : Filter<DBE>
-        smartFilter?    : SmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>,
         projection?     : FindOptions<DBE>['projection']
     };
 export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : SmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>,
         projection?     : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 
