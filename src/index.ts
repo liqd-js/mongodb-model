@@ -1,5 +1,5 @@
 import {MongoClient, MongoClientOptions} from 'mongodb';
-import {flowStart, GET_PARENT, REGISTER_MODEL} from './helpers';
+import {flowStart, flowGet, flowSet, GET_PARENT, REGISTER_MODEL} from './helpers';
 import {AbstractPropertyModel} from "./property-model";
 import {AbstractModel} from "./model";
 
@@ -16,6 +16,7 @@ export class AbstractModels
 {
     protected client: MongoClient;
     private models = new Map<string, ModelInstance>();
+    public readonly flow = Object.freeze({ set: flowSet, get: flowGet });
 
     protected constructor( connectionString: string, options: MongoClientOptions = {} )
     {

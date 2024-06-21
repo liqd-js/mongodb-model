@@ -1,30 +1,13 @@
-const Flow = require('@liqd-js/flow');
 
-export const REGISTER_MODEL = Symbol('REGISTER_MODEL');
-export const GET_PARENT = Symbol('GET_PARENT');
+import { flowStart, flowGet, flowSet, map, LOG } from '../internal/utils';
 
 export * from './mongo';
-
-export function flowStart( callback: Function, scope: object )
-{
-    Flow.start( callback, scope );
-}
-
-export function flowGet<T>( key: string, fallback?: T ): T
-{
-    return Flow.get( key, fallback );
-}
-
-export function flowSet( key: string, value: any )
-{
-    Flow.set( key, value );
-}
 
 export function i18n( i18n: { [key: string]: string } | string ): string
 {
     if( typeof i18n === 'string' ){ return i18n }
 
-    const locales: Set<string> = Flow.get('locales') || [];
+    const locales: Set<string> = flowGet('locales') || [];
 
     for( let locale of locales )
     {
@@ -41,7 +24,7 @@ export function i18n( i18n: { [key: string]: string } | string ): string
 
 export function multiI18n( i18n: { [key: string]: string } | string ): {[key: string]: string }
 {
-    const locales: Set<string> = Flow.get('locales') || [];
+    const locales: Set<string> = flowGet('locales') || [];
     const result: {[key: string]: string } = {};
 
     for( let locale of locales )

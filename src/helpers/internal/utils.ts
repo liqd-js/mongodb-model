@@ -1,5 +1,25 @@
 import {ObjectId} from "mongodb";
 
+export const REGISTER_MODEL = Symbol('REGISTER_MODEL');
+export const GET_PARENT = Symbol('GET_PARENT');
+
+const Flow = require('@liqd-js/flow');
+
+export function flowStart( callback: Function, scope: object )
+{
+    Flow.start( callback, scope );
+}
+
+export function flowGet<T>( key: string, fallback?: T ): T
+{
+    return Flow.get( key, fallback );
+}
+
+export function flowSet( key: string, value: any )
+{
+    Flow.set( key, value );
+}
+
 export function map<T,E>(ids: T[], entries: E[], getID: (e: E ) => T ): Array<E | null>
 {
     console.log({ entries });
