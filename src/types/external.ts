@@ -1,12 +1,11 @@
 import {Document, Filter, FindOptions} from "mongodb";
-import {AbstractConverterOptions, AbstractModelFromConverter, FirstParameter, PublicMethodNames, SmartFilterMethod} from "./internal";
+import {AbstractConverterOptions, AbstractModelFromConverter, FirstType, ModelSmartFilter, SmartFilterMethod, TypeMap} from "./internal";
+import {ApplicationFilters, EngagementFilters} from "../tmp/filters";
 
 export type CreateOptions = { duplicateIgnore?: boolean };
 export type MongoRootDocument = Document & { _id: any };
 export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
-
-export type ModelSmartFilter<T> = { [K in PublicMethodNames<T>]?: FirstParameter<T[K]> }
 
 export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> = Filter<DBE> & { _root?: Filter<RootDBE> };
 
@@ -18,10 +17,10 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
         pipeline?       : Document[],
         count?          : boolean
     };
-export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters = never> = Omit<FindOptions<DBE>, 'projection'> &
+export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends any[] = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<TupleToUnion<Filters>>,
         cursor?         : string
         projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?       : Document[],
@@ -33,10 +32,10 @@ export type ModelFindOptions<DBE extends Document, Filters = never> =
         filter?         : Filter<DBE>
         smartFilter?    : ModelSmartFilter<Filters>,
     }
-export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters = never> =
+export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters extends any[] = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<TupleToUnion<Filters>>,
     }
 
 export type ModelAggregateOptions<DBE extends Document, Filters = never> =
@@ -45,10 +44,15 @@ export type ModelAggregateOptions<DBE extends Document, Filters = never> =
         smartFilter?    : ModelSmartFilter<Filters>,
         projection?     : FindOptions<DBE>['projection']
     };
-export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters = never> =
+
+export type TupleToUnion<T extends any[]> = T extends [infer U, ...infer Rest]
+    ? U & TupleToUnion<Rest>
+    : never;
+
+export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends any[]> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<TupleToUnion<Filters>>
         projection?     : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 
@@ -65,5 +69,13 @@ export type AbstractModelConverters<DBE extends Document> =
     }
 
 export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
+export type AbstractPropertyModelSmartFilters<T extends any[]> = T extends never ? undefined : TypeMap<T>;
+
+/*
+ * len skuska
+ */
+type ApplicationFiltersAll = AbstractPropertyModelSmartFilters<[ApplicationFilters, EngagementFilters]>
+const x: ApplicationFiltersAll = [new ApplicationFilters(), new EngagementFilters()];
+const y: FirstType<ApplicationFiltersAll> = new ApplicationFilters();
 
 export type ModelUpdateResponse = { matchedCount: number, modifiedCount: number };

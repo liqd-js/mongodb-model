@@ -1,8 +1,8 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import { addPrefixToFilter, addPrefixToUpdate, Arr, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
+import { addPrefixToFilter, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import {AbstractModelSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions} from './types';
+import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, FirstType, AbstractPropertyModelSmartFilters, PropertyModelExtensions} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -16,22 +16,22 @@ export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,
     DTO extends Document,
-    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<Extensions['smartFilters']>>
+    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<Extensions['smartFilters']>>
 >
 {
     private abstractFindAggregator;
     private paths;
     private prefix;
     public converters: Extensions['converters'];
-    public smartFilters?: Extensions['smartFilters'];
+    public smartFilters?: FirstType<Extensions['smartFilters']>;
     readonly #models: AbstractModels;
 
     /**
      * 
      * @param models \{AbstractModels\} - Models instance
-     * @param collection 
-     * @param path 
-     * @param params 
+     * @param collection
+     * @param path
+     * @param params
      */
     protected constructor( models: AbstractModels, public collection: Collection<RootDBE>, path: string, params: Extensions )
     {
