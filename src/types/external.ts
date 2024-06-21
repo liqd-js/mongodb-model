@@ -1,5 +1,5 @@
 import {Document, Filter, FindOptions} from "mongodb";
-import {AbstractConverterOptions, FirstParameter, PublicMethodNames, SmartFilterMethod} from "./internal";
+import {AbstractConverterOptions, AbstractModelFromConverter, FirstParameter, PublicMethodNames, SmartFilterMethod} from "./internal";
 
 export type CreateOptions = { duplicateIgnore?: boolean };
 export type MongoRootDocument = Document & { _id: any };
@@ -52,12 +52,11 @@ export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends 
         projection?     : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 
-export type AbstractConverter<DBE extends Document> = ( dbe: DBE ) => unknown | Promise<unknown>;
-export type AbstractFromConverter<DBE extends Document, T> = ( data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
+export type AbstractModelConverter<DBE extends Document> = (dbe: DBE ) => unknown | Promise<unknown>;
 
-export type AbstractConverters<DBE extends Document> =
+export type AbstractModelConverters<DBE extends Document> =
     {
-        from?   : { [key: string]: AbstractFromConverter<DBE, any> },
+        from?   : { [key: string]: AbstractModelFromConverter<DBE, any> },
         dto     : AbstractConverterOptions<DBE>,
     }
     &
@@ -65,6 +64,6 @@ export type AbstractConverters<DBE extends Document> =
         [key: string]: AbstractConverterOptions<DBE>
     }
 
-export type AbstractSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
+export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
 
-export type UpdateResponse = { matchedCount: number, modifiedCount: number };
+export type ModelUpdateResponse = { matchedCount: number, modifiedCount: number };

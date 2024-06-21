@@ -1,7 +1,5 @@
-import {Document, ObjectId} from 'mongodb';
+import {ObjectId} from 'mongodb';
 import crypto from 'crypto';
-import {AbstractConverter} from "../../types";
-import {ModelConverterError} from "./errors";
 import {objectStringify} from "@liqd-js/fast-object-hash";
 
 /**

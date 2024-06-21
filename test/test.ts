@@ -1,7 +1,7 @@
 import {Filter, MongoClient, ObjectId} from "mongodb";
 import 'dotenv/config';
 import {
-    AbstractConverters,
+    AbstractModelConverters,
     AbstractModel,
     AbstractPropertyModel,
     ModelAggregateOptions,
@@ -27,7 +27,7 @@ export const accessFilter = { $and: [] };
 export const jobCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 export const applicationCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 
-export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<JobDBE>>
+export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractModelConverters<JobDBE>>
 {
     public constructor()
     {
@@ -81,7 +81,7 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
     }
 }
 
-export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE, EngagementDTO, AbstractConverters<EngagementDBE>>
+export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE, EngagementDTO, AbstractModelConverters<EngagementDBE>>
 {
     public constructor()
     {
@@ -130,7 +130,7 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
 
 }
 
-export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, AbstractConverters<ApplicationDBE>>
+export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, AbstractModelConverters<ApplicationDBE>>
 {
     public constructor()
     {
@@ -181,7 +181,7 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
     }
 }
 
-export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, PositionDTO, AbstractConverters<PositionDBE>>
+export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, PositionDTO, AbstractModelConverters<PositionDBE>>
 {
     public constructor()
     {

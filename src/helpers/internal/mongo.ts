@@ -1,6 +1,6 @@
 import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter} from "mongodb";
 import {ModelConverterError, objectGet, objectHash, objectSet} from "../external";
-import {AbstractConverter} from "../../types";
+import {AbstractModelConverter} from "../../types";
 
 type Filter = Record<string, any>;
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
@@ -8,7 +8,7 @@ const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
 export const toBase64 = ( str: string ) => Buffer.from( str, 'utf8' ).toString('base64url');
 export const fromBase64 = ( str: string ) => Buffer.from( str, 'base64url' ).toString('utf8');
 
-export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
+export async function convert<DBE extends Document>(model: object, converter: AbstractModelConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
 {
     try
     {

@@ -2,7 +2,7 @@ import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, Upda
 import { addPrefixToFilter, addPrefixToUpdate, Arr, convert, DUMP, flowGet, flowSet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import {AbstractSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, UpdateResponse, WithTotal, PropertyModelFindOptions} from './types';
+import {AbstractModelSmartFilters, SmartFilterMethod, ModelExtensions, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -16,7 +16,7 @@ export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,
     DTO extends Document,
-    Extensions extends ModelExtensions<DBE, AbstractSmartFilters<Extensions['smartFilters']>>
+    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<Extensions['smartFilters']>>
 >
 {
     private abstractFindAggregator;
@@ -172,7 +172,7 @@ export abstract class AbstractPropertyModel<
         return _id;
     }*/
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<UpdateResponse>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse>
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};

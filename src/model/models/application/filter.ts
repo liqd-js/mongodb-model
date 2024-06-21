@@ -1,8 +1,8 @@
 import {DateInterval} from "@ramp-global/types";
 import {applicationStatusAt} from "./property";
-import {AbstractSmartFilters} from "../../../types";
+import {AbstractModelSmartFilters} from "../../../types";
 
-export class ApplicationFilters1 implements AbstractSmartFilters<ApplicationFilters1>
+export class ApplicationFilters1 implements AbstractModelSmartFilters<ApplicationFilters1>
 {
     activeBetweenAggregation( between: DateInterval )
     {
@@ -74,7 +74,7 @@ export class ApplicationFilters1 implements AbstractSmartFilters<ApplicationFilt
     }
 }
 
-export class ApplicationFilters2 implements AbstractSmartFilters<ApplicationFilters2>
+export class ApplicationFilters2 implements AbstractModelSmartFilters<ApplicationFilters2>
 {
     filterDvojka( a: 'b' | 'c' | 3 )
     {

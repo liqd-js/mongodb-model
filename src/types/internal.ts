@@ -1,5 +1,5 @@
 import {Document, FindOptions} from "mongodb";
-import {AbstractConverter, AbstractConverters, AbstractSmartFilters, MongoPropertyDocument, MongoRootDocument} from "./external";
+import {AbstractModelConverter, AbstractModelConverters, AbstractModelSmartFilters, MongoPropertyDocument, MongoRootDocument} from "./external";
 
 /**
  * Utility types
@@ -9,15 +9,16 @@ export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K :
 
 export type SmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null };
 
+export type AbstractModelFromConverter<DBE extends Document, T> = (data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
 export type AbstractConverterOptions<DBE extends Document> =
     {
-        converter       : AbstractConverter<DBE>,
+        converter       : AbstractModelConverter<DBE>,
         projection?     : FindOptions<DBE>['projection'],
         cache?          : { retention?: string, cap?: string, frequency?: number, list?: boolean, precache?: boolean }, // precache prefetchne dalsiu stranu cez cursor
     }
 
-export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractSmartFilters<any> = never> =
+export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never> =
     {
-        converters      : AbstractConverters<DBE>,
+        converters      : AbstractModelConverters<DBE>,
         smartFilters?   : SmartFilters
     }

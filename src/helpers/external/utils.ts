@@ -63,7 +63,7 @@ export function multiI18n( i18n: { [key: string]: string } | string ): {[key: st
     return result;
 }
 
-export function deleteNullProperties( obj: any ): void
+export function deleteNullishProperties(obj: any ): void
 {
     if( Array.isArray( obj ))
     {
@@ -75,7 +75,7 @@ export function deleteNullProperties( obj: any ): void
             }
             else if( typeof obj[i] === 'object' )
             {
-                deleteNullProperties( obj[i] );
+                deleteNullishProperties( obj[i] );
             }
         }
     }
@@ -89,7 +89,7 @@ export function deleteNullProperties( obj: any ): void
             }
             else if( typeof obj[key] === 'object' )
             {
-                deleteNullProperties( obj[key] );
+                deleteNullishProperties( obj[key] );
             }
         }
     }

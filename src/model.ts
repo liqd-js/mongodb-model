@@ -1,7 +1,7 @@
 import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
 import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import { ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, UpdateResponse, AbstractSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions } from './types';
+import { ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions } from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -15,7 +15,7 @@ export const Aggregator = require('@liqd-js/aggregator');
 export abstract class AbstractModel<
     DBE extends MongoRootDocument,
     DTO extends Document,
-    Extensions extends ModelExtensions<DBE, AbstractSmartFilters<Extensions['smartFilters']>>
+    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<Extensions['smartFilters']>>
 >
 {
     private abstractFindAggregator;
@@ -110,7 +110,7 @@ export abstract class AbstractModel<
         throw new Error('Method not implemented.');
     }
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<UpdateResponse>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse>
     {
         const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
         return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
