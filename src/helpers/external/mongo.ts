@@ -4,26 +4,6 @@ import {AbstractConverter} from "../../types";
 import {ModelConverterError} from "./errors";
 import {objectStringify} from "@liqd-js/fast-object-hash";
 
-export const toBase64 = ( str: string ) => Buffer.from( str, 'utf8' ).toString('base64url');
-export const fromBase64 = ( str: string ) => Buffer.from( str, 'base64url' ).toString('utf8');
-
-export async function convert<DBE extends Document>( model: object, converter: AbstractConverter<DBE>, dbe: DBE, conversion: string | number | symbol )
-{
-    try
-    {
-        return await converter( dbe );
-    }
-    catch( e )
-    {
-        if( e instanceof ModelConverterError )
-        {
-            throw e;
-        }
-
-        throw new ModelConverterError( model, conversion.toString(), dbe._id ?? dbe.id, e as Error );
-    }
-}
-
 /**
  * TODO
  * @param obj

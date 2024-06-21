@@ -998,11 +998,11 @@ describe('optimizeMatch', () =>
         const match = {
             $and: [
                 { a: { $elemMatch: { b: 1, c: 2 } } },
-                { a: { $elemMatch: { d: 2 } } }
+                { a: { $elemMatch: { d: 3 } } },
             ]
         }
         const optimized = optimizeMatch(match);
-        assert.deepStrictEqual(optimized, { a: { $elemMatch: { b: 1, c: 2 }, d: 2 } });
+        assert.deepStrictEqual(optimized, { a: { $elemMatch: { b: 1, c: 2 } }, 'a.d': 3 });
     });
 
     it('should optimize $in, $nin, $not $in with single condition', () => {
