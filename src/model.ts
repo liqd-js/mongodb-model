@@ -233,11 +233,4 @@ export abstract class AbstractModel<
     {
         return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] })).deletedCount === 1;
     }
-
-    public scope( scope: object )
-    {
-        Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
-
-        return this;
-    }
 }

@@ -2,6 +2,7 @@ import {MongoClient, MongoClientOptions} from 'mongodb';
 import {flowStart, flowGet, flowSet, GET_PARENT, REGISTER_MODEL} from './helpers';
 import {AbstractPropertyModel} from "./property-model";
 import {AbstractModel} from "./model";
+import { start } from 'repl';
 
 export * from 'mongodb';
 export * from './types/external';
@@ -16,7 +17,13 @@ export class AbstractModels
 {
     protected client: MongoClient;
     private models = new Map<string, ModelInstance>();
-    public readonly flow = Object.freeze({ set: flowSet, get: flowGet });
+    public readonly scope = Object.freeze(
+    {
+        start   : flowStart,
+        assign  : ( scope: object ) => { Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ))},
+        set     : flowSet, 
+        get     : flowGet
+    });
 
     protected constructor( connectionString: string, options: MongoClientOptions = {} )
     {
@@ -51,10 +58,5 @@ export class AbstractModels
                 return this.models.get( parent );
             }
         }
-    }
-
-    public scope( callback: Function, scope: object )
-    {
-        flowStart( callback, scope );
     }
 }

@@ -345,13 +345,6 @@ export abstract class AbstractPropertyModel<
         return { filter, pipeline };
     }
 
-    public scope( scope: object )
-    {
-        Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ) );
-
-        return this;
-    }
-
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']> )
     {
         const sort = list.sort ?? { id: -1 };
