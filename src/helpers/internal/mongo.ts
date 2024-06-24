@@ -41,6 +41,19 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
     if( typeof filter === 'string' && filter.match(/^\$_root\./) ){ return '$' + filter.substring('$_root.'.length); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
+    if( typeof filter === 'object' && !Array.isArray( filter ) && Object.keys( filter ).length === 1 && [ '$cond', '$switch', '$function', '$accumulator', '$reduce', '$map', '$filter', '$convert', '$dateFromString' ].includes( Object.keys( filter )[0] ))
+    {
+        const key = Object.keys( filter )[0];
+
+        if( key === '$switch' )
+        {
+            return { $switch: { branches: filter.$switch.branches.map(( branch: any ) => ({ ...branch, case: addPrefixToValue( branch.case, prefix, prefixKeys )})), default: addPrefixToValue( filter.$switch.default, prefix, prefixKeys ) }};
+        }
+        else
+        {
+            return Object.fromEntries( Object.entries( filter ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]));
+        }
+    }
     if( typeof filter === 'object' &&
         (
             ( filter instanceof ObjectId ) ||
@@ -124,7 +137,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
             {
                 Object.assign( newFilter, addPrefixToValue( filter[key], prefix, false ));
             }
-            else if(  key.startsWith('_root.') )
+            else if( key.startsWith('_root.') )
             {
                 newFilter[key.substring('_root.'.length)] = addPrefixToValue( filter[key], prefix, false );
             }
