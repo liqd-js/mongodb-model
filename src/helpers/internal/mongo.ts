@@ -142,15 +142,51 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
     return newFilter;
 }
 
-/*export function addPrefixToPipeline( pipeline: Document[], prefix: string, prefixKeys: boolean = true ): Document[]
+/**/export function addPrefixToPipeline( pipeline: Document[], prefix: string, prefixKeys: boolean = true ): Document[]
 {
+    if( !prefix ){ return pipeline; }
+
     let prefixed = [];
 
-    for( const stage of pipeline )
+    for( const [ stage, query ] of Object.entries( pipeline ))
     {
-        prefixed.push( addPrefixToStage( stage, prefix, prefixKeys ));
+        if([ '$addFields', '$facet', '$match', '$set', '$sort' ].includes( stage ))
+        {
+            prefixed.push( Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ prefix + '.' + key, addPrefixToValue( value, prefix )])));
+        }
+        else if([ '$group' ].includes( stage ))
+        {
+            prefixed.push( Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key === '_id' ? key : prefix + '.' + key, addPrefixToValue( value, prefix )])));
+        }
+        else if([ '$limit', '$skip' ].includes( stage ))
+        {
+            prefixed.push({ [stage]: query });
+        }
+        else if([ '$unset', '$count' ].includes( stage ))
+        {
+            prefixed.push({ [stage]: Array.isArray( query ) ? query.map(( field ) => `${prefix}.${field}`) : `${prefix}.${query}` });
+        }
+        else if([ '$project' ].includes( stage ))
+        {
+            prefixed.push({ [stage]: projectionToProject( query, prefix ) });
+        }
+        else if([ '$bucket', '$bucketAuto', '$densify', '$fill', '$geoNear', '$graphLookup',  '$lookup', '$replaceRoot', '$replaceWith', '$sample', '$unwind' ].includes( stage ))
+        {
+            // TODO toto nie je uplne dobre
+            prefixed.push( Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )])));
+        }
+        // zakazat graphLookup, collStats, indexStats merge, out, $redact $search, $searchMeta, $setWindowFields, $sortByCount, '$unionWith' vectorSearch
+        else
+        {
+            throw new Error(`Unsupported pipeline stage: "${stage}"`);
+        }
+
+        //lookup - prefixovat localField a as
     }
-}*/
+
+    return prefixed;
+}
+/**/
 
 export function addPrefixToUpdate<RootDBE,DBE>( update: Partial<DBE> | UpdateFilter<DBE>, prefix: string ): Partial<RootDBE> | UpdateFilter<RootDBE>
 {
