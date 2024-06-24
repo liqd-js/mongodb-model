@@ -142,6 +142,16 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
     return newFilter;
 }
 
+/*export function addPrefixToPipeline( pipeline: Document[], prefix: string, prefixKeys: boolean = true ): Document[]
+{
+    let prefixed = [];
+
+    for( const stage of pipeline )
+    {
+        prefixed.push( addPrefixToStage( stage, prefix, prefixKeys ));
+    }
+}*/
+
 export function addPrefixToUpdate<RootDBE,DBE>( update: Partial<DBE> | UpdateFilter<DBE>, prefix: string ): Partial<RootDBE> | UpdateFilter<RootDBE>
 {
     const newUpdate: Record<string, any> = {};
