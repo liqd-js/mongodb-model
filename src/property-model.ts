@@ -310,8 +310,8 @@ export abstract class AbstractPropertyModel<
             if ( hasPublicMethod( this.smartFilters, key ) )
             {
                 const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
-                result.pipeline && result.pipeline.map( ( el: any ) => addPrefixToFilter( el, this.prefix ) );
-                result.filter && addPrefixToFilter( result.filter, this.prefix );
+                result.pipeline && pipeline.push( ...result.pipeline.map( ( el: any ) => addPrefixToFilter( el, this.prefix ) ) );
+                result.filter && ( filter = { $and: [{ ...filter }, addPrefixToFilter( result.filter, this.prefix )].filter(f => Object.keys(f).length > 0) });
             }
             else
             {
