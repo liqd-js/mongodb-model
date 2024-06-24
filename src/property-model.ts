@@ -310,8 +310,8 @@ export abstract class AbstractPropertyModel<
             if ( hasPublicMethod( this.smartFilters, key ) )
             {
                 const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
-                result.pipeline && pipeline.push( ...result.pipeline );
-                result.filter && (filter[ key ] = result.filter);
+                result.pipeline && result.pipeline.map( ( el: any ) => addPrefixToFilter( el, this.prefix ) );
+                result.filter && addPrefixToFilter( result.filter, this.prefix );
             }
             else
             {
@@ -319,17 +319,13 @@ export abstract class AbstractPropertyModel<
             }
         }
 
-        let parent = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
-        while ( parent )
+        const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
+        if ( parentModel )
         {
-            const { model: parentModel, prefix } = parent;
-
-            const localPrefix = prefix.split('.').slice(1).join('.');
-
             const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveSmartFilter( extraFilters )
                 .then(( r: any ) => ({
-                    filter: r.filter && addPrefixToFilter( r.filter, localPrefix ),
-                    pipeline: r.pipeline && r.pipeline.map(( el: any ) => addPrefixToFilter( el, localPrefix ) ),
+                    filter: r.filter && r.filter,
+                    pipeline: r.pipeline && r.pipeline,
                 }));
 
             if ( parentFilter && Object.keys( parentFilter ).length > 0 )
@@ -340,13 +336,11 @@ export abstract class AbstractPropertyModel<
             {
                 pipeline.push( ...parentPipeline )
             }
-
-            parent = this.#models[GET_PARENT]( this.collection.collectionName, prefix );
         }
-        // else if ( Object.keys( extraFilters ).length > 0 )
-        // {
-        //     throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
-        // }
+        else if ( Object.keys( extraFilters ).length > 0 )
+        {
+            throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
+        }
 
         return { filter, pipeline };
     }
