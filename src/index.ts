@@ -44,7 +44,7 @@ export class AbstractModels
         this.models.set( collection + (path ? '.' + path : ''), instance );
     }
 
-    [GET_PARENT]( collection: string, path: string ): ModelInstance | undefined
+    [GET_PARENT]( collection: string, path: string ): { model: ModelInstance, prefix: string } | undefined
     {
         let parent = collection + (path && path !== '' ? '.' + path : '');
 
@@ -54,7 +54,7 @@ export class AbstractModels
 
             if( this.models.has( parent ) && this.models.get( parent )?.smartFilters )
             {
-                return this.models.get( parent );
+                return { model: this.models.get( parent )!, prefix: parent.split('.').slice(1).join('.') };
             }
         }
     }

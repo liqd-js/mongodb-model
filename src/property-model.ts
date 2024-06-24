@@ -319,13 +319,15 @@ export abstract class AbstractPropertyModel<
             }
         }
 
-        const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
-        if ( parentModel )
+        let parent = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
+        while ( parent )
         {
+            const { model: parentModel, prefix } = parent;
+
             const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveSmartFilter( extraFilters )
                 .then(( r: any ) => ({
-                    filter: r.filter && addPrefixToFilter( r.filter, this.prefix ),
-                    pipeline: r.pipeline && r.pipeline.map(( el: any ) => addPrefixToFilter( el, this.prefix ) ),
+                    filter: r.filter && addPrefixToFilter( r.filter, prefix ),
+                    pipeline: r.pipeline && r.pipeline.map(( el: any ) => addPrefixToFilter( el, prefix ) ),
                 }));
 
             if ( parentFilter && Object.keys( parentFilter ).length > 0 )
@@ -336,11 +338,13 @@ export abstract class AbstractPropertyModel<
             {
                 pipeline.push( ...parentPipeline )
             }
+
+            parent = this.#models[GET_PARENT]( this.collection.collectionName, prefix );
         }
-        else if ( Object.keys( extraFilters ).length > 0 )
-        {
-            throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
-        }
+        // else if ( Object.keys( extraFilters ).length > 0 )
+        // {
+        //     throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
+        // }
 
         return { filter, pipeline };
     }
