@@ -142,7 +142,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
     return newFilter;
 }
 
-/**/export function addPrefixToPipeline( pipeline: Document[], prefix: string, prefixKeys: boolean = true ): Document[]
+/**/export function addPrefixToPipeline( pipeline: Document[], prefix: string ): Document[]
 {
     if( !prefix ){ return pipeline; }
 
