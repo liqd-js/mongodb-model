@@ -1,5 +1,5 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import { addPrefixToFilter, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
+import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType} from './types';
@@ -310,7 +310,7 @@ export abstract class AbstractPropertyModel<
             if ( hasPublicMethod( this.smartFilters, key ) )
             {
                 const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
-                result.pipeline && pipeline.push( ...result.pipeline.map( ( el: any ) => addPrefixToFilter( el, this.prefix ) ) );
+                result.pipeline && pipeline.push( ...result.pipeline.map( ( el: any ) => addPrefixToPipeline( el, this.prefix ) ) );
                 result.filter && ( filter = { $and: [{ ...filter }, addPrefixToFilter( result.filter, this.prefix )].filter(f => Object.keys(f).length > 0) });
             }
             else
@@ -353,7 +353,7 @@ export abstract class AbstractPropertyModel<
         const custom = list.smartFilter ? await this.resolveSmartFilter( list.smartFilter as any ) : undefined;
         const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
 
-        const stageFilter = addPrefixToFilter( mergeFilters( list.filter, custom?.filter, accessFilter, cursorFilter ), this.prefix );
+        const stageFilter = mergeFilters( addPrefixToFilter( mergeFilters( list.filter, accessFilter, cursorFilter ), this.prefix ), custom?.filter );
         return splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
     }
 

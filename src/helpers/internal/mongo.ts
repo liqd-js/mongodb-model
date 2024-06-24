@@ -718,6 +718,10 @@ function extractRecursively( obj: any /* TODO: ignoredFields? */ ): Set<string>
             {
                 extractRecursively( value ).forEach(key => fields.add(key));
             }
+            else if ( ['$size'].includes(key) && typeof value === 'string' )
+            {
+                fields.add( value );
+            }
             else if ( Array.isArray( value ) )
             {
                 value.forEach( (item: any) => typeof item === 'string' && item.startsWith('$') && fields.add(item) );
