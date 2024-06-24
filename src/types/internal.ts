@@ -1,9 +1,6 @@
 import {Document, FindOptions} from "mongodb";
 import {AbstractModelConverter, AbstractModelConverters, AbstractModelSmartFilters, AbstractPropertyModelSmartFilters, MongoPropertyDocument, MongoRootDocument} from "./external";
 
-/**
- * Utility types
- */
 export type FirstParameter<T> = T extends (arg: infer P) => any ? P : never;
 export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
 
@@ -24,13 +21,16 @@ export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocumen
         converters      : AbstractModelConverters<DBE>,
         smartFilters?   : SmartFilters
     }
-export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any> = never> =
+export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never> =
     {
         converters      : AbstractModelConverters<DBE>,
-        smartFilters?   : SmartFilters
+        smartFilters?   : SmartFilters,
     }
 
-export type FirstType<T extends any[]> = T extends [infer U, ...infer Rest] ? U : never;
+export type FirstType<T> = T extends [infer U, ...infer Rest] ? U : undefined;
+export type SecondType<T> = T extends [infer U, infer V, ...infer Rest] ? V : undefined;
+
+export type ConstructorExtensions<E extends PropertyModelExtensions<any, any>> = Omit<E, 'smartFilters'> & { smartFilters?: FirstType<E['smartFilters']> }
 
 // TODO: dá sa poslať ako druhý parameter funkcia? - napr. AbstractModelSmartFilters
 export type TypeMap<T extends any[]> = T extends [infer U, ...infer Rest]

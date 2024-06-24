@@ -69,13 +69,10 @@ export type AbstractModelConverters<DBE extends Document> =
     }
 
 export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
-export type AbstractPropertyModelSmartFilters<T extends any[]> = T extends never ? undefined : TypeMap<T>;
+export type AbstractPropertyModelSmartFilters<T extends AbstractModelSmartFilters<any>, P extends AbstractModelSmartFilters<any>> = T extends never ? undefined : [T, P]
 
 /*
  * len skuska
  */
-type ApplicationFiltersAll = AbstractPropertyModelSmartFilters<[ApplicationFilters, EngagementFilters]>
-const x: ApplicationFiltersAll = [new ApplicationFilters(), new EngagementFilters()];
-const y: FirstType<ApplicationFiltersAll> = new ApplicationFilters();
 
 export type ModelUpdateResponse = { matchedCount: number, modifiedCount: number };

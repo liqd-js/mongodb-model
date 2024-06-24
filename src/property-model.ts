@@ -2,7 +2,7 @@ import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, Upda
 import { addPrefixToFilter, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, FirstType, AbstractPropertyModelSmartFilters, PropertyModelExtensions} from './types';
+import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -16,7 +16,7 @@ export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,
     DTO extends Document,
-    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<Extensions['smartFilters']>>
+    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<any, any>>
 >
 {
     private abstractFindAggregator;
@@ -27,13 +27,13 @@ export abstract class AbstractPropertyModel<
     readonly #models: AbstractModels;
 
     /**
-     * 
+     *
      * @param models \{AbstractModels\} - Models instance
      * @param collection
      * @param path
      * @param params
      */
-    protected constructor( models: AbstractModels, public collection: Collection<RootDBE>, path: string, params: Extensions )
+    protected constructor( models: AbstractModels, public collection: Collection<RootDBE>, path: string, params: ConstructorExtensions<Extensions> )
     {
         this.#models = models;
         this.paths = [...path.matchAll(/[^\[\]]+(\[\])?/g)].map( m => ({ path: m[0].replace(/^\./,'').replace(/\[\]$/,''), array: m[0].endsWith('[]')}));
@@ -82,7 +82,7 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline( options: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']> = {} ): Promise<Document[]>
+    protected async pipeline( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> = {} ): Promise<Document[]>
     {
         let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...rest } = resolveBSONObject(options);
         const queryBuilder = new QueryBuilder<RootDBE>();
@@ -218,7 +218,7 @@ export abstract class AbstractPropertyModel<
         return Array.isArray( id ) ? entries : entries[0] ?? null as any;
     }
 
-    public async find<K extends keyof Extensions['converters']>( options: PropertyModelFindOptions<RootDBE, DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
+    public async find<K extends keyof Extensions['converters']>( options: PropertyModelFindOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
     {
         const { converter, projection } = this.converters[conversion];
 
@@ -231,7 +231,7 @@ export abstract class AbstractPropertyModel<
         return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
     }
 
-    public async list<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>>>>>
+    public async list<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>>>>>
     {
         const { converter, projection } = this.converters[conversion];
         const prev = options.cursor?.startsWith('prev:');
@@ -277,7 +277,7 @@ export abstract class AbstractPropertyModel<
         return prev ? result.reverse() : result;
     }
 
-    public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, Extensions['smartFilters']> ): Promise<T[]>
+    public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> ): Promise<T[]>
     {
         const aggregationPipeline = [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
 
@@ -292,14 +292,14 @@ export abstract class AbstractPropertyModel<
         return this.collection.aggregate( isSet( options ) ? [ ...await this.pipeline( options! ), ...pipeline ] : pipeline ).toArray() as Promise<T[]>;*/
     }
 
-    public async count( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, Extensions['smartFilters']> ): Promise<number>
+    public async count( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> ): Promise<number>
     {
         return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
 
     protected async accessFilter(): Promise<PropertyModelFilter<RootDBE,DBE> | void>{}
 
-    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Extensions['smartFilters']>]: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<SecondType<Extensions['smartFilters']>>]: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
         const pipeline: any[] = [];
         let filter: any = {};
@@ -345,7 +345,7 @@ export abstract class AbstractPropertyModel<
         return { filter, pipeline };
     }
 
-    private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']> )
+    private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> )
     {
         const sort = list.sort ?? { id: -1 };
 
@@ -357,7 +357,7 @@ export abstract class AbstractPropertyModel<
         return splitFilterToStages( stageFilter, this.prefix ) as Filter<RootDBE>
     }
 
-    private splitProjection( projection: PropertyModelListOptions<RootDBE, DBE, Extensions['smartFilters']>['projection'] ): {rootProjection?: any, propertyProjection?: any}
+    private splitProjection( projection: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>>['projection'] ): {rootProjection?: any, propertyProjection?: any}
     {
         if ( !projection ) { return {}; }
 
