@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten, addPrefixToPipeline} from '../../src/helpers';
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
@@ -388,6 +388,107 @@ describe('addPrefixToFilter', () =>
         const prefix = 'prefix';
         const expected = { 'a': { $dateToString: { format: '%Y-%m-%d', date: '$model.date' } } }
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected);
+    })
+});
+
+describe('addPrefixToPipeline', () => {
+    it ('should add prefix to keys in $match', () => {
+        const pipeline = [{ $match: { a: 1} }];
+        const expected = [{ $match: { 'prefix.a': 1 } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it ('should add prefix to $project', () => {
+        const pipeline = [{ $project: { a: '$b', b: 1, _root: { c: { d: '$x' } } } }];
+        const expected = [{ $project: { 'prefix.a': '$prefix.b', 'prefix.b': 1, _root: { c: { d: '$prefix.x' }}}}];
+        LOG(addPrefixToPipeline(pipeline, 'prefix'))
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $addFields', () => {
+        const pipeline = [{ $addFields: { a: '$b', b: 1, _root: { c: { d: '$x' } } } }];
+        const expected = [{ $addFields: { 'prefix.a': '$prefix.b', 'prefix.b': 1, c: { d: '$prefix.x' } } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $lookup', () => {
+        const pipeline = [{ $lookup: { from: 'collection', localField: 'a', foreignField: 'b', as: 'c' } }];
+        const expected = [{ $lookup: { from: 'collection', localField: 'prefix.a', foreignField: 'b', as: 'prefix.c' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should not add prefix to $lookup', () => {
+        const pipeline = [{ $lookup: { from: 'collection', localField: '$$ROOT.a', foreignField: 'b', as: 'c' } }];
+        const expected = [{ $lookup: { from: 'collection', localField: 'a', foreignField: 'b', as: 'c' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should not add prefix to $limit', () => {
+        const pipeline = [{ $limit: 1 }];
+        const expected = [{ $limit: 1 }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    })
+
+    it('should add prefix to $group', () => {
+        const pipeline = [{ $group: { _id: '$a', count: { $sum: 1 } } }];
+        const expected = [{ $group: { _id: '$prefix.a', count: { $sum: 1 } } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $unwind', () => {
+        const pipelineField = [{ $unwind: '$a' }];
+        const expectedField = [{ $unwind: '$prefix.a' }];
+        const pipelineArray = [{ $unwind: [ '$a', '$_root.b' ] }];
+        const expectedArray = [{ $unwind: [ '$prefix.a', '$b' ] }];
+
+        assert.deepStrictEqual(addPrefixToPipeline(pipelineField, 'prefix'), expectedField);
+        assert.deepStrictEqual(addPrefixToPipeline(pipelineArray, 'prefix'), expectedArray);
+    });
+
+    it('should add prefix to $replaceRoot', () => {
+        const pipeline = [{ $replaceRoot: { newRoot: '$a' } }];
+        const expected = [{ $replaceRoot: { newRoot: '$prefix.a' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $replaceWith', () => {
+        const pipeline = [{ $replaceWith: '$a' }];
+        const expected = [{ $replaceWith: '$prefix.a' }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should not add prefix to $replaceWith ($$ROOT)', () => {
+        const pipeline = [{ $replaceWith: '$$ROOT.a' }];
+        const expected = [{ $replaceWith: '$a' }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $set', () => {
+        const pipeline = [{ $set: { a: '$b', b: '$_root.c' } }];
+        const expected = [{ $set: { 'prefix.a': '$prefix.b', 'prefix.b': '$c' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $count', () => {
+        const pipeline = [{ $count: 'count' }];
+        const expected = [{ $count: 'prefix.count' }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should throw error for unsupported stages', () => {
+        assert.throws(() => addPrefixToPipeline([{ $graphLookup: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $collStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $indexStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $merge: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $out: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $redact: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $search: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $searchMeta: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $setWindowFields: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $sortByCount: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $unionWith: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{$vectorSearch: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
     })
 });
 

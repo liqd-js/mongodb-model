@@ -161,15 +161,17 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
 
     let prefixed = [];
 
-    for( const [ stage, query ] of Object.entries( pipeline ))
+    for( const pipelineStage of pipeline )
     {
+        const [ stage, query ] = Object.entries( pipelineStage )[0];
+
         if([ '$addFields', '$facet', '$match', '$set', '$sort' ].includes( stage ))
         {
-            prefixed.push( Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ prefix + '.' + key, addPrefixToValue( value, prefix )])));
+            prefixed.push( { [stage]: Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ prefix + '.' + key, addPrefixToValue( value, prefix )]))});
         }
         else if([ '$group' ].includes( stage ))
         {
-            prefixed.push( Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key === '_id' ? key : prefix + '.' + key, addPrefixToValue( value, prefix )])));
+            prefixed.push( { [stage]: Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key === '_id' ? key : prefix + '.' + key, addPrefixToValue( value, prefix )]))});
         }
         else if([ '$limit', '$skip' ].includes( stage ))
         {
@@ -186,7 +188,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         else if([ '$bucket', '$bucketAuto', '$densify', '$fill', '$geoNear', '$graphLookup',  '$lookup', '$replaceRoot', '$replaceWith', '$sample', '$unwind' ].includes( stage ))
         {
             // TODO toto nie je uplne dobre
-            prefixed.push( Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )])));
+            prefixed.push( { [stage]: Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]))});
         }
         // zakazat graphLookup, collStats, indexStats merge, out, $redact $search, $searchMeta, $setWindowFields, $sortByCount, '$unionWith' vectorSearch
         else
