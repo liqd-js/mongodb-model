@@ -17,10 +17,10 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
         pipeline?       : Document[],
         count?          : boolean
     };
-export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends any[] = never> = Omit<FindOptions<DBE>, 'projection'> &
+export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<TupleToUnion<Filters>>,
+        smartFilter?    : ModelSmartFilter<Filters>,
         cursor?         : string
         projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?       : Document[],
@@ -32,10 +32,10 @@ export type ModelFindOptions<DBE extends Document, Filters = never> =
         filter?         : Filter<DBE>
         smartFilter?    : ModelSmartFilter<Filters>,
     }
-export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters extends any[] = never> =
+export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<TupleToUnion<Filters>>,
+        smartFilter?    : ModelSmartFilter<Filters>,
     }
 
 export type ModelAggregateOptions<DBE extends Document, Filters = never> =
@@ -49,10 +49,10 @@ export type TupleToUnion<T extends any[]> = T extends [infer U, ...infer Rest]
     ? U & TupleToUnion<Rest>
     : never;
 
-export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends any[]> =
+export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<TupleToUnion<Filters>>
+        smartFilter?    : ModelSmartFilter<Filters>
         projection?     : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 
