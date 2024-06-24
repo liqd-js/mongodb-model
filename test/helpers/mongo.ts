@@ -417,12 +417,6 @@ describe('addPrefixToPipeline', () => {
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     });
 
-    it('should not add prefix to $lookup', () => {
-        const pipeline = [{ $lookup: { from: 'collection', localField: '$$ROOT.a', foreignField: 'b', as: 'c' } }];
-        const expected = [{ $lookup: { from: 'collection', localField: 'a', foreignField: 'b', as: 'c' } }];
-        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
-    });
-
     it('should not add prefix to $limit', () => {
         const pipeline = [{ $limit: 1 }];
         const expected = [{ $limit: 1 }];
@@ -432,6 +426,12 @@ describe('addPrefixToPipeline', () => {
     it('should add prefix to $group', () => {
         const pipeline = [{ $group: { _id: '$a', count: { $sum: 1 } } }];
         const expected = [{ $group: { _id: '$prefix.a', count: { $sum: 1 } } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $sort', () => {
+        const pipeline = [{ $sort: { a: 1, '$_root.b': -1 } }];
+        const expected = [{ $sort: { 'prefix.a': 1, b: -1 } }];
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     });
 

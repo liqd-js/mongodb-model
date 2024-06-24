@@ -167,7 +167,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
 
         if([ '$addFields', '$facet', '$match', '$set', '$sort' ].includes( stage ))
         {
-            prefixed.push( { [stage]: Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ prefix + '.' + key, addPrefixToValue( value, prefix )]))});
+            prefixed.push( { [stage]: addPrefixToValue( query, prefix )}); // Object.entries( query ).map(([ key, value ]) => [ prefix + '.' + key, ]))});
         }
         else if([ '$group' ].includes( stage ))
         {
