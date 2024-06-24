@@ -310,8 +310,8 @@ export abstract class AbstractPropertyModel<
             if ( hasPublicMethod( this.smartFilters, key ) )
             {
                 const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
-                result.pipeline && pipeline.push( ...result.pipeline );
-                result.filter && (filter[ key ] = result.filter);
+                result.pipeline && result.pipeline.map( ( el: any ) => addPrefixToFilter( el, this.prefix ) );
+                result.filter && addPrefixToFilter( result.filter, this.prefix );
             }
             else
             {
@@ -324,8 +324,8 @@ export abstract class AbstractPropertyModel<
         {
             const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveSmartFilter( extraFilters )
                 .then(( r: any ) => ({
-                    filter: r.filter && addPrefixToFilter( r.filter, this.prefix ),
-                    pipeline: r.pipeline && r.pipeline.map(( el: any ) => addPrefixToFilter( el, this.prefix ) ),
+                    filter: r.filter && r.filter,
+                    pipeline: r.pipeline && r.pipeline,
                 }));
 
             if ( parentFilter && Object.keys( parentFilter ).length > 0 )
