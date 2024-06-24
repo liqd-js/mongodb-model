@@ -324,10 +324,12 @@ export abstract class AbstractPropertyModel<
         {
             const { model: parentModel, prefix } = parent;
 
+            const localPrefix = prefix.split('.').slice(1).join('.');
+
             const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveSmartFilter( extraFilters )
                 .then(( r: any ) => ({
-                    filter: r.filter && addPrefixToFilter( r.filter, prefix ),
-                    pipeline: r.pipeline && r.pipeline.map(( el: any ) => addPrefixToFilter( el, prefix ) ),
+                    filter: r.filter && addPrefixToFilter( r.filter, localPrefix ),
+                    pipeline: r.pipeline && r.pipeline.map(( el: any ) => addPrefixToFilter( el, localPrefix ) ),
                 }));
 
             if ( parentFilter && Object.keys( parentFilter ).length > 0 )

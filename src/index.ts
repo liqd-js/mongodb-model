@@ -54,7 +54,7 @@ export class AbstractModels
 
             if( this.models.has( parent ) && this.models.get( parent )?.smartFilters )
             {
-                return { model: this.models.get( parent )!, prefix: parent.split('.').slice(1).join('.') };
+                return { model: this.models.get( parent )!, prefix: parent };
             }
         }
     }
