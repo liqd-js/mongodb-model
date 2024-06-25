@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import {deleteNullishProperties} from "../../src";
+import { describe, it } from 'node:test';
 
 describe('deleteNullishProperties', () => {
     it('should delete null and undefined properties from an object', () => {

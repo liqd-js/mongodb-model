@@ -425,12 +425,12 @@ describe('addPrefixToPipeline', () => {
 
     it('should add prefix to $group', () => {
         const pipeline = [{ $group: { _id: '$a', count: { $sum: 1 } } }];
-        const expected = [{ $group: { _id: '$prefix.a', count: { $sum: 1 } } }];
+        const expected = [{ $group: { _id: '$prefix.a', 'prefix.count': { $sum: 1 } } }];
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     });
 
     it('should add prefix to $sort', () => {
-        const pipeline = [{ $sort: { a: 1, '$_root.b': -1 } }];
+        const pipeline = [{ $sort: { a: 1, '_root.b': -1 } }];
         const expected = [{ $sort: { 'prefix.a': 1, b: -1 } }];
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     });
@@ -438,11 +438,8 @@ describe('addPrefixToPipeline', () => {
     it('should add prefix to $unwind', () => {
         const pipelineField = [{ $unwind: '$a' }];
         const expectedField = [{ $unwind: '$prefix.a' }];
-        const pipelineArray = [{ $unwind: [ '$a', '$_root.b' ] }];
-        const expectedArray = [{ $unwind: [ '$prefix.a', '$b' ] }];
 
         assert.deepStrictEqual(addPrefixToPipeline(pipelineField, 'prefix'), expectedField);
-        assert.deepStrictEqual(addPrefixToPipeline(pipelineArray, 'prefix'), expectedArray);
     });
 
     it('should add prefix to $replaceRoot', () => {

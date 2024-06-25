@@ -37,7 +37,7 @@ export function sortProjection( sort: Sort, id: string ): Record<string, 1>
 
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
 {
-    if( typeof filter === 'string' && filter.match(/^\$$ROOT\./) ){ return filter; }
+    if( typeof filter === 'string' && filter.match(/^\$\$ROOT\./) ){ return filter.replace(/^\$\$ROOT\./,'$'); }
     if( typeof filter === 'string' && filter.match(/^\$_root\./) ){ return '$' + filter.substring('$_root.'.length); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
@@ -185,10 +185,50 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         {
             prefixed.push({ [stage]: projectionToProject( query, prefix ) });
         }
-        else if([ '$bucket', '$bucketAuto', '$densify', '$fill', '$geoNear', '$graphLookup',  '$lookup', '$replaceRoot', '$replaceWith', '$sample', '$unwind' ].includes( stage ))
+        else if([ '$densify' ].includes( stage ))
+        {
+            prefixed.push({ $densify: 
+            {
+                field: addPrefixToValue( query.field, prefix ),
+                partitionByFields: query.partitionByFields.map(( field: string ) => addPrefixToValue( field, prefix )),
+                range: 
+                {
+                    step: query.range.step,
+                    unit: query.range.unit,
+                    bounds: query.range.bounds.map(( bound: any ) => addPrefixToValue( bound, prefix ))
+                }
+            }});
+        }
+        else if([ '$geoNear' ].includes( stage ))
+        {
+            prefixed.push({ $geoNear: 
+            { 
+                ...Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )])),
+                near: query.near
+            }});
+        }
+        else if([ '$lookup' ].includes( stage ))
+        {
+            prefixed.push({ $lookup: 
+            {
+                from: query.from,
+                localField: prefix + '.' + query.localField, // TODO root?
+                foreignField: query.foreignField,
+                as: prefix + '.' + query.as
+            }});
+        }
+        else if([ '$bucket', '$bucketAuto', '$fill', '$graphLookup', '$replaceRoot', '$replaceWith', '$sample', '$unwind' ].includes( stage ))
         {
             // TODO toto nie je uplne dobre
-            prefixed.push( { [stage]: Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]))});
+
+            if( typeof query === 'string' )
+            {
+                prefixed.push( { [stage]: addPrefixToValue( query, prefix )});
+            }
+            else
+            {
+                prefixed.push( { [stage]: Object.fromEntries( Object.entries( query ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]))});
+            }
         }
         // zakazat graphLookup, collStats, indexStats merge, out, $redact $search, $searchMeta, $setWindowFields, $sortByCount, '$unionWith' vectorSearch
         else
