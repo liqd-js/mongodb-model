@@ -199,6 +199,8 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         //lookup - prefixovat localField a as
     }
 
+    console.log( prefixed );
+
     return prefixed;
 }
 /**/
