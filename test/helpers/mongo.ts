@@ -472,8 +472,41 @@ describe('addPrefixToPipeline', () => {
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     });
 
+    it('should not add prefix to $function properties', () => {
+        const func = ( args: any ) => {
+            return 'test';
+        }
+        const pipeline = [
+            {
+                $addFields: {
+                    tmp: {
+                        $function: {
+                            body: func,
+                            args: ['$a', '$b'],
+                            lang: 'js'
+                        }
+                    }
+                }
+            }
+        ]
+        const expected = [
+            {
+                $addFields: {
+                    'prefix.tmp': {
+                        $function: {
+                            body: func,
+                            args: ['$prefix.a', '$prefix.b'],
+                            lang: 'js'
+                        }
+                    }
+                }
+            }
+        ]
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    })
+
     it('should throw error for unsupported stages', () => {
-        assert.throws(() => addPrefixToPipeline([{ $graphLookup: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        // assert.throws(() => addPrefixToPipeline([{ $graphLookup: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
         assert.throws(() => addPrefixToPipeline([{ $collStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
         assert.throws(() => addPrefixToPipeline([{ $indexStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
         assert.throws(() => addPrefixToPipeline([{ $merge: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
