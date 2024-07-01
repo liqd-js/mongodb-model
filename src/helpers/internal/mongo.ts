@@ -51,7 +51,7 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
         }
         else
         {
-            return Object.fromEntries( Object.entries( filter ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]));
+            return { [key]:  Object.fromEntries( Object.entries( filter[key] ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]))};
         }
     }
     if( typeof filter === 'object' &&

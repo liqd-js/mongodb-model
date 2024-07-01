@@ -7,7 +7,7 @@ export function i18n( i18n: { [key: string]: string } | string ): string
 {
     if( typeof i18n === 'string' ){ return i18n }
 
-    const locales: Set<string> = flowGet('locales') || [];
+    const locales: Set<string> = flowGet('locales') || new Set();
 
     for( let locale of locales )
     {
@@ -24,7 +24,7 @@ export function i18n( i18n: { [key: string]: string } | string ): string
 
 export function multiI18n( i18n: { [key: string]: string } | string ): {[key: string]: string }
 {
-    const locales: Set<string> = flowGet('locales') || [];
+    const locales: Set<string> = flowGet('locales') || new Set();
     const result: {[key: string]: string } = {};
 
     for( let locale of locales )
@@ -86,7 +86,7 @@ export function deleteNullishProperties(obj: any ): void
  */
 export function objectHash( obj: any, options: { sort?: boolean, alg?: 'plain' | 'sha1' | 'sha256' | 'cyrb64' } = {})
 {
-    const value = objectStringify( obj, { sortArrays: options.sort, ignoreUndefinedProperties: true, toString: ( obj: any ) => obj instanceof ObjectId ? `ObjectId("${obj.toString()}")` : undefined });
+    const value = objectStringify( obj, { sortArrays: options.sort, ignoreUndefinedProperties: true, stringify: ( obj: any ) => obj instanceof ObjectId ? `ObjectId("${obj.toString()}")` : undefined });
 
     return options.alg !== 'plain' ? crypto.createHash( options.alg ?? 'sha1' ).update( value ).digest('hex') : value;
 }
