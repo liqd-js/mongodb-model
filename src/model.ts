@@ -1,5 +1,5 @@
 import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
-import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
+import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, addPrefixToPipeline, addPrefixToFilter} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions } from './types';
 import { AbstractModels } from "./index";
@@ -225,7 +225,7 @@ export abstract class AbstractModel<
         }
 
         const pipeline: any[] = [];
-        const filter: any = {};
+        let filter: any = {};
         const extraFilters: any = {};
 
         for ( const [key, value] of Object.entries( smartFilter ) )
@@ -234,7 +234,7 @@ export abstract class AbstractModel<
             {
                 const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
                 result.pipeline && pipeline.push( ...result.pipeline );
-                result.filter && (filter[ key ] = result.filter);
+                result.filter && ( filter = { $and: [{ ...filter }, result.filter ].filter(f => Object.keys(f).length > 0) });
             }
             else
             {
