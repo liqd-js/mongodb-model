@@ -1,4 +1,4 @@
-import { MongoClient, MongoClientOptions } from 'mongodb';
+import { MongoClient, MongoClientOptions, WithTransactionCallback } from 'mongodb';
 import { flowStart, flowGet, flowSet, GET_PARENT, REGISTER_MODEL } from './helpers';
 import { AbstractPropertyModel } from "./property-model";
 import { AbstractModel } from "./model";
@@ -57,5 +57,10 @@ export class AbstractModels
                 return this.models.get( parent );
             }
         }
+    }
+
+    public async transaction<T = void>( transaction: WithTransactionCallback<T> ): Promise<T>
+    {
+        return await this.client.startSession().withTransaction( transaction );
     }
 }

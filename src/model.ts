@@ -1,7 +1,7 @@
 import {Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter} from 'mongodb';
 import {flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import { ModelAggregateOptions, CreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions } from './types';
+import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions } from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -79,7 +79,7 @@ export abstract class AbstractModel<
         return pipeline;
     }
 
-    public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: CreateOptions ): Promise<DTO['id']>
+    public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: ModelCreateOptions ): Promise<DTO['id']>
     {
         /*if( options?.converter )
         {
@@ -105,15 +105,28 @@ export abstract class AbstractModel<
         return _id;
     }
 
-    public async createFrom( data: any, id?: DTO['id'], options?: CreateOptions ): Promise<DTO['id']>
+    public async createFrom( data: any, id?: DTO['id'], options?: ModelCreateOptions ): Promise<DTO['id']>
     {
         throw new Error('Method not implemented.');
     }
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse>
     {
-        const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
-        return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
+        let documentBefore: DBE | undefined, documentAfter: DBE | undefined;
+
+        if( true )// !options?.documentBefore && !options?.documentAfter )
+        {
+            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );    
+
+            return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
+        }
+        else if( options?.documentBefore && options?.documentAfter )
+        {
+            this.#models.transaction( async() => {});
+        }
+
+        
+        //return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
     }
 
     public async get( id: DTO['id'] | DBE['_id'] ): Promise<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
@@ -138,7 +151,7 @@ export abstract class AbstractModel<
 
     public async find<K extends keyof Extensions['converters']>( options: ModelFindOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
     {
-        const { converter, projection } = this.converters[conversion];
+        const { converter } = this.converters[conversion];
 
         const dbe = await this.aggregate<DBE>( [{$limit: 1}], options ).then( r => r[0]);
 
@@ -147,7 +160,7 @@ export abstract class AbstractModel<
 
     public async list<K extends keyof Extensions['converters']>( options: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
-        const { converter, projection, cache } = this.converters[conversion];
+        const { converter, cache } = this.converters[conversion];
         const { filter = {}, sort = { _id: 1 }, cursor, limit, ...rest } = resolveBSONObject(options);
         const prev = cursor?.startsWith('prev:');
 

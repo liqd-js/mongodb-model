@@ -2,7 +2,8 @@ import {Document, Filter, FindOptions} from "mongodb";
 import {AbstractConverterOptions, AbstractModelFromConverter, FirstType, ModelSmartFilter, SmartFilterMethod, TypeMap} from "./internal";
 import {ApplicationFilters, EngagementFilters} from "../tmp/filters";
 
-export type CreateOptions = { duplicateIgnore?: boolean };
+export type ModelCreateOptions = { duplicateIgnore?: boolean };
+export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean };
 export type MongoRootDocument = Document & { _id: any };
 export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
