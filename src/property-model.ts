@@ -126,7 +126,7 @@ export abstract class AbstractPropertyModel<
         if( isSet( propertyProjection ))
         {
             // TODO je toto uplne spravne?
-            $project = projectionToProject({ id: 1, ...propertyProjection }, this.prefix );
+            $project = projectionToProject({ id: 1, ...propertyProjection }, this.prefix, false );
         }
         if( isSet( rootProjection ))
         {

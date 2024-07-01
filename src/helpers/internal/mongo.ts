@@ -353,9 +353,9 @@ function projectionToProjectInternal<DBE extends Document>( projection: FindOpti
     return result;
 }
 
-export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string ): Record<string, unknown>
+export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string, prefixKeys: boolean = true ): Record<string, unknown>
 {
-    return projectionToProjectInternal( projection, prefix, true, prefix );
+    return projectionToProjectInternal( projection, prefix, prefixKeys, prefix );
 }
 
 export function bsonValue( value: any )
