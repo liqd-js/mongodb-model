@@ -682,7 +682,7 @@ describe('projectionToProject', () =>
     it('should handle projection with string property', () =>
     {
         const projection = { 'a.b': 'c' };
-        const expected = { 'a': { 'b': 'c' } };
+        const expected = { 'a.b': 'c' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
@@ -710,8 +710,8 @@ describe('projectionToProject', () =>
     it('should handle projection with nested properties - object style', () =>
     {
         const projection = { a: { b: {c: 1, d: '$x'}, e: 1} };
-        const expected = { 'a': { 'b': { 'c': '$a.b.c', d: '$a.b.c.x' }, 'e': '$a.e' } };
-        assert.deepStrictEqual(projectionToProject(projection), expected);
+        const expected = { 'y.a': { 'b': { 'c': '$y.a.b.c', d: '$y.x' }, 'e': '$y.a.e' } };
+        assert.deepStrictEqual(projectionToProject(projection, 'y'), expected);
     });
 
     it('should handle projection with 0', () => {

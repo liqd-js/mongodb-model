@@ -125,11 +125,12 @@ export abstract class AbstractPropertyModel<
 
         if( isSet( propertyProjection ))
         {
-            $project = addPrefixToFilter( projectionToProject({ id: 1, ...propertyProjection }), this.prefix, false )
+            // TODO je toto uplne spravne?
+            $project = projectionToProject({ id: 1, ...propertyProjection }, this.prefix );
         }
         if( isSet( rootProjection ))
         {
-            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? addPrefixToFilter( projectionToProject( rootProjection ), '$$ROOT', false ) : '$$ROOT'
+            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? projectionToProject( rootProjection, '$$ROOT' ) : '$$ROOT'
         }
 
         if( $rootProject )

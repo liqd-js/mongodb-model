@@ -189,7 +189,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         }
         else if([ '$project' ].includes( stage ))
         {
-            prefixed.push({ [stage]: projectionToProject( query, prefix, true ) });
+            prefixed.push({ [stage]: projectionToProject( query, prefix ) });
         }
         else if([ '$densify' ].includes( stage ))
         {
@@ -313,74 +313,35 @@ export function isExclusionProjection<DBE extends Document>( projection: FindOpt
     return isExclusion ?? false;
 }
 
-export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '', prefixKeys: boolean = false ): Record<string, unknown>
+function projectionToProjectInternal<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '', prefixKeys: boolean = false, fullPath: string = '' ): Record<string, unknown>
 {
     const result: Document = {};
 
-    if( prefixKeys )
-    {
-        LOG( 'projectionToProject INPUT', { projection, prefix, prefixKeys });
-    }
-
     for ( const [ key, value ] of Object.entries( projection ))
     {
+        if( key.startsWith('$') && prefixKeys ){ throw new Error('Projection key cannot start with "$"'); }
+
         const prefixedKey = prefix ? prefix + '.' + key : key;
+        const keyFullPath = fullPath ? fullPath + '.' + key : key;
 
         if( key.startsWith('$') )
         {
-            result[key] = projectionToProject( value, key, false );
-        }
-        else if( prefixKeys )
-        {
-            switch ( typeof value )
-            {
-                case 'number':
-                    /*if( value === 0 )
-                    {
-                        result[prefixedKey] = 0;
-                    }
-                    else
-                    {
-                        result[prefixedKey] = '$' + prefixedKey;
-                    }*/
-                    result[prefixedKey] = value;
-                    break;
-
-                case 'string':
-                    result[prefixedKey] = addPrefixToValue( value, prefix, false );
-                    break;
-
-                case 'object':
-                    result[prefixedKey] = projectionToProject( value, prefix, false );
-                    break;
-
-                default:
-                    throw new Error('Unsupported projection value type');
-            }
+            result[key] = projectionToProjectInternal( value, key, false, keyFullPath );
         }
         else
         {
-            const path = key.split('.');
-
             switch ( typeof value )
             {
                 case 'number':
-                    /*if (value === 0)
-                    {
-                        objectSet( result, path, 0 );
-                    }
-                    else {
-                        objectSet( result, path, '$' + prefixedKey );
-                    }*/
-                    objectSet( result, path, value );
+                    result[ prefixKeys ? prefixedKey : key ] = ( value === 0 ) ? 0 : '$' + keyFullPath;
                     break;
 
                 case 'string':
-                    objectSet( result, path, addPrefixToValue( value, prefix, false ));
+                    result[ prefixKeys ? prefixedKey : key ] = addPrefixToValue( value, prefix, false );
                     break;
 
                 case 'object':
-                    objectSet( result, path, projectionToProject( value, prefix, false ));
+                    result[ prefixKeys ? prefixedKey : key ] = projectionToProjectInternal( value, prefix, false, keyFullPath );
                     break;
 
                 default:
@@ -389,12 +350,12 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
         }
     }
 
-    if( prefixKeys )
-    {
-        LOG( 'projectionToProject OUTPUT', { projection, prefix, prefixKeys });
-    }
-
     return result;
+}
+
+export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string ): Record<string, unknown>
+{
+    return projectionToProjectInternal( projection, prefix, true, prefix );
 }
 
 export function bsonValue( value: any )
