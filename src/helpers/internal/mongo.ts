@@ -335,14 +335,15 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
             switch ( typeof value )
             {
                 case 'number':
-                    if( value === 0 )
+                    /*if( value === 0 )
                     {
                         result[prefixedKey] = 0;
                     }
                     else
                     {
                         result[prefixedKey] = '$' + prefixedKey;
-                    }
+                    }*/
+                    result[prefixedKey] = value;
                     break;
 
                 case 'string':
@@ -364,13 +365,14 @@ export function projectionToProject<DBE extends Document>( projection: FindOptio
             switch ( typeof value )
             {
                 case 'number':
-                    if (value === 0)
+                    /*if (value === 0)
                     {
                         objectSet( result, path, 0 );
                     }
                     else {
                         objectSet( result, path, '$' + prefixedKey );
-                    }
+                    }*/
+                    objectSet( result, path, value );
                     break;
 
                 case 'string':
