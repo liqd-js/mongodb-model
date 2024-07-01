@@ -1,6 +1,7 @@
 import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter} from "mongodb";
 import {ModelConverterError, objectGet, objectHash, objectSet} from "../external";
 import {AbstractModelConverter} from "../../types";
+import { LOG } from "./utils";
 
 type Filter = Record<string, any>;
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
@@ -40,6 +41,7 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
     if( typeof filter === 'string' && filter.match(/^\$\$ROOT\./) ){ return filter.replace(/^\$\$ROOT\./,'$'); }
     if( typeof filter === 'string' && filter.match(/^\$_root\./) ){ return '$' + filter.substring('$_root.'.length); }
     if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
+    if( typeof filter === 'string' ){ return filter; }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
     if( typeof filter === 'object' && !Array.isArray( filter ) && Object.keys( filter ).length === 1 && [ '$cond', '$switch', '$function', '$accumulator', '$reduce', '$map', '$filter', '$convert', '$dateFromString' ].includes( Object.keys( filter )[0] ))
     {
@@ -48,6 +50,10 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
         if( key === '$switch' )
         {
             return { $switch: { branches: filter.$switch.branches.map(( branch: any ) => ({ ...branch, case: addPrefixToValue( branch.case, prefix, prefixKeys )})), default: addPrefixToValue( filter.$switch.default, prefix, prefixKeys ) }};
+        }
+        else if( key === '$function' )
+        {
+            return { $function: { lang: filter[key].lang, args: addPrefixToValue( filter[key].args, prefix, false ), body: filter[key].body }};
         }
         else
         {
@@ -83,7 +89,7 @@ export function resolveBSONValue( value: any ): any
     }
     if( typeof value === 'object' && Object.keys( value ).length === 1 )
     {
-        if( value.hasOwnProperty('$oid') ){ return new ObjectId( value.$oid )}
+        if( value.hasOwnProperty('$oid') ){ return new ObjectId( value.$oid as string )}
         if( value.hasOwnProperty('$date') ){ return new Date( value.$date )} // TODO verify it is not colliding
         if( value.hasOwnProperty('$function') )
         {
@@ -183,7 +189,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         }
         else if([ '$project' ].includes( stage ))
         {
-            prefixed.push({ [stage]: projectionToProject( query, prefix ) });
+            prefixed.push({ [stage]: projectionToProject( query, prefix, true ) });
         }
         else if([ '$densify' ].includes( stage ))
         {
@@ -307,51 +313,86 @@ export function isExclusionProjection<DBE extends Document>( projection: FindOpt
     return isExclusion ?? false;
 }
 
-export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '' ): Record<string, unknown>
+export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '', prefixKeys: boolean = false ): Record<string, unknown>
 {
     const result: Document = {};
 
+    if( prefixKeys )
+    {
+        LOG( 'projectionToProject INPUT', { projection, prefix, prefixKeys });
+    }
+
     for ( const [ key, value ] of Object.entries( projection ))
     {
-        if ( key.startsWith('$') )
+        const prefixedKey = prefix ? prefix + '.' + key : key;
+
+        if( key.startsWith('$') )
         {
-            result[key] = value;
-            continue;
+            result[key] = projectionToProject( value, key, false );
         }
-
-        switch ( typeof value )
+        else if( prefixKeys )
         {
-            case 'number':
-                if (value === 0)
-                {
-                    objectSet( result, key.split('.'), 0 );
-                }
-                else {
-                    objectSet( result, key.split('.'), '$' + prefixField(key, prefix) );
-                }
-                break;
+            switch ( typeof value )
+            {
+                case 'number':
+                    if( value === 0 )
+                    {
+                        result[prefixedKey] = 0;
+                    }
+                    else
+                    {
+                        result[prefixedKey] = '$' + prefixedKey;
+                    }
+                    break;
 
-            case 'string':
-                objectSet( result, key.split('.'), value );
-                break;
+                case 'string':
+                    result[prefixedKey] = addPrefixToValue( value, prefix, false );
+                    break;
 
-            case 'object':
-                objectSet( result, key.split('.'), projectionToProject( value, prefixField(key, prefix) ));
-                break;
+                case 'object':
+                    result[prefixedKey] = projectionToProject( value, prefix, false );
+                    break;
 
-            default:
-                throw new Error('Unsupported projection value type');
+                default:
+                    throw new Error('Unsupported projection value type');
+            }
+        }
+        else
+        {
+            const path = key.split('.');
+
+            switch ( typeof value )
+            {
+                case 'number':
+                    if (value === 0)
+                    {
+                        objectSet( result, path, 0 );
+                    }
+                    else {
+                        objectSet( result, path, '$' + prefixedKey );
+                    }
+                    break;
+
+                case 'string':
+                    objectSet( result, path, addPrefixToValue( value, prefix, false ));
+                    break;
+
+                case 'object':
+                    objectSet( result, path, projectionToProject( value, prefix, false ));
+                    break;
+
+                default:
+                    throw new Error('Unsupported projection value type');
+            }
         }
     }
 
+    if( prefixKeys )
+    {
+        LOG( 'projectionToProject OUTPUT', { projection, prefix, prefixKeys });
+    }
+
     return result;
-}
-
-function prefixField( field: string, prefix: string ): string
-{
-    if ( prefix === '' ) { return field; }
-
-    return prefix + '.' + field;
 }
 
 export function bsonValue( value: any )
