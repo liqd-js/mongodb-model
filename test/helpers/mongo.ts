@@ -400,7 +400,7 @@ describe('addPrefixToPipeline', () => {
 
     it ('should add prefix to $project', () => {
         const pipeline = [{ $project: { a: '$b', b: 1, _root: { c: { d: '$x' } } } }];
-        const expected = [{ $project: { 'prefix.a': '$prefix.b', 'prefix.b': 1, _root: { c: { d: '$prefix.x' }}}}];
+        const expected = [{ $project: { 'prefix.a': '$prefix.b', 'prefix.b': 1, 'prefix._root': { c: { d: '$prefix.x' }}}}];
         LOG(addPrefixToPipeline(pipeline, 'prefix'))
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     });
@@ -689,7 +689,7 @@ describe('projectionToProject', () =>
     it('should handle projection with non-string property', () =>
     {
         const projection = { 'a.b': 1 };
-        const expected = { 'a': { 'b': '$a.b' } };
+        const expected = { 'a': { 'b': 1 } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
@@ -703,32 +703,32 @@ describe('projectionToProject', () =>
     it('should handle projection with nested properties', () =>
     {
         const projection = { 'a.b.c': 1, 'a.b.d': 1, 'c': 1 };
-        const expected = { 'a': { 'b': { 'c': '$a.b.c', 'd': '$a.b.d' }}, 'c': '$c' };
+        const expected = { 'a': { 'b': { 'c': 1, 'd': 1 }}, 'c': 1 };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
     it('should handle projection with nested properties - object style', () =>
     {
-        const projection = { a: { b: {c: 1}, d: 1} };
-        const expected = { 'a': { 'b': { 'c': '$a.b.c' }, 'd': '$a.d' } };
+        const projection = { a: { b: {c: 1, d: '$x'}, e: 1} };
+        const expected = { a: { b: { c: 1, d: '$x' }, e: 1 } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
     it('should handle projection with 0', () => {
         const projection = { 'a.b': 0, 'a.c': 1 };
-        const expected = { 'a': { 'b': 0, 'c': '$a.c' } };
+        const expected = { 'a': { 'b': 0, 'c': 1 } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
     it('should handle $dateToString', () => {
         const projection = { date: {$dateToString: {format: '%Y-%m-%d', date: '$_root.date'}} };
-        const expected = { date: { $dateToString: { format: '%Y-%m-%d', date: '$_root.date' } } };
+        const expected = { date: { $dateToString: { format: '%Y-%m-%d', date: '$date' } } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
     it('should handle basic projection', () => {
         const projection = { a: 1, b: 1 };
-        const expected = { a: '$a', b: '$b' };
+        const expected = { a: 1, b: 1 };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
@@ -740,14 +740,14 @@ describe('projectionToProject', () =>
 
     it('should handle nested projection', () => {
         const projection = { a: {b: 0, c: 1} };
-        const expected = { a: {b: 0, c: '$a.c'} };
+        const expected = { a: {b: 0, c: 1} };
 
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
     it('should handle nested projection 2', () => {
         const projection = { a: {b: {c: 1}, d: 1} };
-        const expected = { a: {b: {c: '$a.b.c'}, d: '$a.d'} };
+        const expected = { a: {b: {c: 1}, d: 1} };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 });
