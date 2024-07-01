@@ -505,6 +505,55 @@ describe('addPrefixToPipeline', () => {
         assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
     })
 
+    it('should not add prefix to objects in $function args', () => {
+        const func = ( args: any ) => {}
+        const pipeline = [
+            {
+                $match: {
+                    $expr: {
+                        $function: {
+                            body: func,
+                            args: [
+                                "$events",
+                                {
+                                    "from": new Date(),
+                                    "to": new Date()
+                                },
+                                {
+                                    test: '$aaa'
+                                }
+                            ],
+                            lang: "js"
+                        }
+                    }
+                }
+            }
+        ];
+        const expected = [
+            {
+                $match: {
+                    $expr: {
+                        $function: {
+                            body: func,
+                            args: [
+                                "$prefix.events",
+                                {
+                                    "from": new Date(),
+                                    "to": new Date()
+                                },
+                                {
+                                    test: '$prefix.aaa'
+                                }
+                            ],
+                            lang: "js"
+                        }
+                    }
+                }
+            }
+        ];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    })
+
     it('should throw error for unsupported stages', () => {
         // assert.throws(() => addPrefixToPipeline([{ $graphLookup: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
         assert.throws(() => addPrefixToPipeline([{ $collStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
