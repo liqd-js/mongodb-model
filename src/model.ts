@@ -122,11 +122,19 @@ export abstract class AbstractModel<
         }
         else if( options?.documentBefore && options?.documentAfter )
         {
-            this.#models.transaction( async() => {});
+            this.#models.transaction( async() => 
+            {
+                
+            });
         }
 
         
         //return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
+    }
+
+    public async updateOne( match: ModelFindOptions<DBE, Extensions['smartFilters']>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse>
+    {
+        return { matchedCount: 1, modifiedCount: 1 };
     }
 
     public async get( id: DTO['id'] | DBE['_id'] ): Promise<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
