@@ -689,7 +689,7 @@ describe('projectionToProject', () =>
     it('should handle projection with non-string property', () =>
     {
         const projection = { 'a.b': 1 };
-        const expected = { 'a': { 'b': 1 } };
+        const expected = { 'a': { 'b': '$a.b' } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
@@ -703,20 +703,20 @@ describe('projectionToProject', () =>
     it('should handle projection with nested properties', () =>
     {
         const projection = { 'a.b.c': 1, 'a.b.d': 1, 'c': 1 };
-        const expected = { 'a': { 'b': { 'c': 1, 'd': 1 }}, 'c': 1 };
+        const expected = { 'a': { 'b': { 'c': '$a.b.c', 'd': '$a.b.d' }}, 'c': '$c' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
     it('should handle projection with nested properties - object style', () =>
     {
         const projection = { a: { b: {c: 1, d: '$x'}, e: 1} };
-        const expected = { a: { b: { c: 1, d: '$x' }, e: 1 } };
+        const expected = { 'a': { 'b': { 'c': '$a.b.c', d: '$a.b.c.x' }, 'e': '$a.e' } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
     it('should handle projection with 0', () => {
         const projection = { 'a.b': 0, 'a.c': 1 };
-        const expected = { 'a': { 'b': 0, 'c': 1 } };
+        const expected = { 'a': { 'b': 0, 'c': '$a.c' } };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
@@ -728,7 +728,7 @@ describe('projectionToProject', () =>
 
     it('should handle basic projection', () => {
         const projection = { a: 1, b: 1 };
-        const expected = { a: 1, b: 1 };
+        const expected = { a: '$a', b: '$b' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
@@ -740,14 +740,14 @@ describe('projectionToProject', () =>
 
     it('should handle nested projection', () => {
         const projection = { a: {b: 0, c: 1} };
-        const expected = { a: {b: 0, c: 1} };
+        const expected = { a: {b: 0, c: '$a.c'} };
 
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 
     it('should handle nested projection 2', () => {
         const projection = { a: {b: {c: 1}, d: 1} };
-        const expected = { a: {b: {c: 1}, d: 1} };
+        const expected = { a: {b: {c: '$a.b.c'}, d: '$a.d'} };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
 });
