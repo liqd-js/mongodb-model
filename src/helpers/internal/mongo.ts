@@ -40,7 +40,7 @@ function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boo
 {
     if( typeof filter === 'string' && filter.match(/^\$\$ROOT\./) ){ return filter.replace(/^\$\$ROOT\./,'$'); }
     if( typeof filter === 'string' && filter.match(/^\$_root\./) ){ return '$' + filter.substring('$_root.'.length); }
-    if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return filter.replace(/^\$/, '$' + prefix + '.' ); }
+    if( typeof filter === 'string' && filter.match(/^\$[^\$]/) ){ return prefix ? filter.replace(/^\$/, '$' + prefix + '.' ) : filter; }
     if( typeof filter === 'string' ){ return filter; }
     if( typeof filter !== 'object' || filter === null ){ return filter; }
     if( typeof filter === 'object' && !Array.isArray( filter ) && Object.keys( filter ).length === 1 && [ '$cond', '$switch', '$function', '$accumulator', '$reduce', '$map', '$filter', '$convert', '$dateFromString' ].includes( Object.keys( filter )[0] ))
