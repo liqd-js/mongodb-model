@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod } from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod } from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions} from './types';
 import { AbstractModels } from "./index";
@@ -263,7 +263,7 @@ export abstract class AbstractModel<
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                fields[property] = await (this.computedProperties as any)[property]
+                fields[property] = await (this.computedProperties as any)[property]();
             }
         }
 
