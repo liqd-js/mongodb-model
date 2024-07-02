@@ -5,6 +5,7 @@ import { collectAddedFields, generateCursorCondition, isSet, mergeFilters, optim
 export type ListParams<DBE extends MongoRootDocument> =
 {
     accessFilter?: Filter<DBE>
+    computedProperties?: Document
     filter?: Filter<DBE>
     smartFilter?: {filter?: Filter<DBE>, pipeline?: Document[]}
     pipeline?: Document[]
@@ -37,7 +38,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
             ...( options.smartFilter?.pipeline || [] ),
-            ...( options.projection ? [{ $project: options.projection }] : []),
+            ...( options.projection ? [{ $project: {...options.projection, ...params.computedProperties }}] : []),
             ...( options.pipeline || [] ),
             ...( addedFields.length ? [{ $unset: addedFields }] : []),
             ...( options.sort ? [{ $sort: prev ? reverseSort( options.sort ) : options.sort }] : []),
@@ -48,7 +49,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 
     async count( params: ListParams<DBE> )
     {
-        const { cursor, ...options } = params;
+        const { cursor, computedProperties, ...options } = params;
         return this.buildCountPipeline(await this.pipeline({ ...options }));
     }
 

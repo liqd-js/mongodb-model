@@ -1,7 +1,7 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
 import { flowGet, DUMP, flowSet, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod } from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions } from './types';
+import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -15,18 +15,20 @@ export const Aggregator = require('@liqd-js/aggregator');
 export abstract class AbstractModel<
     DBE extends MongoRootDocument,
     DTO extends Document,
-    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<Extensions['smartFilters']>>
+    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<Extensions['smartFilters']>, AbstractModelProperties<Extensions['computedProperties']>>
 >
 {
     private abstractFindAggregator;
     public converters: Extensions['converters'];
     public smartFilters?: Extensions['smartFilters'];
+    private computedProperties: Extensions['computedProperties'];
     readonly #models: AbstractModels;
 
     protected constructor( models: AbstractModels, public collection: Collection<DBE>, params: Extensions )
     {
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
-        this.smartFilters = params.smartFilters as any;
+        this.smartFilters = params.smartFilters;
+        this.computedProperties = params.computedProperties;
 
         this.#models = models;
 
@@ -116,7 +118,7 @@ export abstract class AbstractModel<
 
         if( true )// !options?.documentBefore && !options?.documentAfter )
         {
-            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );    
+            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
 
             return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
         }
@@ -173,10 +175,13 @@ export abstract class AbstractModel<
         const prev = cursor?.startsWith('prev:');
 
         const smartFilter = options.smartFilter && await this.resolveSmartFilter( options.smartFilter );
+        const computedProperties = options.computedProperties && await this.resolveComputedProperties( rest.computedProperties );
+
         const params = {
             filter, sort, smartFilter, cursor, limit, ...rest,
             accessFilter: await this.accessFilter() || undefined,
-            pipeline: options.pipeline
+            pipeline: options.pipeline,
+            computedProperties
         };
         const queryBuilder = new QueryBuilder<DBE>();
 
@@ -248,6 +253,21 @@ export abstract class AbstractModel<
         }
 
         return { filter, pipeline };
+    }
+
+    private async resolveComputedProperties( properties: string[] )
+    {
+        const fields: ReturnType<ComputedPropertyMethod> = {};
+
+        for ( const property of properties )
+        {
+            if ( hasPublicMethod( this.computedProperties, property ) )
+            {
+                fields[property] = await (this.computedProperties as any)[property]
+            }
+        }
+
+        return fields;
     }
 
     public async delete( id: DTO['id'] ): Promise<Boolean>

@@ -1,8 +1,8 @@
 import {Document, Filter, FindOptions} from "mongodb";
-import {AbstractConverterOptions, AbstractModelFromConverter, ModelSmartFilter, SmartFilterMethod} from "./internal";
+import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ModelSmartFilter, SmartFilterMethod} from "./internal";
 
 export type ModelCreateOptions = { duplicateIgnore?: boolean };
-export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean };
+export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean, /* TODO upsert a ine veci */ };
 export type MongoRootDocument = Document & { _id: any };
 export type MongoPropertyDocument = Document & ({ id: any } | { _id: any });
 export type WithTotal<T> = T & { total?: number };
@@ -11,11 +11,12 @@ export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> 
 
 export type ModelListOptions<DBE extends Document, Filters = never> = FindOptions<DBE> &
     {
-        filter?         : Filter<DBE>,
-        smartFilter?    : ModelSmartFilter<Filters>,
-        cursor?         : string,
-        pipeline?       : Document[],
-        count?          : boolean
+        filter?             : Filter<DBE>,
+        smartFilter?        : ModelSmartFilter<Filters>,
+        computedProperties? : string[],
+        cursor?             : string,
+        pipeline?           : Document[],
+        count?              : boolean
     };
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
@@ -71,5 +72,7 @@ export type AbstractModelConverters<DBE extends Document> =
 export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
 export type AbstractPropertyModelSmartFilters<T extends AbstractModelSmartFilters<any>, P extends AbstractModelSmartFilters<any>> = T extends never ? undefined : [T, P]
 
+export type AbstractModelProperties<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? ComputedPropertyMethod : T[K] }
+// TODO: property model computed properties
 
 export type ModelUpdateResponse = { matchedCount: number, modifiedCount: number };
