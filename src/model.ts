@@ -21,7 +21,7 @@ export abstract class AbstractModel<
     private abstractFindAggregator;
     public converters: Extensions['converters'];
     public smartFilters?: Extensions['smartFilters'];
-    private computedProperties: Extensions['computedProperties'];
+    private readonly computedProperties: Extensions['computedProperties'];
     readonly #models: AbstractModels;
 
     protected constructor( models: AbstractModels, public collection: Collection<DBE>, params: Extensions )
@@ -175,7 +175,7 @@ export abstract class AbstractModel<
         const prev = cursor?.startsWith('prev:');
 
         const smartFilter = options.smartFilter && await this.resolveSmartFilter( options.smartFilter );
-        const computedProperties = options.computedProperties && await this.resolveComputedProperties( rest.computedProperties );
+        const computedProperties = converter.computedProperties && await this.resolveComputedProperties( converter.computedProperties );
 
         const params = {
             filter, sort, smartFilter, cursor, limit, ...rest,

@@ -11,18 +11,19 @@ export type SmartFilterMethod = ( params: any ) => { pipeline: Document[] | null
 export type ComputedPropertyMethod = ( params: any ) => any;
 
 export type AbstractModelFromConverter<DBE extends Document, T> = (data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
-export type AbstractConverterOptions<DBE extends Document> =
+export type AbstractConverterOptions<DBE extends Document, ComputedProperties = never> =
     {
-        converter       : AbstractModelConverter<DBE>,
-        projection?     : FindOptions<DBE>['projection'],
-        cache?          : { retention?: string, cap?: string, frequency?: number, list?: boolean, precache?: boolean }, // precache prefetchne dalsiu stranu cez cursor
+        converter           : AbstractModelConverter<DBE>,
+        projection?         : FindOptions<DBE>['projection'],
+        computedProperties? : string[] | ( (...args: any) => string[] ),
+        cache?              : { retention?: string, cap?: string, frequency?: number, list?: boolean, precache?: boolean }, // precache prefetchne dalsiu stranu cez cursor
     }
 
 export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never, ComputedProperties extends AbstractModelSmartFilters<any> = never> =
     {
         converters      : AbstractModelConverters<DBE>,
-        smartFilters?   : SmartFilters
-        computedProperties?: ComputedProperties
+        smartFilters?   : SmartFilters,
+        computedProperties?: ComputedProperties,
     }
 export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never> =
     {

@@ -38,6 +38,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
             ...( options.smartFilter?.pipeline || [] ),
+            ...( !options.projection && params.computedProperties ? [{ $addFields: params.computedProperties }] : [] ),
             ...( options.projection ? [{ $project: {...options.projection, ...params.computedProperties }}] : []),
             ...( options.pipeline || [] ),
             ...( addedFields.length ? [{ $unset: addedFields }] : []),
