@@ -1,5 +1,5 @@
 import {Document, FindOptions} from "mongodb";
-import {AbstractModelConverter, AbstractModelConverters, AbstractModelSmartFilters, AbstractPropertyModelSmartFilters, MongoPropertyDocument, MongoRootDocument} from "./external";
+import {AbstractModelConverter, AbstractModelConverters, AbstractModelProperties, AbstractModelSmartFilters, AbstractPropertyModelSmartFilters, MongoPropertyDocument, MongoRootDocument} from "./external";
 
 export type FirstParameter<T> = T extends (arg: infer P) => any ? P : never;
 export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
@@ -19,7 +19,7 @@ export type AbstractConverterOptions<DBE extends Document, ComputedProperties = 
         cache?              : { retention?: string, cap?: string, frequency?: number, list?: boolean, precache?: boolean }, // precache prefetchne dalsiu stranu cez cursor
     }
 
-export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never, ComputedProperties extends AbstractModelSmartFilters<any> = never> =
+export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never, ComputedProperties extends AbstractModelProperties<any> = never> =
     {
         converters      : AbstractModelConverters<DBE>,
         smartFilters?   : SmartFilters,
