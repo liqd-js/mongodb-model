@@ -1,6 +1,5 @@
 import {Document, Filter, FindOptions} from "mongodb";
-import {AbstractConverterOptions, AbstractModelFromConverter, FirstType, ModelSmartFilter, SmartFilterMethod, TypeMap} from "./internal";
-import {ApplicationFilters, EngagementFilters} from "../tmp/filters";
+import {AbstractConverterOptions, AbstractModelFromConverter, ModelSmartFilter, SmartFilterMethod} from "./internal";
 
 export type ModelCreateOptions = { duplicateIgnore?: boolean };
 export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean };
@@ -72,8 +71,5 @@ export type AbstractModelConverters<DBE extends Document> =
 export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? SmartFilterMethod : T[K] }
 export type AbstractPropertyModelSmartFilters<T extends AbstractModelSmartFilters<any>, P extends AbstractModelSmartFilters<any>> = T extends never ? undefined : [T, P]
 
-/*
- * len skuska
- */
 
 export type ModelUpdateResponse = { matchedCount: number, modifiedCount: number };

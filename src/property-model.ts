@@ -1,5 +1,5 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType} from './types';
@@ -126,11 +126,11 @@ export abstract class AbstractPropertyModel<
         if( isSet( propertyProjection ))
         {
             // TODO je toto uplne spravne?
-            $project = projectionToProject({ id: 1, ...propertyProjection }, this.prefix, false );
+            $project = projectionToReplace({ id: 1, ...propertyProjection }, this.prefix );
         }
         if( isSet( rootProjection ))
         {
-            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? projectionToProject( rootProjection, '$$ROOT' ) : '$$ROOT'
+            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? projectionToReplace( rootProjection, '$$ROOT' ) : '$$ROOT'
         }
 
         if( $rootProject )

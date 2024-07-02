@@ -1,5 +1,5 @@
 import {DateInterval} from "@ramp-global/types";
-import {AbstractModelSmartFilters} from "../types";
+import {AbstractModelSmartFilters, AbstractPropertyModelSmartFilters} from "../types";
 
 export class ApplicationFilters implements AbstractModelSmartFilters<ApplicationFilters>
 {

@@ -313,7 +313,15 @@ export function isExclusionProjection<DBE extends Document>( projection: FindOpt
     return isExclusion ?? false;
 }
 
-function projectionToProjectInternal<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '', prefixKeys: boolean = false, fullPath: string = '' ): Record<string, unknown>
+/**
+ * Converts projection to project object
+ * @param projection - projection to convert
+ * @param prefix - prefix to add to keys
+ * @param prefixKeys - whether to add prefix to object keys
+ * @param fullPath - full path to the object - used for nested object projections
+ * @param simpleKeys - true if keys are simple - without dots
+ */
+function projectionToProjectInternal<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '', prefixKeys: boolean = false, fullPath: string = '', simpleKeys?: boolean ): Record<string, unknown>
 {
     const result: Document = {};
 
@@ -330,22 +338,33 @@ function projectionToProjectInternal<DBE extends Document>( projection: FindOpti
         }
         else
         {
+            let projectedValue:any;
+
             switch ( typeof value )
             {
                 case 'number':
-                    result[ prefixKeys ? prefixedKey : key ] = ( value === 0 ) ? 0 : '$' + keyFullPath;
+                    projectedValue = ( value === 0 ) ? 0 : '$' + keyFullPath;
                     break;
 
                 case 'string':
-                    result[ prefixKeys ? prefixedKey : key ] = addPrefixToValue( value, prefix, false );
+                    projectedValue = addPrefixToValue( value, prefix, false );
                     break;
 
                 case 'object':
-                    result[ prefixKeys ? prefixedKey : key ] = projectionToProjectInternal( value, prefix, false, keyFullPath );
+                    projectedValue = projectionToProjectInternal( value, prefix, false, keyFullPath );
                     break;
 
                 default:
                     throw new Error('Unsupported projection value type');
+            }
+
+            if( simpleKeys )
+            {
+                objectSet( result, ( prefixKeys ? prefixedKey : key ).split('.'), projectedValue );
+            }
+            else
+            {
+                result[ prefixKeys ? prefixedKey : key ] = projectedValue;
             }
         }
     }
@@ -353,9 +372,14 @@ function projectionToProjectInternal<DBE extends Document>( projection: FindOpti
     return result;
 }
 
+export function projectionToReplace<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string ): Record<string, unknown>
+{
+    return projectionToProjectInternal( projection, prefix, false, prefix, false );
+}
+
 export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string, prefixKeys: boolean = true ): Record<string, unknown>
 {
-    return projectionToProjectInternal( projection, prefix, prefixKeys, prefix );
+    return projectionToProjectInternal( projection, prefix, prefixKeys, prefix, true );
 }
 
 export function bsonValue( value: any )
