@@ -374,12 +374,12 @@ function projectionToProjectInternal<DBE extends Document>( projection: FindOpti
 
 export function projectionToReplace<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string ): Record<string, unknown>
 {
-    return projectionToProjectInternal( projection, prefix, false, prefix, false );
+    return projectionToProjectInternal( projection, prefix, false, prefix, true );
 }
 
 export function projectionToProject<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string, prefixKeys: boolean = true ): Record<string, unknown>
 {
-    return projectionToProjectInternal( projection, prefix, prefixKeys, prefix, true );
+    return projectionToProjectInternal( projection, prefix, prefixKeys, prefix, false );
 }
 
 export function bsonValue( value: any )
