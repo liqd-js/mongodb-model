@@ -130,7 +130,7 @@ export abstract class AbstractPropertyModel<
         }
         if( isSet( rootProjection ))
         {
-            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? projectionToReplace( rootProjection, '$$ROOT' ) : '$$ROOT'
+            $rootProject = typeof rootProjection === 'object' && unsetFieldsRoot.length === 0 ? projectionToReplace( rootProjection, '$ROOT' ) : '$$ROOT'
         }
 
         if( $rootProject )
