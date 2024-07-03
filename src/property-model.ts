@@ -86,13 +86,15 @@ export abstract class AbstractPropertyModel<
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
     protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> = {}, conversion?: K ): Promise<Document[]>
     {
+        const { computedProperties } = this.converters[conversion ?? 'dto'];
+
         let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...rest } = resolveBSONObject(options);
         const queryBuilder = new QueryBuilder<RootDBE>();
 
         let pipeline:  Document[] = [], prefix = '$';
 
         const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
-        const computedProperties = conversion && this.computedProperties ? await this.resolveComputedProperties( this.computedProperties ) : undefined;
+        const computed = conversion && computedProperties ? await this.resolveComputedProperties( Array.isArray(computedProperties) ? computedProperties : computedProperties() ) : undefined;
 
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
@@ -127,16 +129,15 @@ export abstract class AbstractPropertyModel<
 
         console.log( 'ROOT PROJECTION SET', { rootProjection, propertyProjection });
 
-        // addFields - computed properties
-        if ( computedProperties?.fields )
+        if ( computed?.fields )
         {
-            pipeline.push([{ $addFields: computedProperties.fields }]);
+            pipeline.push([{ $addFields: computed.fields }]);
         }
 
         if( isSet( propertyProjection ))
         {
             // TODO je toto uplne spravne?
-            $project = projectionToReplace({ id: 1, ...propertyProjection }, this.prefix );
+            $project = projectionToReplace({ id: 1, ...propertyProjection, ...computed?.fields }, this.prefix );
         }
         if( isSet( rootProjection ))
         {
@@ -145,11 +146,11 @@ export abstract class AbstractPropertyModel<
 
         if( $rootProject )
         {
-            pipeline.push({ $replaceWith: { $mergeObjects: [ {...$project, ...computedProperties?.fields }, { '_root': $rootProject }]}});
+            pipeline.push({ $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject }]}});
         }
         else
         {
-            pipeline.push({ $replaceWith: {...$project, ...computedProperties?.fields } });
+            pipeline.push({ $replaceWith: $project });
         }
 
         const unsetFields = [...unsetFieldsProperty, ...unsetFieldsRoot];
@@ -374,7 +375,7 @@ export abstract class AbstractPropertyModel<
             }
         }
 
-        return { fields: fields !== {} ? fields : null, pipeline: null };
+        return { fields: Object.keys(fields).length ? fields : null, pipeline: null };
     }
 
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> )

@@ -22,7 +22,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 {
     async pipeline( params: ListParams<DBE> )
     {
-        const { fields: computedFields, pipeline: computedPipeline } = params.computedProperties
+        const { fields: computedFields, pipeline: computedPipeline } = params.computedProperties || {}
 
         const options = resolveBSONObject( params );
         const accessFilter = options.accessFilter

@@ -175,7 +175,7 @@ export abstract class AbstractModel<
         const prev = cursor?.startsWith('prev:');
 
         const smartFilter = options.smartFilter && await this.resolveSmartFilter( options.smartFilter );
-        const computedProperties = await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() );
+        const computedProperties = compProps && await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() ) || undefined;
 
         const params = {
             filter, sort, smartFilter, cursor, limit, ...rest,
