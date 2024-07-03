@@ -136,12 +136,12 @@ export abstract class AbstractPropertyModel<
 
         if( isSet( propertyProjection ))
         {
-            const computedProjection: Record<string, 1> = {};
+            const computedProjection: Record<string, string> = {};
 
             for ( const key in computed?.fields )
             {
                 const path = key.split('.');
-                computedProjection[path[path.length - 1]] = 1;
+                computedProjection[path[path.length - 1]] = key;
             }
 
             // TODO je toto uplne spravne?
