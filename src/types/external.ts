@@ -72,6 +72,5 @@ export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in
 export type AbstractPropertyModelSmartFilters<T extends AbstractModelSmartFilters<any>, P extends AbstractModelSmartFilters<any>> = T extends never ? undefined : [T, P]
 
 export type AbstractModelProperties<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? ComputedPropertyMethod : T[K] }
-// TODO: property model computed properties
 
 export type ModelUpdateResponse = { matchedCount: number, modifiedCount: number };

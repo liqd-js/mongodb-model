@@ -1,8 +1,8 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, extractAddedFields, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType} from './types';
+import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -16,7 +16,7 @@ export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,
     DTO extends Document,
-    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<any, any>>
+    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<any, any>, AbstractModelProperties<Extensions['computedProperties']>>
 >
 {
     private abstractFindAggregator;
@@ -24,6 +24,7 @@ export abstract class AbstractPropertyModel<
     private prefix;
     public converters: Extensions['converters'];
     public smartFilters?: FirstType<Extensions['smartFilters']>;
+    private readonly computedProperties;
     readonly #models: AbstractModels;
 
     /**
@@ -40,6 +41,7 @@ export abstract class AbstractPropertyModel<
         this.prefix = this.paths.map( p => p.path ).join('.');
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
         this.smartFilters = params.smartFilters;
+        this.computedProperties = params.computedProperties;
 
         this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'] ) =>
         {
@@ -82,7 +84,7 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> = {} ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> = {}, conversion?: K ): Promise<Document[]>
     {
         let { filter = {} as PropertyModelFilter<RootDBE, DBE>, sort = { id: -1 }, ...rest } = resolveBSONObject(options);
         const queryBuilder = new QueryBuilder<RootDBE>();
@@ -90,6 +92,8 @@ export abstract class AbstractPropertyModel<
         let pipeline:  Document[] = [], prefix = '$';
 
         const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
+        const computedProperties = conversion && this.computedProperties ? await this.resolveComputedProperties( this.computedProperties ) : undefined;
+
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
         const stages = await this.filterStages( options );
@@ -123,6 +127,12 @@ export abstract class AbstractPropertyModel<
 
         console.log( 'ROOT PROJECTION SET', { rootProjection, propertyProjection });
 
+        // addFields - computed properties
+        if ( computedProperties?.fields )
+        {
+            pipeline.push([{ $addFields: computedProperties.fields }]);
+        }
+
         if( isSet( propertyProjection ))
         {
             // TODO je toto uplne spravne?
@@ -135,11 +145,11 @@ export abstract class AbstractPropertyModel<
 
         if( $rootProject )
         {
-            pipeline.push({ $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject }]}});
+            pipeline.push({ $replaceWith: { $mergeObjects: [ {...$project, ...computedProperties?.fields }, { '_root': $rootProject }]}});
         }
         else
         {
-            pipeline.push({ $replaceWith: $project });
+            pipeline.push({ $replaceWith: {...$project, ...computedProperties?.fields } });
         }
 
         const unsetFields = [...unsetFieldsProperty, ...unsetFieldsRoot];
@@ -344,6 +354,27 @@ export abstract class AbstractPropertyModel<
         }
 
         return { filter, pipeline };
+    }
+
+    // TODO: add support for other stages in the pipeline
+    private async resolveComputedProperties( properties: string[] ): Promise<{fields: Document | null, pipeline: Document[] | null}>
+    {
+        const fields: ReturnType<ComputedPropertyMethod>[0] = {};
+
+        for ( const property of properties )
+        {
+            if ( hasPublicMethod( this.computedProperties, property ) )
+            {
+                const pipeline = await ( this.computedProperties as any )[property]();
+                const addedFields = extractAddedFields( pipeline );
+                for ( const field in addedFields )
+                {
+                    fields[this.prefix + '.' + field] = addPrefixToFilter(addedFields[field], this.prefix);
+                }
+            }
+        }
+
+        return { fields: fields !== {} ? fields : null, pipeline: null };
     }
 
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> )

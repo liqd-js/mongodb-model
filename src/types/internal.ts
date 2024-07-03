@@ -7,8 +7,7 @@ export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K :
 export type ModelSmartFilter<T> = { [K in PublicMethodNames<T>]?: FirstParameter<T[K]> }
 
 export type SmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null };
-// TODO: proper structure
-export type ComputedPropertyMethod = ( params: any ) => any;
+export type ComputedPropertyMethod = ( params: any ) => Document[];
 
 export type AbstractModelFromConverter<DBE extends Document, T> = (data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
 export type AbstractConverterOptions<DBE extends Document, ComputedProperties = never> =
@@ -25,10 +24,11 @@ export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocumen
         smartFilters?   : SmartFilters,
         computedProperties?: ComputedProperties,
     }
-export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never> =
+export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never, ComputedProperties extends AbstractModelProperties<any> = never> =
     {
         converters      : AbstractModelConverters<DBE>,
         smartFilters?   : SmartFilters,
+        computedProperties?: ComputedProperties,
     }
 
 export type FirstType<T> = T extends [infer U, ...infer Rest] ? U : undefined;

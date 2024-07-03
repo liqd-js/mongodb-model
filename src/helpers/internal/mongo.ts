@@ -1022,6 +1022,23 @@ export function mergeFilters<DBE>( ...filters: (MongoFilter<DBE> | undefined | v
     return { $and: nonEmpty } as MongoFilter<DBE>;
 }
 
+export function extractAddedFields( pipeline: Document[] )
+{
+    const fields: Document = {};
+
+    for ( const stage of pipeline )
+    {
+        if ( !stage.$addFields ) { continue }
+
+        for ( const [key, value] of Object.entries(stage.$addFields) )
+        {
+            fields[key] = value;
+        }
+    }
+
+    return fields;
+}
+
 export const isSet = ( value: any ): boolean => value !== undefined && value !== null && ( Array.isArray( value ) ? value.length > 0 : ( typeof value === 'object' ? Object.keys( value ).length > 0 : true ));
 export const Arr = ( value: any ): any[] => Array.isArray( value ) ? value : [ value ];
 

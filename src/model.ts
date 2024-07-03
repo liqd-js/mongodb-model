@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod } from './helpers';
+import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, extractAddedFields} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions} from './types';
 import { AbstractModels } from "./index";
@@ -175,7 +175,7 @@ export abstract class AbstractModel<
         const prev = cursor?.startsWith('prev:');
 
         const smartFilter = options.smartFilter && await this.resolveSmartFilter( options.smartFilter );
-        const computedProperties = compProps && await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() );
+        const computedProperties = await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() );
 
         const params = {
             filter, sort, smartFilter, cursor, limit, ...rest,
@@ -255,19 +255,25 @@ export abstract class AbstractModel<
         return { filter, pipeline };
     }
 
+    // TODO: add support for other stages in the pipeline
     private async resolveComputedProperties( properties: string[] )
     {
-        const fields: ReturnType<ComputedPropertyMethod> = {};
+        const fields: ReturnType<ComputedPropertyMethod>[0] = {};
 
         for ( const property of properties )
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                fields[property] = await (this.computedProperties as any)[property]();
+                const pipeline = await ( this.computedProperties as any )[property]();
+                const addedFields = extractAddedFields( pipeline );
+                for ( const field in addedFields )
+                {
+                    fields[field] = addedFields[field];
+                }
             }
         }
 
-        return fields;
+        return { fields, pipeline: null };
     }
 
     public async delete( id: DTO['id'] ): Promise<Boolean>

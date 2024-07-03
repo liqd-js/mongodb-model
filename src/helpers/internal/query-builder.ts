@@ -5,7 +5,7 @@ import { collectAddedFields, generateCursorCondition, isSet, mergeFilters, optim
 export type ListParams<DBE extends MongoRootDocument> =
 {
     accessFilter?: Filter<DBE>
-    computedProperties?: Document
+    computedProperties?: { fields: Document | null, pipeline: Document[] | null }
     filter?: Filter<DBE>
     smartFilter?: {filter?: Filter<DBE>, pipeline?: Document[]}
     pipeline?: Document[]
@@ -22,6 +22,8 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 {
     async pipeline( params: ListParams<DBE> )
     {
+        const { fields: computedFields, pipeline: computedPipeline } = params.computedProperties
+
         const options = resolveBSONObject( params );
         const accessFilter = options.accessFilter
         let filter = mergeFilters(
@@ -38,8 +40,9 @@ export class QueryBuilder<DBE extends MongoRootDocument>
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
             ...( options.smartFilter?.pipeline || [] ),
-            ...( !options.projection && params.computedProperties ? [{ $addFields: params.computedProperties }] : [] ),
-            ...( options.projection ? [{ $project: {...options.projection, ...params.computedProperties }}] : []),
+            ...( computedPipeline || [] ),
+            ...( !options.projection && computedFields ? [{ $addFields: computedFields }] : [] ),
+            ...( options.projection ? [{ $project: {...options.projection, ...computedFields }}] : []),
             ...( options.pipeline || [] ),
             ...( addedFields.length ? [{ $unset: addedFields }] : []),
             ...( options.sort ? [{ $sort: prev ? reverseSort( options.sort ) : options.sort }] : []),
