@@ -323,53 +323,72 @@ export function isExclusionProjection<DBE extends Document>( projection: FindOpt
  */
 function projectionToProjectInternal<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix: string = '', prefixKeys: boolean = false, fullPath: string = '', simpleKeys?: boolean ): Record<string, unknown>
 {
-    const result: Document = {};
-
-    for ( const [ key, value ] of Object.entries( projection ))
+    if( Array.isArray( projection ))
     {
-        if( key.startsWith('$') && prefixKeys ){ throw new Error('Projection key cannot start with "$"'); }
-
-        const prefixedKey = prefix ? prefix + '.' + key : key;
-        const keyFullPath = fullPath ? fullPath + '.' + key : key;
-
-        if( key.startsWith('$') )
+        //@ts-ignore
+        return projection.map( item => 
         {
-            result[key] = projectionToProjectInternal( value, key, false, keyFullPath );
-        }
-        else
-        {
-            let projectedValue:any;
-
-            switch ( typeof value )
+            if( item )
             {
-                case 'number':
-                    projectedValue = ( value === 0 ) ? 0 : '$' + keyFullPath;
-                    break;
-
-                case 'string':
-                    projectedValue = addPrefixToValue( value, prefix, false );
-                    break;
-
-                case 'object':
-                    projectedValue = projectionToProjectInternal( value, prefix, false, keyFullPath );
-                    break;
-
-                default:
-                    throw new Error('Unsupported projection value type');
+                switch ( typeof item )
+                {
+                    case 'string': return addPrefixToValue( item, prefix, false );
+                    case 'object': return projectionToProjectInternal( item, prefix, false, fullPath );
+                }
             }
 
-            if( simpleKeys )
+            return item;
+        });
+    }
+    else
+    {
+        const result: Document = {};
+
+        for ( const [ key, value ] of Object.entries( projection ))
+        {
+            if( key.startsWith('$') && prefixKeys ){ throw new Error('Projection key cannot start with "$"'); }
+
+            if( key.startsWith('$') )
             {
-                objectSet( result, ( prefixKeys ? prefixedKey : key ).split('.'), projectedValue );
+                result[key] = projectionToProjectInternal( value, key, false, fullPath );
             }
             else
             {
-                result[ prefixKeys ? prefixedKey : key ] = projectedValue;
+                const prefixedKey = prefix ? prefix + '.' + key : key;
+                const keyFullPath = fullPath ? fullPath + '.' + key : key;
+                let projectedValue:any;
+
+                switch ( typeof value )
+                {
+                    case 'number':
+                        projectedValue = ( value === 0 ) ? 0 : '$' + keyFullPath;
+                        break;
+
+                    case 'string':
+                        projectedValue = addPrefixToValue( value, prefix, false );
+                        break;
+
+                    case 'object':
+                        projectedValue = projectionToProjectInternal( value, prefix, false, keyFullPath );
+                        break;
+
+                    default:
+                        throw new Error('Unsupported projection value type');
+                }
+
+                if( simpleKeys )
+                {
+                    objectSet( result, ( prefixKeys ? prefixedKey : key ).split('.'), projectedValue );
+                }
+                else
+                {
+                    result[ prefixKeys ? prefixedKey : key ] = projectedValue;
+                }
             }
         }
-    }
 
-    return result;
+        return result;
+    }
 }
 
 export function projectionToReplace<DBE extends Document>( projection: FindOptions<DBE>['projection'] = {}, prefix?: string ): Record<string, unknown>
