@@ -131,7 +131,7 @@ export abstract class AbstractPropertyModel<
 
         if ( computed?.fields )
         {
-            pipeline.push([{ $addFields: computed.fields }]);
+            pipeline.push({ $addFields: computed.fields });
         }
 
         if( isSet( propertyProjection ))
@@ -251,7 +251,7 @@ export abstract class AbstractPropertyModel<
 
         const resolvedList = resolveBSONObject( options );
 
-        const pipeline = this.pipeline({ ...resolvedList, projection });
+        const pipeline = this.pipeline({ ...resolvedList, projection }, conversion);
 
         let perf = new Benchmark();
 

@@ -750,6 +750,20 @@ describe('projectionToProject', () =>
         const expected = { a: {b: {c: '$a.b.c'}, d: '$a.d'} };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     })
+
+    it('should handle $arrayElemAt', () => {
+        const projection = {
+            'a': {
+                '$arrayElemAt': ['$b', 0]
+            }
+        }
+        const expected = {
+            'x.a': {
+                '$arrayElemAt': ['$x.b', 0]
+            }
+        }
+        assert.deepStrictEqual(projectionToProject(projection, 'x'), expected);
+    })
 });
 
 describe('bsonValue', () =>
