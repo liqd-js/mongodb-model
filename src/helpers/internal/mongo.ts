@@ -344,13 +344,13 @@ function projectionToProjectInternal<DBE extends Document>( projection: FindOpti
     {
         const result: Document = {};
 
-        for ( const [ key, value ] of Object.entries( projection ))
+        for ( const [ key, value ] of Object.entries( projection || {} ))
         {
             if( key.startsWith('$') && prefixKeys ){ throw new Error('Projection key cannot start with "$"'); }
 
             if( key.startsWith('$') )
             {
-                result[key] = projectionToProjectInternal( value, key, false, fullPath );
+                result[key] = projectionToProjectInternal( value, prefix, false, fullPath );
             }
             else
             {
