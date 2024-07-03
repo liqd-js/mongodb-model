@@ -1,5 +1,5 @@
 import { Collection, Document, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions } from 'mongodb';
-import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, extractAddedFields, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, projectionToProject, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, extractAddedFields, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeFilters, objectSet, projectionToProject, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties} from './types';
@@ -136,8 +136,13 @@ export abstract class AbstractPropertyModel<
 
         if( isSet( propertyProjection ))
         {
+            for ( let field in propertyProjection )
+            {
+                objectSet( propertyProjection, field.split('.'), propertyProjection[field] )
+            }
+
             // TODO je toto uplne spravne?
-            $project = projectionToReplace({ id: 1, ...propertyProjection, ...computed?.fields }, this.prefix );
+            $project = projectionToReplace({ id: 1, ...propertyProjection}, this.prefix );
         }
         if( isSet( rootProjection ))
         {
