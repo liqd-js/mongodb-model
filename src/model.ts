@@ -126,12 +126,14 @@ export abstract class AbstractModel<
         {
             this.#models.transaction( async() => 
             {
-                
+                let documentBefore = await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] });
+
+                const res = await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
             });
         }
         else
         {
-            
+
         }
 
         
