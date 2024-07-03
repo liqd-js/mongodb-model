@@ -136,7 +136,7 @@ export abstract class AbstractPropertyModel<
 
         if( isSet( propertyProjection ))
         {
-            const computedProjection = {};
+            const computedProjection: Record<string, 1> = {};
 
             for ( const key in computed?.fields )
             {
