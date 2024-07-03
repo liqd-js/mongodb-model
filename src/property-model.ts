@@ -141,7 +141,8 @@ export abstract class AbstractPropertyModel<
             for ( const key in computed?.fields )
             {
                 const path = key.split('.');
-                computedProjection[path[path.length - 1]] = '$' + key;
+                const fieldName = path[path.length - 1];
+                computedProjection[fieldName] = '$' + fieldName;
             }
 
             // TODO je toto uplne spravne?
