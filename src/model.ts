@@ -112,15 +112,16 @@ export abstract class AbstractModel<
         throw new Error('Method not implemented.');
     }
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse>
+    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
-        let documentBefore: DBE | undefined, documentAfter: DBE | undefined;
+        let matchedCount: number | undefined, modifiedCount: number | undefined, documentBefore: DBE | undefined, documentAfter: DBE | undefined;
 
         if( true )// !options?.documentBefore && !options?.documentAfter )
         {
             const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
 
-            return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
+            matchedCount = res.matchedCount;
+            modifiedCount = res.modifiedCount;
         }
         else if( options?.documentBefore && options?.documentAfter )
         {
@@ -137,10 +138,10 @@ export abstract class AbstractModel<
         }
 
         
-        //return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
+        return { matchedCount, modifiedCount, documentBefore, documentAfter };
     }
 
-    public async updateOne( match: ModelFindOptions<DBE, Extensions['smartFilters']>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse>
+    public async updateOne( match: ModelFindOptions<DBE, Extensions['smartFilters']>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
         return { matchedCount: 1, modifiedCount: 1 };
     }
