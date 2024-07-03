@@ -1,16 +1,14 @@
-import {
-    AbstractConverters,
-    AbstractModel,
-    AbstractPropertyModel,
-    AggregateOptions,
-    extractFields, filterUnwindedProperties,
-    LOG
-} from "../src/model";
 import {Filter, MongoClient, ObjectId} from "mongodb";
 import 'dotenv/config';
+import {
+    AbstractModelConverters,
+    AbstractModel,
+    AbstractPropertyModel,
+    ModelAggregateOptions,
+} from "../src";
 
-type JobDBE = { _id: ObjectId, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
-type JobDTO = { _id: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
+type JobDBE = { _id: ObjectId, title: string, name: string, events: { created: Date }, positions: PositionDBE[], engagements: EngagementDBE[] };
+type JobDTO = { _id: string, title: string, name: string, events: { created: Date }, positions: PositionDTO[], engagements: EngagementDTO[] };
 
 type EngagementDBE = { id: ObjectId, agencyID: ObjectId, recruiterID: ObjectId, date: Date, applications: ApplicationDBE[] };
 type EngagementDTO = { id: string, agencyID: string, recruiterID: string, date: Date, applications: ApplicationDTO[] };
@@ -21,7 +19,7 @@ type ApplicationDTO = { id: string, date: Date, status: string };
 type PositionDBE = { id: ObjectId, events: { opened: Date, closed?: Date } };
 type PositionDTO = { id: string, events: { opened: Date, closed?: Date } };
 
-export const accessFilter = { name: { $in: ['a', 'b'] } };
+export const accessFilter = { $and: [] };
 
 /**
  * Pipelines
@@ -29,7 +27,7 @@ export const accessFilter = { name: { $in: ['a', 'b'] } };
 export const jobCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 export const applicationCreatedBetween = (params: {between: {from: Date, to: Date}}) => ([{$match: { 'events.created': { $gte: params.between.from, $lt: params.between.to } } }]);
 
-export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<JobDBE>>
+export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractModelConverters<JobDBE>>
 {
     public constructor()
     {
@@ -42,13 +40,24 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
                 dto: {
                     converter: ( dbe: JobDBE ) => ({
                         _id: dbe._id.toString(),
-                        name: dbe.name,
-                        positions: dbe.positions.map( position => positionModel.converters.dto.converter( position ) ),
-                        engagements: dbe.engagements.map( engagement => engagementModel.converters.dto.converter( engagement ) )
+                        title: dbe.title,
+                        // name: dbe.name,
+                        // positions: dbe.positions.map( position => positionModel.converters.dto.converter( position ) ),
+                        // engagements: dbe.engagements.map( engagement => engagementModel.converters.dto.converter( engagement ) )
                     }),
                 }
             }
         );
+    }
+
+    public dbeID(id: ApplicationDTO["id"] | ApplicationDBE["id"]): ApplicationDBE["id"]
+    {
+        return new ObjectId(id);
+    }
+
+    public dtoID(dbeID: ApplicationDBE["id"]): ApplicationDTO["id"]
+    {
+        return dbeID.toString();
     }
 
     protected async accessFilter(): Promise<Filter<JobDBE>>
@@ -56,23 +65,23 @@ export class JobModel extends AbstractModel<JobDBE, JobDTO, AbstractConverters<J
         return accessFilter;
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
 
-        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
+        smartFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(smartFilter.jobCreatedBetween));
 
         return { filter, pipeline };
     }
 
-    public pipeline( options: AggregateOptions<JobDBE> )
+    public pipeline( options: ModelAggregateOptions<JobDBE> )
     {
         return super.pipeline( options );
     }
 }
 
-export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE, EngagementDTO, AbstractConverters<EngagementDBE>>
+export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE, EngagementDTO, AbstractModelConverters<EngagementDBE>>
 {
     public constructor()
     {
@@ -96,12 +105,22 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
         );
     }
 
-    public pipeline( options: AggregateOptions<EngagementDBE> )
+    public dbeID(id: ApplicationDTO["id"] | ApplicationDBE["id"]): ApplicationDBE["id"]
+    {
+        return new ObjectId(id);
+    }
+
+    public dtoID(dbeID: ApplicationDBE["id"]): ApplicationDTO["id"]
+    {
+        return dbeID.toString();
+    }
+
+    public pipeline( options: ModelAggregateOptions<EngagementDBE> )
     {
         return super.pipeline( options );
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
@@ -111,7 +130,7 @@ export class EngagementModel extends AbstractPropertyModel<JobDBE, EngagementDBE
 
 }
 
-export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, AbstractConverters<ApplicationDBE>>
+export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationDBE, ApplicationDTO, AbstractModelConverters<ApplicationDBE>>
 {
     public constructor()
     {
@@ -133,26 +152,36 @@ export class ApplicationModel extends AbstractPropertyModel<JobDBE, ApplicationD
         );
     }
 
-    public pipeline( options: AggregateOptions<ApplicationDBE> )
+    public dbeID(id: ApplicationDTO["id"] | ApplicationDBE["id"]): ApplicationDBE["id"]
+    {
+        return new ObjectId(id);
+    }
+
+    public dtoID(dbeID: ApplicationDBE["id"]): ApplicationDTO["id"]
+    {
+        return dbeID.toString();
+    }
+
+    public pipeline( options: ModelAggregateOptions<ApplicationDBE> )
     {
         return super.pipeline( options );
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
 
-        customFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(customFilter.jobCreatedBetween));
+        smartFilter.jobCreatedBetween && pipeline.push(...jobCreatedBetween(smartFilter.jobCreatedBetween));
 
-        customFilter.applicationStatus  && (filter['status'] = { $in: customFilter.applicationStatus });
-        customFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(customFilter.applicationCreatedBetween));
+        smartFilter.applicationStatus  && (filter['status'] = { $in: smartFilter.applicationStatus });
+        smartFilter.applicationCreatedBetween && pipeline.push(...applicationCreatedBetween(smartFilter.applicationCreatedBetween));
 
         return { filter, pipeline };
     }
 }
 
-export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, PositionDTO, AbstractConverters<PositionDBE>>
+export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, PositionDTO, AbstractModelConverters<PositionDBE>>
 {
     public constructor()
     {
@@ -173,12 +202,12 @@ export class PositionModel extends AbstractPropertyModel<JobDBE, PositionDBE, Po
         );
     }
 
-    public pipeline( options: AggregateOptions<PositionDBE> )
+    public pipeline( options: ModelAggregateOptions<PositionDBE> )
     {
         return super.pipeline( options );
     }
 
-    public async resolveCustomFilter( customFilter: any )
+    public async resolveSmartFilter( smartFilter: any )
     {
         const filter: any = {};
         const pipeline: any[] = [];
@@ -594,4 +623,4 @@ const matchUnwind1 = {
         ]
     }
 }
-LOG(filterUnwindedProperties(matchUnwind1, 'a.b.cd'));
+// LOG(filterUnwindedProperties(matchUnwind1, 'a.b.cd'));

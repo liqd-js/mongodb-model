@@ -1,8 +1,9 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, extractFields, generateCursorCondition, getCursor, filterUnwindedProperties, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection} from '../../src/helpers';
+import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten, addPrefixToPipeline, LOG} from '../../src/helpers';
 import crypto from 'crypto';
-import {ObjectId, Sort} from "mongodb";
-
+import {Filter, ObjectId, Sort} from "mongodb";
+import {objectStringify} from "@liqd-js/fast-object-hash";
+import { describe, it } from 'node:test';
 
 describe('objectHash', () =>
 {
@@ -16,35 +17,35 @@ describe('objectHash', () =>
     it('should stringify ObjectId', () =>
     {
         const obj = new ObjectId('5f4d6f9e6f0a4d001f9a2a4d');
-        const expected = JSON.stringify('5f4d6f9e6f0a4d001f9a2a4d');
+        const expected = 'ObjectId("5f4d6f9e6f0a4d001f9a2a4d")';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'ObjectId not correctly stringified' );
     });
 
     it('should stringify Date', () =>
     {
         const obj = new Date('2020-08-31T14:00:00.000Z');
-        const expected = JSON.stringify(obj);
+        const expected = '2020-08-31T14:00:00.000Z';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'Date not correctly stringified' );
     });
 
     it('should stringify RegExp', () =>
     {
         const obj = new RegExp('tes.*t', 'i');
-        const expected = JSON.stringify('/tes.*t/i');
+        const expected = '/tes.*t/i';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'RegExp not correctly stringified' );
     });
 
     it('should stringify Set', () =>
     {
         const obj = new Set([3, 1, 2]);
-        const expected = '[1,2,3]';
+        const expected = 'Set(1,2,3)';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'Set not correctly stringified' );
     });
 
     it('should stringify Map', () =>
     {
         const obj = new Map([['a', 1], ['b', 2]]);
-        const expected = '{"a":1,"b":2}';
+        const expected = 'Map("a":1,"b":2)';
         assert.equal( objectHash( obj, { sort: true, alg: 'plain' } ), expected, 'Map not correctly stringified' );
     });
 
@@ -155,6 +156,34 @@ describe('objectHashId', () =>
         const expected = crypto.createHash('sha256').update('{"a":1,"b":2}').digest('hex').substring(0, 24);
         assert.equal( objectHashID( obj, { sort: true, alg: 'sha256' }), expected, 'incorrect object hash ID' );
     });
+});
+
+describe('objectFlatten', () =>
+{
+    it('should flatten simple object', () => {
+        const obj = { a: 1, b: 2 };
+        const expected = { a: 1, b: 2 };
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'simple object not correctly flattened');
+    });
+
+    it('should flatten nested object', () => {
+        const obj = { a: { b: 1, c: { d: 2 } } };
+        const expected = { 'a.b': 1, 'a.c.d': 2 };
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'nested object not correctly flattened');
+    });
+
+    it('should flatten nested object with array', () => {
+        const obj = { a: { b: [1, 2], c: 3 } };
+        const expected = { 'a.b.0': 1, 'a.b.1': 2, 'a.c': 3 };
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'nested object with array not correctly flattened');
+    });
+
+    it('should flatten nested object with array of objects', () => {
+        const obj = { a: { b: [{ c: 1 }, { d: { e: 2 } }], f: 3 } };
+        const expected = { 'a.b.0.c': 1, 'a.b.1.d.e': 2, 'a.f': 3 };
+        LOG(objectFlatten(obj));
+        assert.deepStrictEqual(objectFlatten(obj), expected, 'nested object with array of objects not correctly flattened');
+    })
 });
 
 describe('reverseSort', () =>
@@ -322,21 +351,224 @@ describe('addPrefixToFilter', () =>
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix, false), expected, 'prefix added to keys when prefixKeys is false');
     });
 
-    it('should handle $root key correctly as nested object', () =>
+    it('should handle _root key correctly as nested object', () =>
     {
-        const filter = { $root: { a: { b: 1 } }, b: 2 };
+        const filter = { _root: { a: { b: 1 } }, b: 2 };
         const prefix = 'prefix';
         const expected = { a: { b: 1 }, 'prefix.b': 2 };
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
     });
 
-    it('should handle $root key correctly as concatenated string', () =>
+    it('should handle nested object', () =>
     {
-        const filter = { '$root.a.b': 1, b: 2 };
+        const filter = { a: { b: 1 }, b: 2 };
+        const prefix = 'prefix';
+        const expected = { 'prefix.a': { b: 1 }, 'prefix.b': 2 };
+        assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
+    });
+
+    it('should handle nested object with function', () =>
+    {
+        const filter = { a: { b: {$dateToString: {format: '%Y-%m-%d', date: '$model.date'} }}, b: 2 };
+        const prefix = 'prefix';
+        const expected = { 'prefix.a': { b: {$dateToString: {format: '%Y-%m-%d', date: '$prefix.model.date'} } }, 'prefix.b': 2 };
+        assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
+    });
+
+    it('should handle _root key correctly as concatenated string', () =>
+    {
+        const filter = { '_root.a.b': 1, b: 2 };
         const prefix = 'prefix';
         const expected = { 'a.b': 1, 'prefix.b': 2 };
         assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected, 'prefix not added to $root key');
     });
+
+    it('should prefix property inside $dateToString', () => {
+        const filter = { '_root.a': {$dateToString: {format: '%Y-%m-%d', date: '$_root.model.date'}} }
+        const prefix = 'prefix';
+        const expected = { 'a': { $dateToString: { format: '%Y-%m-%d', date: '$model.date' } } }
+        assert.deepStrictEqual(addPrefixToFilter(filter, prefix), expected);
+    })
+});
+
+describe('addPrefixToPipeline', () => {
+    it ('should add prefix to keys in $match', () => {
+        const pipeline = [{ $match: { a: 1} }];
+        const expected = [{ $match: { 'prefix.a': 1 } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it ('should add prefix to $project', () => {
+        const pipeline = [{ $project: { a: '$b', b: 1, _root: { c: { d: '$x' } } } }];
+        const expected = [{ $project: { 'prefix.a': '$prefix.b', 'prefix.b': '$prefix.b', 'prefix._root': { c: { d: '$prefix.x' }}}}];
+        LOG(addPrefixToPipeline(pipeline, 'prefix'))
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $addFields', () => {
+        const pipeline = [{ $addFields: { a: '$b', b: 1, _root: { c: { d: '$x' } } } }];
+        const expected = [{ $addFields: { 'prefix.a': '$prefix.b', 'prefix.b': 1, c: { d: '$prefix.x' } } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $lookup', () => {
+        const pipeline = [{ $lookup: { from: 'collection', localField: 'a', foreignField: 'b', as: 'c' } }];
+        const expected = [{ $lookup: { from: 'collection', localField: 'prefix.a', foreignField: 'b', as: 'prefix.c' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should not add prefix to $limit', () => {
+        const pipeline = [{ $limit: 1 }];
+        const expected = [{ $limit: 1 }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    })
+
+    it('should add prefix to $group', () => {
+        const pipeline = [{ $group: { _id: '$a', count: { $sum: 1 } } }];
+        const expected = [{ $group: { _id: '$prefix.a', 'prefix.count': { $sum: 1 } } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $sort', () => {
+        const pipeline = [{ $sort: { a: 1, '_root.b': -1 } }];
+        const expected = [{ $sort: { 'prefix.a': 1, b: -1 } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $unwind', () => {
+        const pipelineField = [{ $unwind: '$a' }];
+        const expectedField = [{ $unwind: '$prefix.a' }];
+
+        assert.deepStrictEqual(addPrefixToPipeline(pipelineField, 'prefix'), expectedField);
+    });
+
+    it('should add prefix to $replaceRoot', () => {
+        const pipeline = [{ $replaceRoot: { newRoot: '$a' } }];
+        const expected = [{ $replaceRoot: { newRoot: '$prefix.a' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $replaceWith', () => {
+        const pipeline = [{ $replaceWith: '$a' }];
+        const expected = [{ $replaceWith: '$prefix.a' }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should not add prefix to $replaceWith ($$ROOT)', () => {
+        const pipeline = [{ $replaceWith: '$$ROOT.a' }];
+        const expected = [{ $replaceWith: '$a' }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $set', () => {
+        const pipeline = [{ $set: { a: '$b', b: '$_root.c' } }];
+        const expected = [{ $set: { 'prefix.a': '$prefix.b', 'prefix.b': '$c' } }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should add prefix to $count', () => {
+        const pipeline = [{ $count: 'count' }];
+        const expected = [{ $count: 'prefix.count' }];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    });
+
+    it('should not add prefix to $function properties', () => {
+        const func = ( args: any ) => {
+            return 'test';
+        }
+        const pipeline = [
+            {
+                $addFields: {
+                    tmp: {
+                        $function: {
+                            body: func,
+                            args: ['$a', '$b'],
+                            lang: 'js'
+                        }
+                    }
+                }
+            }
+        ]
+        const expected = [
+            {
+                $addFields: {
+                    'prefix.tmp': {
+                        $function: {
+                            body: func,
+                            args: ['$prefix.a', '$prefix.b'],
+                            lang: 'js'
+                        }
+                    }
+                }
+            }
+        ]
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    })
+
+    it('should not add prefix to objects in $function args', () => {
+        const func = ( args: any ) => {}
+        const pipeline = [
+            {
+                $match: {
+                    $expr: {
+                        $function: {
+                            body: func,
+                            args: [
+                                "$events",
+                                {
+                                    "from": new Date(),
+                                    "to": new Date()
+                                },
+                                {
+                                    test: '$aaa'
+                                }
+                            ],
+                            lang: "js"
+                        }
+                    }
+                }
+            }
+        ];
+        const expected = [
+            {
+                $match: {
+                    $expr: {
+                        $function: {
+                            body: func,
+                            args: [
+                                "$prefix.events",
+                                {
+                                    "from": new Date(),
+                                    "to": new Date()
+                                },
+                                {
+                                    test: '$prefix.aaa'
+                                }
+                            ],
+                            lang: "js"
+                        }
+                    }
+                }
+            }
+        ];
+        assert.deepStrictEqual(addPrefixToPipeline(pipeline, 'prefix'), expected);
+    })
+
+    it('should throw error for unsupported stages', () => {
+        // assert.throws(() => addPrefixToPipeline([{ $graphLookup: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $collStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $indexStats: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $merge: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $out: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $redact: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $search: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $searchMeta: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $setWindowFields: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $sortByCount: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{ $unionWith: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+        assert.throws(() => addPrefixToPipeline([{$vectorSearch: { a: 1 } }], 'prefix'), 'Unsupported pipeline stage');
+    })
 });
 
 describe('addPrefixToUpdate', () =>
@@ -450,21 +682,14 @@ describe('projectionToProject', () =>
     it('should handle projection with string property', () =>
     {
         const projection = { 'a.b': 'c' };
-        const expected = { 'a': { 'b': '$c' } };
-        assert.deepStrictEqual(projectionToProject(projection), expected);
-    });
-
-    it('should handle projection with string property starting with $root', () =>
-    {
-        const projection = { 'a.b': '$root.c' };
-        const expected = { 'a': { 'b': '$$ROOT.c' } };
+        const expected = { 'a.b': 'c' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
     it('should handle projection with non-string property', () =>
     {
         const projection = { 'a.b': 1 };
-        const expected = { 'a': { 'b': '$a.b' } };
+        const expected = { 'a.b': '$a.b' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
 
@@ -478,9 +703,67 @@ describe('projectionToProject', () =>
     it('should handle projection with nested properties', () =>
     {
         const projection = { 'a.b.c': 1, 'a.b.d': 1, 'c': 1 };
-        const expected = { 'a': { 'b': { 'c': '$a.b.c', 'd': '$a.b.d' }}, 'c': '$c' };
+        const expected = { 'a.b.c': '$a.b.c', 'a.b.d': '$a.b.d', 'c': '$c' };
         assert.deepStrictEqual(projectionToProject(projection), expected);
     });
+
+    it('should handle projection with nested properties - object style', () =>
+    {
+        const projection = { a: { b: {c: 1, d: '$x'}, e: 1} };
+        const expected = { 'y.a': { 'b': { 'c': '$y.a.b.c', d: '$y.x' }, 'e': '$y.a.e' } };
+        assert.deepStrictEqual(projectionToProject(projection, 'y'), expected);
+    });
+
+    it('should handle projection with 0', () => {
+        const projection = { 'a.b': 0, 'a.c': 1 };
+        const expected = { 'a.b': 0, 'a.c': '$a.c' };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle $dateToString', () => {
+        const projection = { date: {$dateToString: {format: '%Y-%m-%d', date: '$_root.date'}} };
+        const expected = { date: { $dateToString: { format: '%Y-%m-%d', date: '$date' } } };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle basic projection', () => {
+        const projection = { a: 1, b: 1 };
+        const expected = { a: '$a', b: '$b' };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle exclusion projection', () => {
+        const projection = { a: 0, b: 0 };
+        const expected = { a: 0, b: 0 };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle nested projection', () => {
+        const projection = { a: {b: 0, c: 1} };
+        const expected = { a: {b: 0, c: '$a.c'} };
+
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle nested projection 2', () => {
+        const projection = { a: {b: {c: 1}, d: 1} };
+        const expected = { a: {b: {c: '$a.b.c'}, d: '$a.d'} };
+        assert.deepStrictEqual(projectionToProject(projection), expected);
+    })
+
+    it('should handle $arrayElemAt', () => {
+        const projection = {
+            'a': {
+                '$arrayElemAt': ['$b', 0]
+            }
+        }
+        const expected = {
+            'x.a': {
+                '$arrayElemAt': ['$x.b', 0]
+            }
+        }
+        assert.deepStrictEqual(projectionToProject(projection, 'x'), expected);
+    })
 });
 
 describe('bsonValue', () =>
@@ -656,8 +939,8 @@ describe('optimizeMatch', () =>
 
     it('should remove empty elements inside $and', () =>
     {
-        const match = {$and: [undefined, {}, null, {a: 1}, {b: 2}]};
-        assert.deepStrictEqual(optimizeMatch(match), {$and: [{a: 1}, {b: 2}]});
+        const match = {$and: [undefined, {}, null, {a: 1}, {b: 2}]} as Filter<any>;
+        assert.deepStrictEqual(optimizeMatch(match), {a: 1, b: 2});
     })
 
     it('should extract properties from $and with one element and empty $match root', () =>
@@ -689,6 +972,269 @@ describe('optimizeMatch', () =>
         const match = { $and: [{ $or: [{ $and: [{ a: 1 }] }] }] }
         assert.deepStrictEqual(optimizeMatch(match), {a: 1});
     })
+
+    it('should merge nested $and', () => {
+        const match = {
+            $and: [
+                {
+                    $and: [
+                        {
+                            $and: [
+                                { title: 'a' },
+                                { surname: { '$in': [ 'a', 'b' ] } }
+                            ]
+                        },
+                        {$or: []}
+                    ]
+                },
+                {}
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { title: 'a', surname: { $in: ['a', 'b'] }} );
+    })
+
+    it('should handle $or with one element', () => {
+        const match = {
+            $or: [{a: 1}]
+        };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: 1 });
+    });
+
+    it('should handle simple $or', () => {
+        const match = {
+            $or: [
+                {a: 1}, {b: 2}, {a: 4}, {a: {$gte: 3}}
+            ]
+        };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {$or: [ { a: 1 }, { b: 2 }, { a: 4 }, { a: { $gte: 3 } } ]}
+        );
+    });
+
+    it('should merge simple nested $or', () => {
+        const match = {
+            $or: [
+                { $or: [{ a: 1}, {b: 4}] },
+                { b: 2 },
+                { $or: [{ a: 2}, {b: 5}, { a: {gte: 6} }, { b: 7 }] },
+                { a: 2 }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {
+            $or: [
+                { a: 1 },
+                { b: 4 },
+                { b: 2 },
+                { a: 2 },
+                { b: 5 },
+                { a: { gte: 6 } },
+                { b: 7 },
+                { a: 2 }
+            ]
+        });
+    })
+
+    it('should merge nested $or combined with $and', () => {
+        const match = {
+            $or: [
+                { $or: [{ $and: [{ a: 1}, {b: 4}] }, { b: 2 }], a: 4 },
+                { $or: [{ $and: [{ a: 2}, {b: 5}] }, { a: {gte: 6} }, { b: 7 }] },
+                { a: 2 }
+            ]
+        }
+
+        const optimized = objectStringify( optimizeMatch(match), { sortArrays: true });
+        const expected = objectStringify({
+            $or: [
+                { $or: [{ a: 1, b: 4}, {b: 2}], a: 4 },
+                { a: 2 },
+                { a: 2, b: 5 },
+                { a: {gte: 6} },
+                { b: 7 },
+            ].sort()
+        }, { sortArrays: true });
+        assert.deepStrictEqual(optimized, expected);
+    })
+
+    it('should not merge combination of $and and $or', () => {
+        const match = {
+            $and: [
+                { $or: [{ a: 1 }, { b: 2 }] },
+                { $or: [{ a: {gte: 1} }, { d: 4 }] }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should not merge combination of $or and $and', () => {
+        const match = {
+            $or: [
+                { $and: [{ a: 1}, {b: 4}] }, { b: 2 }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {
+            $or: [
+                { a: 1, b: 4 },
+                { b: 2 }
+            ]
+        });
+    })
+
+    it('should not merge conflicting properties', () => {
+        const match = {
+            $and: [
+                { a: 1 },
+                { a: 2 },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should merge object properties', () => {
+        const match = {
+            $and: [
+                { $and: [{ a: 1}, {b: 4}] },
+                { a: { $lt: 4} },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: { $lt: 4, $eq: 1 }, b: 4 });
+    })
+
+    it('should keep basic object intact', () => {
+        const match = { a: 1, b: 2 };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    });
+
+    it('should keep simple $or intact', () => {
+        const match = {
+            $or: [
+                { a: 1 },
+                { b: 2 },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    });
+
+    it('should keep unknown properties intact ($exists)', () => {
+        const match = {
+            a: { $exists: true }
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should keep unknown properties intact ($nor)', () => {
+        const match = {
+            $nor: [{ a: 1 }]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+
+    it('should keep nested $and with conflicting properties intact', () => {
+        const match = {
+            $and: [
+                { $and: [{ a: 1}, {b: 2}] },
+                { a: 4 },
+                { d: 3 }
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { $and: [{ a: 1, b: 2 }, { a: 4 }, { d: 3 }] });
+    })
+
+    it('should merge $and with conflicting properties but different conditions', () => {
+        const match = {
+            $and: [
+                { $and: [{ a: 1}, {b: 2}] },
+                { a: { $gte: 4 } },
+                { a: { $in: [1, 2, 3, 4] } },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: { $eq: 1, $gte: 4, $in: [1, 2, 3, 4] }, b: 2 });
+    })
+
+    it('should process ObjectId values', () => {
+        const match = {
+            $and:
+            [
+                {a: new ObjectId('5f4d6f9e6f0a4d001f9a2a4d')},
+                {a: new ObjectId('5f4d6f9e6f0a4d001f9a2a4a')},
+                {a: {$gte: new ObjectId('5f4d6f9e6f0a4d001f9a2a4b')}},
+            ]
+        };
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    });
+
+    it('should optimize $elemMatch with single condition', () => {
+        const match = {
+            $and: [
+                { $or: [ { a: { $elemMatch: { b: 1 } } } ] },
+                { $or: [ { a: { $elemMatch: { c: 2 } } } ] },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { 'a.b': 1, 'a.c': 2 });
+    })
+
+    it('should not optimize $elemMatch with multiple conditions', () => {
+        const match = {
+            $and: [
+                { a: { $elemMatch: { b: 1, c: 2 } } },
+                { a: { $elemMatch: { d: 3 } } },
+            ]
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: { $elemMatch: { b: 1, c: 2 } }, 'a.d': 3 });
+    });
+
+    it('should optimize $in, $nin, $not $in with single condition', () => {
+        const match = {
+            a: { $in: [1] },
+            b: { $nin: [3] },
+            c: { $not: { $in: [5] } },
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, { a: 1, b: { $ne: 3 }, c: { $ne: 5 } });
+    })
+
+    it('should not optimize $in, $nin, $not $in with multiple conditions', () => {
+        const match = {
+            a: { $in: [1, 2] } ,
+            b: { $nin: [3, 4] } ,
+            c: { $not: { $in: [5, 6] } },
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
+    })
+})
+
+describe('mergeProperties', () => {
+    it('should keep non-conflicting properties', () => {
+        const merged = mergeProperties({ a: 1 }, { b: 2 });
+        assert.deepStrictEqual(merged, { a: 1, b: 2 });
+    });
+
+    it('should prepend $eq to conflicting properties - different condition', () => {
+        const merged = mergeProperties({ a: 5 }, { a: { $gte: 2 } });
+        assert.deepStrictEqual(merged, { a: { $eq: 5, $gte: 2 } });
+    });
+
+    it('should return false for conflicting properties - same condition', () => {
+        const merged = mergeProperties({ a: 5 }, { a: { $eq: 2 } });
+        assert.deepStrictEqual(merged, false);
+    });
 })
 
 describe('extractFields', () =>
@@ -696,55 +1242,55 @@ describe('extractFields', () =>
     it('should extract fields from simple $match', () =>
     {
         const pipeline = [{ $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['a', 'b'], ignored: []});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['a', 'b'], ignored: []});
     });
 
     it('should extract fields from $match with nested $and and $or', () =>
     {
         const pipeline = [{ $match: { $and: [{ a: 1 }, { $or: [{ b: 2 }, { c: 3 }] }] } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['a', 'b', 'c'], ignored: []});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['a', 'b', 'c'], ignored: []});
     });
 
     it('should add ignored fields created in $project', () =>
     {
         const pipeline = [{ $project: { a: '$positions', b: 1 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should exclude fields in $match created in $project before', () =>
     {
         const pipeline = [{ $project: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should add ignored fields created in $addFields', () =>
     {
         const pipeline = [{ $addFields: { a: '$positions', b: 1 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should exclude fields in $match created in $addFields before', () =>
     {
         const pipeline = [{ $addFields: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should add ignored fields created in $group', () =>
     {
         const pipeline = [{ $group: { a: '$positions', b: 1 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should add fields in $expr', () =>
     {
         const pipeline = [{ $match: { $expr: {$gt: ['$positions', 1] }} }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: []});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: []});
     });
 
     it('should exclude fields in $match created in $group before', () =>
     {
         const pipeline = [{ $group: { a: '$positions', b: 1 } }, { $match: { a: 1, b: 2 } }];
-        assert.deepStrictEqual(extractFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
+        assert.deepStrictEqual(getUsedFields(pipeline), {used: ['positions'], ignored: ['a', 'b']});
     });
 
     it('should combine multiple stages and operators', () =>
@@ -848,71 +1394,202 @@ describe('extractFields', () =>
             ].sort(),
             ignored: [ 'id', 'jobID', 'statusAt', '_id', 'placedJobs', 'positions', 'mapped', 'filtered', 'merged', 'elemAt' ].sort()
         }
-        const {used, ignored } = extractFields(pipeline);
+        const {used, ignored } = getUsedFields(pipeline);
         assert.deepStrictEqual({used: used.sort(), ignored: ignored.sort()}, expected);
     });
 
     it('should throw error for unsupported stages', () =>
     {
         const pipeline = [{ $unsupported: {} }];
-        assert.throws(() => extractFields(pipeline), /Unsupported pipeline stage: "\$unsupported"/);
+        assert.throws(() => getUsedFields(pipeline), /Unsupported pipeline stage: "\$unsupported"/);
     });
 
     it('should throw error for unsupported operators', () =>
     {
         const pipeline = [{ $match: { $unsupported: {} } }];
-        assert.throws(() => extractFields(pipeline), /Unsupported operator: "\$unsupported"/);
+        assert.throws(() => getUsedFields(pipeline), /Unsupported operator: "\$unsupported"/);
     });
 })
 
-describe('getPartiallyResolvedFilter', () =>
+describe('subfilter', () =>
 {
-    it('should resolve simple object filter', () =>
-    {
-        const filter = { x: 1, 'a.x': 2, 'a.b.x': 3, 'a.b.c.x': 4 };
-
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), { x: 1 });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { x: 1, 'a.x': 2 });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), { x: 1, 'a.x': 2, 'a.b.x': 3 });
+    it('should extract filters from basic filter', () => {
+        const input = {
+            'x': 1,
+            'engagements.x': 2,
+            'engagements.applications.x': 3,
+        }
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     })
 
-    it('should resolve comparison operators', () =>
-    {
-        const filter = { x: { $eq: '$b' }, 'a.x': { $gt: 2 }, 'a.b.x': { $lt: 3 }, 'a.b.c.x': { $gte: 4 } };
-
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), { x: { $eq: '$b' } });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { x: { $eq: '$b' }, 'a.x': { $gt: 2 } });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), { x: { $eq: '$b' }, 'a.x': { $gt: 2 }, 'a.b.x': { $lt: 3 } });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'aaa'), filter);
-    });
-
-    it('should resolve logical operators', () =>
-    {
-        const filter = {
+    it('should extract filters from simple $and - root', () => {
+        const input = {
             $and: [
-                {
-                    'a.x': 1,
-                    $or: [
-                        { $not: { 'a.b.x': 1 } },
-                        { 'a.b.y': 1 }
-                    ]
-                }
+                { 'x': 1 },
+                { 'engagements.x': 2 },
+                { 'engagements.applications.x': 3 },
             ]
-        };
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b'), { $and: [{'a.x': 1}] });
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a.b.c'), filter);
+        }
+
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+    })
+
+    it('should extract filters from nested $and - root', () => {
+        const input = {
+            $and: [
+                { 'x': 1 },
+                { $and: [
+                        { 'y': 2 },
+                        { 'engagements.x': 2 },
+                        { 'engagements.applications.x': 3 },
+                    ]},
+            ]
+        }
+
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
     });
 
-    it('should resolve $expr', () =>
+    it('should extract partial filters from basic $or - root', () => {
+        const input = {
+            $or: [
+                {'x': 1},
+                {'engagements.x': 2},
+                {'engagements.applications.x': 3},
+            ]
+        }
+
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+    })
+
+    it('should extract filter from combination of $and and $or - root', () => {
+        const input = {
+            $and: [
+                { x: 1 },
+                { 'engagements.x': 2 },
+                { $or: [
+                    { 'engagements.x': 3 },
+                    { 'engagements.y': 4 },
+                ]},
+            ],
+            $or: [
+                { 'engagements.z': 5 },
+                { 'engagements.applications.z': 6 },
+            ]
+        }
+
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+    })
+
+    it('should skip unsupported operator', () => {
+        // $nor
+        const filter = subfilter({
+            $unsupported: [
+                { x: 1 },
+                { y: 2 }
+            ]
+        }, '', 'engagements', 'engagements.applications');
+
+        assert.deepStrictEqual(filter, {});
+    })
+
+    it('should skip {$exists: false}', () => {
+        const filter = {
+            'engagements.applications.events.submitted': {$exists: false}
+        };
+
+        assert.deepStrictEqual(subfilter(filter, '', 'engagements', 'engagements.applications'), {});
+        assert.deepStrictEqual(subfilter(filter, 'engagements.applications', 'engagements.applications', 'engagements.applications'), filter);
+    })
+
+    it('should add unsupported operators at the last level', () => {
+        const filter = {
+            $unsupported: [
+                { x: 1 },
+                { y: 2 }
+            ]
+        }
+        const sub = subfilter( filter, 'engagements', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual( sub, filter );
+    })
+
+    it('should transform $in to $elemMatch', () => {
+        const filter = {
+            'engagements.applications.x': { $in: [1, 2, 3]}
+        }
+        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $in: [1, 2, 3] } } } });
+    })
+
+    it('should transform $nin to $elemMatch', () => {
+        const filter = {
+            'engagements.applications.x': { $nin: [1, 2, 3]}
+        }
+        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $nin: [1, 2, 3] } } } });
+    })
+
+    it('should transform $not $in to $elemMatch', () => {
+        const filter = {
+            'engagements.applications.x': { $not: {$in: [1, 2, 3]}}
+        }
+        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $nin: [1, 2, 3] } } } });
+    })
+})
+
+describe('transformToElemMatch', () =>
+{
+    it('should transform $in', () =>
     {
-        const filter = { $expr: { $eq: ['$a', '$b'] } };
-        assert.deepStrictEqual(filterUnwindedProperties(filter, ''), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'a'), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'b'), undefined);
-        assert.deepStrictEqual(filterUnwindedProperties(filter, 'c'), filter);
-    });
+        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$in", 'engagements.applications');
+        assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$in: [1, 2, 3]}}}});
+    })
+
+    it('should transform $nin', () =>
+    {
+        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$nin", 'engagements.applications');
+        assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$nin: [1, 2, 3]}}}});
+    })
+})
+
+describe('isExclusionProjection', () => {
+    it('should return true for projection with 0', () => {
+        const projection = { 'a.b': 0, 'a.c': 0 };
+        assert.strictEqual(isExclusionProjection(projection), true);
+    })
+
+    it('should return false for projection without 0', () => {
+        const projection = { 'a.b': 1, 'a.c': 1 };
+        assert.strictEqual(isExclusionProjection(projection), false);
+    })
+
+    it('should throw error for mixed projection', () => {
+        const projection = { 'a.b': 0, 'a.c': 1 };
+        assert.throws(() => isExclusionProjection(projection));
+    })
+
+    it('should return true for nested properties with 0', () => {
+        const projection = { a: { b: {c: 0, d: {e: 0}}} };
+        assert.strictEqual(isExclusionProjection(projection), true);
+    })
+
+    it('should return false for nested properties with 1', () => {
+        const projection = { a: { b: {c: 1, d: {e: 1}}} };
+        assert.strictEqual(isExclusionProjection(projection), false);
+    })
+
+    it('should throw error for mixed nested properties', () => {
+        const projection = { a: { b: {c: 1, d: {e: 0}}} };
+        assert.throws(() => isExclusionProjection(projection));
+    })
 })
