@@ -136,13 +136,16 @@ export abstract class AbstractPropertyModel<
 
         if( isSet( propertyProjection ))
         {
-            for ( let field in propertyProjection )
+            const computedProjection = {};
+
+            for ( const key in computed?.fields )
             {
-                objectSet( propertyProjection, field.split('.'), propertyProjection[field] )
+                const path = key.split('.');
+                computedProjection[path[path.length - 1]] = 1;
             }
 
             // TODO je toto uplne spravne?
-            $project = projectionToReplace({ id: 1, ...propertyProjection}, this.prefix );
+            $project = projectionToReplace({ id: 1, ...propertyProjection, ...computedProjection}, this.prefix );
         }
         if( isSet( rootProjection ))
         {
