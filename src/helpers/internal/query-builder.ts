@@ -1,6 +1,6 @@
 import { MongoRootDocument } from '../../types';
 import { Document, Filter, Sort } from 'mongodb';
-import { collectAddedFields, generateCursorCondition, isSet, mergeFilters, optimizeMatch, resolveBSONObject, reverseSort } from './mongo';
+import { collectAddedFields, generateCursorCondition, isSet, optimizeMatch, resolveBSONObject, reverseSort } from './mongo';
 
 export type ListParams<DBE extends MongoRootDocument> =
 {
@@ -26,12 +26,12 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 
         const options = resolveBSONObject( params );
         const accessFilter = options.accessFilter
-        let filter = mergeFilters(
+        let filter = {$and: [
             options.filter,
             options.smartFilter?.filter,
             accessFilter,
             options.cursor ? generateCursorCondition( options.cursor, options.sort || {} ) : undefined
-        );
+        ]};
 
         let prev = options.cursor?.startsWith('prev:')
 

@@ -1025,22 +1025,6 @@ function getOperations( obj: object )
     return operations;
 }
 
-export function mergeFilters<DBE>( ...filters: (MongoFilter<DBE> | undefined | void)[] ): MongoFilter<DBE>
-{
-    const nonEmpty = filters.filter( isSet );
-    if ( nonEmpty.length === 0 )
-    {
-        return {};
-    }
-
-    if ( nonEmpty.length === 1 )
-    {
-        return nonEmpty[0] as MongoFilter<DBE>;
-    }
-
-    return { $and: nonEmpty } as MongoFilter<DBE>;
-}
-
 export function extractAddedFields( pipeline: Document[] )
 {
     const fields: Document = {};
