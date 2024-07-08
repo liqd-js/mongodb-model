@@ -1,7 +1,7 @@
 {
     "name": "@liqd-js/mongodb-model",
     "description": "Mongo model class",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "author": "radixxko",
     "license": "MIT",
     "main": "dist/index.js",
@@ -37,7 +37,7 @@
     "devDependencies": {
         "@types/jest": "^29.5.12",
         "@types/mocha": "^10.0.7",
-        "@types/node": "^20.14.9",
+        "@types/node": "^20.14.10",
         "coveralls": "^3.1.1",
         "dotenv": "^16.4.5",
         "mocha": "^10.6.0",
