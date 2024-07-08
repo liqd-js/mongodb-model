@@ -490,6 +490,11 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
 
     for ( const [key, value] of Object.entries(obj) )
     {
+        if ( !value )
+        {
+            continue;
+        }
+
         if ( key === '$and' || key === '$or' )
         {
             const filteredArray = value
