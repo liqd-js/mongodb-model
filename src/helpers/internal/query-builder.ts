@@ -35,16 +35,18 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 
         let prev = options.cursor?.startsWith('prev:')
 
-        const addedFields = collectAddedFields( [...(options.pipeline || []), ...(options.smartFilter?.pipeline || []) ] )
+        const addedFieldsSmartFilter = collectAddedFields( options.smartFilter?.pipeline || [] )
+        const addedFieldsPipeline = collectAddedFields( options.pipeline || [] )
 
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
             ...( options.smartFilter?.pipeline || [] ),
+            ...( addedFieldsSmartFilter.length ? [{ $unset: addedFieldsSmartFilter }] : []),
             ...( computedPipeline || [] ),
             ...( !options.projection && computedFields ? [{ $addFields: computedFields }] : [] ),
             ...( options.projection ? [{ $project: {...options.projection, ...computedFields }}] : []),
             ...( options.pipeline || [] ),
-            ...( addedFields.length ? [{ $unset: addedFields }] : []),
+            ...( addedFieldsPipeline.length ? [{ $unset: addedFieldsPipeline }] : []),
             ...( options.sort ? [{ $sort: prev ? reverseSort( options.sort ) : options.sort }] : []),
             ...( options.skip ? [{ $skip: options.skip }] : []),
             ...( options.limit ? [{ $limit: options.limit }] : []),
