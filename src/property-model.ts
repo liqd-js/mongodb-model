@@ -43,7 +43,7 @@ export abstract class AbstractPropertyModel<
         this.smartFilters = params.smartFilters;
         this.computedProperties = params.computedProperties;
 
-        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'] ) =>
+        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id'] | DBE['id']>, conversion: keyof Extensions['converters'] ) =>
         {
             try
             {

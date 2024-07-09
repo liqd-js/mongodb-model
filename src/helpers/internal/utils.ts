@@ -24,9 +24,14 @@ export function map<T,E>(ids: T[], entries: E[], getID: (e: E ) => T ): Array<E 
 {
     console.log({ entries });
 
-    const index = new Map<T,E>( entries.map( e => [ getID( e ), e ] ));
+    const index = new Map<T,E>( entries.map( e => [ idToIndexKey(getID( e )), e ] ));
 
-    return ids.map( id => index.get( id ) ?? null );
+    return ids.map( id => index.get( idToIndexKey(getID(id)) ) ?? null );
+}
+
+function idToIndexKey<T>( id: T )
+{
+    return id instanceof ObjectId ? id.toString() : id;
 }
 
 const { inspect } = require('util');
