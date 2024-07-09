@@ -810,6 +810,14 @@ function extractRecursively( obj: any /* TODO: ignoredFields? */ ): Set<string>
                     .filter( (arg: any) => typeof arg === 'string' && arg.startsWith('$'))
                     .forEach( (arg: string) => fields.add(arg));
             }
+            else if ( key === '$switch' )
+            {
+                for ( const branch of (value as any).branches )
+                {
+                    extractRecursively( branch.case ).forEach(key => fields.add(key));
+                }
+                extractRecursively( (value as any).default ).forEach(key => fields.add(key));
+            }
             else if ( MATHEMATICAL_OPERATORS.includes(key) )
             {
                 extractRecursively( value ).forEach(key => fields.add(key));
