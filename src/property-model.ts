@@ -51,7 +51,7 @@ export abstract class AbstractPropertyModel<
 
                 flowGet('log') && ( console.log( this.constructor.name + '::get', ids ), DUMP( pipeline ));
 
-                return map( ids, await this.collection.aggregate( pipeline ).toArray() as DBE[], ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id ));
+                return map( ids.map( id => this.dtoID( id ) ), await this.collection.aggregate( pipeline ).toArray() as DBE[], ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id ));
             }
             catch( e )
             {
