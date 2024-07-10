@@ -391,7 +391,8 @@ describe('addPrefixToFilter', () =>
     })
 });
 
-describe('addPrefixToPipeline', () => {
+describe('addPrefixToPipeline', () =>
+{
     it ('should add prefix to keys in $match', () => {
         const pipeline = [{ $match: { a: 1} }];
         const expected = [{ $match: { 'prefix.a': 1 } }];
@@ -1220,7 +1221,8 @@ describe('optimizeMatch', () =>
     })
 })
 
-describe('mergeProperties', () => {
+describe('mergeProperties', () =>
+{
     it('should keep non-conflicting properties', () => {
         const merged = mergeProperties({ a: 1 }, { b: 2 });
         assert.deepStrictEqual(merged, { a: 1, b: 2 });
@@ -1562,7 +1564,8 @@ describe('transformToElemMatch', () =>
     })
 })
 
-describe('isExclusionProjection', () => {
+describe('isExclusionProjection', () =>
+{
     it('should return true for projection with 0', () => {
         const projection = { 'a.b': 0, 'a.c': 0 };
         assert.strictEqual(isExclusionProjection(projection), true);

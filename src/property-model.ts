@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, extractAddedFields, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties} from './types';
@@ -367,24 +367,34 @@ export abstract class AbstractPropertyModel<
     }
 
     // TODO: add support for other stages in the pipeline
-    private async resolveComputedProperties( properties: string[] ): Promise<{fields: Document | null, pipeline: Document[] | null}>
+    private async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
     {
-        const fields: ReturnType<ComputedPropertyMethod>[0] = {};
+        const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
 
         for ( const property of properties )
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const pipeline = await ( this.computedProperties as any )[property]();
-                const addedFields = extractAddedFields( pipeline );
-                for ( const field in addedFields )
+                const properties: ReturnType<ComputedPropertyMethod> = await ( this.computedProperties as any )[property]();
+                result.fields = { ...result.fields, ...properties.fields };
+                result.pipeline?.push( ...properties.pipeline );
+
+                for ( const field in properties.fields )
                 {
-                    fields[this.prefix + '.' + field] = addPrefixToFilter(addedFields[field], this.prefix);
+                    result.fields[this.prefix + '.' + field] = addPrefixToFilter(properties.fields![field], this.prefix);
+                }
+
+                if ( properties.pipeline )
+                {
+                    result.pipeline?.push( ...addPrefixToPipeline(properties.pipeline, this.prefix) );
                 }
             }
         }
 
-        return { fields: Object.keys(fields).length ? fields : null, pipeline: null };
+        return {
+            fields: Object.keys( result.fields ).length ? result.fields : null,
+            pipeline: result.pipeline?.length ? result.pipeline : null
+        };
     }
 
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> )

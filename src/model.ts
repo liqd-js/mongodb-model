@@ -262,25 +262,24 @@ export abstract class AbstractModel<
         return { filter, pipeline };
     }
 
-    // TODO: add support for other stages in the pipeline
-    private async resolveComputedProperties( properties: string[] )
+    private async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
     {
-        const fields: ReturnType<ComputedPropertyMethod>[0] = {};
+        const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
 
         for ( const property of properties )
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const pipeline = await ( this.computedProperties as any )[property]();
-                const addedFields = extractAddedFields( pipeline );
-                for ( const field in addedFields )
-                {
-                    fields[field] = addedFields[field];
-                }
+                const properties: ReturnType<ComputedPropertyMethod> = await ( this.computedProperties as any )[property]();
+                result.fields = { ...result.fields, ...properties.fields };
+                result.pipeline?.push( ...properties.pipeline );
             }
         }
 
-        return { fields, pipeline: null };
+        return {
+            fields: Object.keys( result.fields ).length ? result.fields : null,
+            pipeline: result.pipeline?.length ? result.pipeline : null
+        };
     }
 
     public async delete( id: DTO['id'] ): Promise<Boolean>
