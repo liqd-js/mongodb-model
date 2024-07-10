@@ -37,7 +37,10 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 
         // TODO: optimalizácia - vyhodiť zo smart filter pipeliny duplikátny lookup - ak sa v computedProperties niečo pridá a potom sa to používa aj v smart filtri
 
-        const addedFieldsComputedProperties = new Set(collectAddedFields( [{ $addFields: computedFields }, ...(computedPipeline || [])] ))
+        const addedFieldsComputedProperties = new Set(collectAddedFields( [
+            ...( computedFields && Object.keys(computedFields).length ? [{ $addFields: computedFields }] : [] ),
+            ...( computedPipeline?.length && computedPipeline || [] )
+        ]))
         const addedFieldsSmartFilterAll = new Set(collectAddedFields( options.smartFilter?.pipeline || [] ))
         const addedFieldsPipeline = collectAddedFields( options.pipeline || [] )
 
