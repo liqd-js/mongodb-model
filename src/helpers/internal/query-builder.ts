@@ -35,14 +35,21 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 
         let prev = options.cursor?.startsWith('prev:')
 
-        const addedFieldsSmartFilter = collectAddedFields( options.smartFilter?.pipeline || [] )
+        // TODO: optimalizácia - vyhodiť zo smart filter pipeliny duplikátny lookup - ak sa v computedProperties niečo pridá a potom sa to používa aj v smart filtri
+
+        const addedFieldsComputedProperties = new Set(collectAddedFields( [{ $addFields: computedFields }, ...(computedPipeline || [])] ))
+        const addedFieldsSmartFilterAll = new Set(collectAddedFields( options.smartFilter?.pipeline || [] ))
         const addedFieldsPipeline = collectAddedFields( options.pipeline || [] )
+
+        // only unset ones that are not in computed properties
+        const addedFieldsSmartFilter = [...addedFieldsSmartFilterAll].filter(x => !addedFieldsComputedProperties.has(x));
 
         return resolveBSONObject([
             ...( isSet(filter) ? [{ $match: optimizeMatch( filter ) }] : []),
+            ...( computedPipeline || [] ),
+            ...( computedFields ? [{ $addFields: computedFields }] : [] ),
             ...( options.smartFilter?.pipeline || [] ),
             ...( addedFieldsSmartFilter.length ? [{ $unset: addedFieldsSmartFilter }] : []),
-            ...( computedPipeline || [] ),
             ...( !options.projection && computedFields ? [{ $addFields: computedFields }] : [] ),
             ...( options.projection ? [{ $project: {...options.projection, ...computedFields }}] : []),
             ...( options.pipeline || [] ),

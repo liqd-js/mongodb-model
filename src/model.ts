@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, extractAddedFields} from './helpers';
+import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions} from './types';
 import { AbstractModels } from "./index";
@@ -125,7 +125,7 @@ export abstract class AbstractModel<
         }
         else if( options?.documentBefore && options?.documentAfter )
         {
-            this.#models.transaction( async() => 
+            this.#models.transaction( async() =>
             {
                 let documentBefore = await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] });
 
@@ -137,7 +137,7 @@ export abstract class AbstractModel<
 
         }
 
-        
+
         return { matchedCount, modifiedCount, documentBefore, documentAfter };
     }
 
@@ -272,12 +272,12 @@ export abstract class AbstractModel<
             {
                 const properties: ReturnType<ComputedPropertyMethod> = await ( this.computedProperties as any )[property]();
                 result.fields = { ...result.fields, ...properties.fields };
-                result.pipeline?.push( ...properties.pipeline );
+                result.pipeline?.push( ...(properties.pipeline || []) );
             }
         }
 
         return {
-            fields: Object.keys( result.fields ).length ? result.fields : null,
+            fields: result.fields && Object.keys( result.fields ).length ? result.fields : null,
             pipeline: result.pipeline?.length ? result.pipeline : null
         };
     }

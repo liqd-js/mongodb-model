@@ -377,7 +377,7 @@ export abstract class AbstractPropertyModel<
             {
                 const properties: ReturnType<ComputedPropertyMethod> = await ( this.computedProperties as any )[property]();
                 result.fields = { ...result.fields, ...properties.fields };
-                result.pipeline?.push( ...properties.pipeline );
+                result.pipeline?.push( ...(properties.pipeline || []) );
 
                 for ( const field in properties.fields )
                 {
@@ -392,7 +392,7 @@ export abstract class AbstractPropertyModel<
         }
 
         return {
-            fields: Object.keys( result.fields ).length ? result.fields : null,
+            fields: result.fields && Object.keys( result.fields ).length ? result.fields : null,
             pipeline: result.pipeline?.length ? result.pipeline : null
         };
     }
