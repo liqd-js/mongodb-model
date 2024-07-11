@@ -51,7 +51,7 @@ export abstract class AbstractPropertyModel<
 
                 flowGet('log') && ( console.log( this.constructor.name + '::get', ids ), DUMP( pipeline ));
 
-                return map( ids.map( id => this.dtoID( id ) ), await this.collection.aggregate( pipeline ).toArray() as DBE[], ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id ));
+                return map( ids.map( id => this.dtoID( id ) ), await this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray() as DBE[], ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id ));
             }
             catch( e )
             {
@@ -197,21 +197,22 @@ export abstract class AbstractPropertyModel<
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
-        let options: UpdateOptions = {};
+        let options: UpdateOptions = { collation: { locale: 'en' } };
 
         if( this.paths.length === 1 && !this.paths[0].array )
         {
             operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths[0].path );
         }
-        if( this.paths[this.paths.length - 1].array )
+        // TODO - over či vazne else if
+        else if( this.paths[this.paths.length - 1].array )
         {
             operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
-            options = { arrayFilters: [{ 'entry.id': this.dbeID( id )}]};
+            options = { ...options, arrayFilters: [{ 'entry.id': this.dbeID( id )}]};
         }
         else
         {
             operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
-            options = { arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id )}]};
+            options = { ...options, arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id )}]};
         }
 
         flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options });
@@ -269,8 +270,8 @@ export abstract class AbstractPropertyModel<
         const { cursor, sort = { id: 1 }, limit, skip, ...countOptions } = resolvedList;
 
         const [ entries, total ] = await Promise.all([
-            this.collection.aggregate( await pipeline ).toArray(),
-            resolvedList.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) ).toArray().then( r => r[0]?.count ?? 0 ) : 0
+            this.collection.aggregate( await pipeline, { collation: { locale: 'en' } } ).toArray(),
+            resolvedList.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ), { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
         flowGet( 'log' ) && LOG( {
@@ -304,7 +305,7 @@ export abstract class AbstractPropertyModel<
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
-        return this.collection.aggregate( aggregationPipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as Promise<T[]>;
 
         /* WHY THE HELL WAS IT LIKE THAT
 
@@ -366,7 +367,6 @@ export abstract class AbstractPropertyModel<
         return { filter, pipeline };
     }
 
-    // TODO: add support for other stages in the pipeline
     private async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
     {
         const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
@@ -413,7 +413,7 @@ export abstract class AbstractPropertyModel<
     {
         if ( !projection ) { return {}; }
 
-        let { _root: rootProjection, ...propertyProjection } = projection; // TODO add support for '$root.property' projection
+        let { _root: rootProjection, ...propertyProjection } = projection;
 
         // add to _root all properties from propertyProjection starting with _root
         for ( let key in propertyProjection )

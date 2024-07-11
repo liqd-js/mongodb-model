@@ -37,7 +37,7 @@ export abstract class AbstractModel<
         {
             try
             {
-                const documents = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection }).toArray();
+                const documents = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
                 const index = documents.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
 
                 return ids.map( id => index.get( id ) ?? null );
@@ -92,13 +92,13 @@ export abstract class AbstractModel<
 
         try
         {
-            await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
+            await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE>, { collation: { locale: 'en' } } );
         }
         catch( e: any )
         {
             if( options?.duplicateIgnore === true && e.code === 11000 )
             {
-                return this.dtoID( await this.collection.findOne( e.keyValue, { projection: { _id: 1 }}).then( r => r?._id ));
+                return this.dtoID( await this.collection.findOne( e.keyValue, { projection: { _id: 1 }, collation: { locale: 'en' } }).then( r => r?._id ));
             }
 
             throw e;
@@ -118,7 +118,7 @@ export abstract class AbstractModel<
 
         if( true )// !options?.documentBefore && !options?.documentAfter )
         {
-            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>, { collation: { locale: 'en' } } );
 
             matchedCount = res.matchedCount;
             modifiedCount = res.modifiedCount;
@@ -127,9 +127,9 @@ export abstract class AbstractModel<
         {
             this.#models.transaction( async() =>
             {
-                let documentBefore = await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] });
+                let documentBefore = await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }});
 
-                const res = await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+                const res = await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>, { collation: { locale: 'en' } } );
             });
         }
         else
@@ -201,8 +201,8 @@ export abstract class AbstractModel<
 
         let [ entries, total ] = await Promise.all(
             [
-                this.collection.aggregate( pipeline ).toArray(),
-                options.count ? this.collection.aggregate( countPipeline ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
+                this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray(),
+                options.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
             ]);
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
@@ -226,7 +226,7 @@ export abstract class AbstractModel<
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
-        return this.collection.aggregate( aggregationPipeline ).toArray() as Promise<T[]>;
+        return this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as Promise<T[]>;
     }
 
     public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<number>
@@ -291,6 +291,6 @@ export abstract class AbstractModel<
 
     public async delete( id: DTO['id'] ): Promise<Boolean>
     {
-        return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] })).deletedCount === 1;
+        return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, { collation: { locale: 'en' } })).deletedCount === 1;
     }
 }
