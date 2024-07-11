@@ -191,11 +191,18 @@ export abstract class AbstractModel<
             computedProperties
         };
         const queryBuilder = new QueryBuilder<DBE>();
+        const [pipeline, countPipeline] = await Promise.all ([
+            queryBuilder.pipeline( params ),
+            options.count ? queryBuilder.count( params ) : undefined
+        ]);
+
+        flowGet( 'log' ) && DUMP( pipeline );
+        flowGet( 'log' ) && countPipeline && DUMP( countPipeline );
 
         let [ entries, total ] = await Promise.all(
             [
-                this.collection.aggregate( await queryBuilder.pipeline( params )).toArray(),
-                options.count ? this.collection.aggregate( await queryBuilder.count( params ) ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
+                this.collection.aggregate( pipeline ).toArray(),
+                options.count ? this.collection.aggregate( countPipeline ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
             ]);
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
