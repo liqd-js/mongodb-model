@@ -127,8 +127,6 @@ export abstract class AbstractPropertyModel<
         const unsetFieldsRoot = isExclusionProjection( rootProjection ) && getUsedFields( [{$match: rootProjection}] ).used.map(el => ('_root.' + el)) || [];
         const unsetFieldsProperty = isExclusionProjection( propertyProjection ) && getUsedFields( [{$match: propertyProjection}] ).used || [];
 
-        console.log( 'ROOT PROJECTION SET', { rootProjection, propertyProjection });
-
         if ( computed?.fields )
         {
             pipeline.push({ $addFields: computed.fields });
@@ -177,8 +175,6 @@ export abstract class AbstractPropertyModel<
             //projection: options.projection,
         }) );
 
-        DUMP( pipeline );
-
         return pipeline;
     }
 
@@ -197,7 +193,7 @@ export abstract class AbstractPropertyModel<
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
-        let options: UpdateOptions = { collation: { locale: 'en' } };
+        let options: UpdateOptions = {/* collation: { locale: 'en' } */};
 
         if( this.paths.length === 1 && !this.paths[0].array )
         {

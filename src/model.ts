@@ -92,7 +92,7 @@ export abstract class AbstractModel<
 
         try
         {
-            await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE>, { collation: { locale: 'en' } } );
+            await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE>/*, { collation: { locale: 'en' } }*/ );
         }
         catch( e: any )
         {
@@ -118,7 +118,7 @@ export abstract class AbstractModel<
 
         if( true )// !options?.documentBefore && !options?.documentAfter )
         {
-            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>, { collation: { locale: 'en' } } );
+            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ );
 
             matchedCount = res.matchedCount;
             modifiedCount = res.modifiedCount;
@@ -129,7 +129,7 @@ export abstract class AbstractModel<
             {
                 let documentBefore = await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }});
 
-                const res = await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>, { collation: { locale: 'en' } } );
+                const res = await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ );
             });
         }
         else
@@ -291,6 +291,6 @@ export abstract class AbstractModel<
 
     public async delete( id: DTO['id'] ): Promise<Boolean>
     {
-        return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, { collation: { locale: 'en' } })).deletedCount === 1;
+        return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }/*, { collation: { locale: 'en' } }*/)).deletedCount === 1;
     }
 }

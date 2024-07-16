@@ -22,8 +22,6 @@ export function flowSet( key: string, value: any )
 
 export function map<T,E>(ids: T[], entries: E[], getID: (e: E ) => T ): Array<E | null>
 {
-    console.log({ entries });
-
     const index = new Map<T | string,E>( entries.map( e => [ idToIndexKey(getID( e )), e ] ));
 
     return ids.map( id => index.get( idToIndexKey(id) ) ?? null );
