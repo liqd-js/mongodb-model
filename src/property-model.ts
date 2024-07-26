@@ -193,7 +193,7 @@ export abstract class AbstractPropertyModel<
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
-        let options: UpdateOptions = {/* collation: { locale: 'en' } */};
+        let options: UpdateOptions = {};
 
         if( this.paths.length === 1 && !this.paths[0].array )
         {
@@ -375,7 +375,7 @@ export abstract class AbstractPropertyModel<
 
                 for ( const field in properties.fields )
                 {
-                    result.fields[this.prefix + '.' + field] = addPrefixToFilter(properties.fields![field], this.prefix);
+                    result.fields![this.prefix + '.' + field] = addPrefixToFilter(properties.fields![field], this.prefix);
                 }
 
                 if ( properties.pipeline )
