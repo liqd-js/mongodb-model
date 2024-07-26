@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties} from './types';
@@ -95,6 +95,11 @@ export abstract class AbstractPropertyModel<
 
         const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
         const computed = conversion && computedProperties ? await this.resolveComputedProperties( Array.isArray(computedProperties) ? computedProperties : computedProperties() ) : undefined;
+        let computedAddedFields = Object.fromEntries(([
+            ...collectAddedFields( [{$addFields: computed?.fields || {}}] ),
+            ...collectAddedFields( computed?.pipeline || [] ),
+        ]).map( f => [f.replace( new RegExp('^' + this.prefix + '.'), '' ), f ]));
+        computedAddedFields = projectionToReplace( computedAddedFields, this.prefix ) as {[p: string]: any};
 
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
@@ -127,6 +132,10 @@ export abstract class AbstractPropertyModel<
         const unsetFieldsRoot = isExclusionProjection( rootProjection ) && getUsedFields( [{$match: rootProjection}] ).used.map(el => ('_root.' + el)) || [];
         const unsetFieldsProperty = isExclusionProjection( propertyProjection ) && getUsedFields( [{$match: propertyProjection}] ).used || [];
 
+        if ( computed?.pipeline )
+        {
+            pipeline.push( ...computed.pipeline );
+        }
         if ( computed?.fields )
         {
             pipeline.push({ $addFields: computed.fields });
@@ -134,17 +143,7 @@ export abstract class AbstractPropertyModel<
 
         if( isSet( propertyProjection ))
         {
-            const computedProjection: Record<string, string> = {};
-
-            for ( const key in computed?.fields )
-            {
-                const path = key.split('.');
-                const fieldName = path[path.length - 1];
-                computedProjection[fieldName] = '$' + fieldName;
-            }
-
-            // TODO je toto uplne spravne?
-            $project = projectionToReplace({ id: 1, ...propertyProjection, ...computedProjection}, this.prefix );
+            $project = projectionToReplace({ id: 1, ...propertyProjection }, this.prefix );
         }
         if( isSet( rootProjection ))
         {
@@ -153,11 +152,11 @@ export abstract class AbstractPropertyModel<
 
         if( $rootProject )
         {
-            pipeline.push({ $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject }]}});
+            pipeline.push({ $replaceWith: { $mergeObjects: [ $project, { '_root': $rootProject, ...computedAddedFields }]}});
         }
         else
         {
-            pipeline.push({ $replaceWith: $project });
+            pipeline.push({ $replaceWith: { $mergeObjects: [ $project, computedAddedFields ] } });
         }
 
         const unsetFields = [...unsetFieldsProperty, ...unsetFieldsRoot];
