@@ -370,7 +370,7 @@ export abstract class AbstractPropertyModel<
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const properties: ReturnType<ComputedPropertyMethod> = await ( this.computedProperties as any )[property]();
+                const properties: Awaited<ReturnType<ComputedPropertyMethod>> = await (( this.computedProperties as any )[property])();
 
                 for ( const field in properties.fields )
                 {

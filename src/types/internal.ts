@@ -7,7 +7,10 @@ export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K :
 export type AsyncSmartFilterMethod = ( params: any ) => Promise<{ pipeline: Document[] | null, filter: Document | null }>
 export type SyncSmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null }
 export type SmartFilterMethod = AsyncSmartFilterMethod | SyncSmartFilterMethod;
-export type ComputedPropertyMethod = ( params: any ) => { fields: Document | null, pipeline: Document[] | null };
+
+export type AsyncComputedPropertyMethod = ( params: any ) => Promise<{ fields: Document | null, pipeline: Document[] | null }>;
+export type SyncComputedPropertyMethod = ( params: any ) => { fields: Document | null, pipeline: Document[] | null };
+export type ComputedPropertyMethod = AsyncComputedPropertyMethod | SyncComputedPropertyMethod;
 
 export type AbstractModelFromConverter<DBE extends Document, T> = (data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
 export type AbstractConverterOptions<DBE extends Document, ComputedProperties = never> =
