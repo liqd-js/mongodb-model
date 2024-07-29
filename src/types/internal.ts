@@ -4,7 +4,9 @@ import {AbstractModelConverter, AbstractModelSmartFilters} from "./external";
 export type FirstParameter<T> = T extends (arg: infer P) => any ? P : never;
 export type PublicMethodNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
 
-export type SmartFilterMethod = ( params: any ) => Promise<{ pipeline: Document[] | null, filter: Document | null }>;
+export type AsyncSmartFilterMethod = ( params: any ) => Promise<{ pipeline: Document[] | null, filter: Document | null }>
+export type SyncSmartFilterMethod = ( params: any ) => { pipeline: Document[] | null, filter: Document | null }
+export type SmartFilterMethod = AsyncSmartFilterMethod | SyncSmartFilterMethod;
 export type ComputedPropertyMethod = ( params: any ) => { fields: Document | null, pipeline: Document[] | null };
 
 export type AbstractModelFromConverter<DBE extends Document, T> = (data: T ) => ( Omit<DBE, '_id'> & { _id?: DBE['_id'] }) | (Promise<Omit<DBE, '_id'> & { _id?: DBE['_id'] }>);
