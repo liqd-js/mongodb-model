@@ -251,7 +251,7 @@ export abstract class AbstractModel<
         {
             if ( hasPublicMethod( this.smartFilters, key ) )
             {
-                const result = (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
+                const result = await (( this.smartFilters as any )[key] as SmartFilterMethod)( value );
                 result.pipeline && pipeline.push( ...result.pipeline );
                 result.filter && ( filter = { $and: [{ ...filter }, result.filter ].filter(f => Object.keys(f).length > 0) });
             }
