@@ -56,7 +56,7 @@ export abstract class AbstractModel<
 
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
-    public dtoID( dbeID: DBE['_id'] ): DTO['id']{ return dbeID as DTO['id']; }
+    public dtoID( dbeID: DBE['_id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     protected async pipeline( options: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<Document[]>
     {

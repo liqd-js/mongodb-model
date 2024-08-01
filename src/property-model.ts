@@ -87,7 +87,7 @@ export abstract class AbstractPropertyModel<
      * @param dbeID {DBE['id']} - DBE id
      * @returns {DTO['id']} - DTO id
      */
-    public dtoID( dbeID: DBE['id'] ): DTO['id']{ return dbeID as DTO['id']; }
+    public dtoID( dbeID: DBE['id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
     protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> = {}, conversion?: K ): Promise<Document[]>
