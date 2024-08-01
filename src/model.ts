@@ -40,7 +40,7 @@ export abstract class AbstractModel<
                 const documents = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
                 const index = documents.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
 
-                return ids.map( id => index.get( id ) ?? null );
+                return ids.map( id => index.get( this.dtoID(id) ) ?? null );
             }
             catch( e )
             {
@@ -157,6 +157,7 @@ export abstract class AbstractModel<
         //let perf = new Benchmark();
         //let find = perf.step();
         //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
+
 
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
         const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
