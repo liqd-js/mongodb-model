@@ -110,7 +110,7 @@ export abstract class AbstractPropertyModel<
             ...collectAddedFields( [{$addFields: computed?.fields || {}}] ),
             ...collectAddedFields( computed?.pipeline || [] ),
         ]).map( f => [f.replace( new RegExp('^' + this.prefix + '.'), '' ), 1 ]));
-        computedAddedFields = projectionToReplace( computedAddedFields, this.prefix ) as {[p: string]: any};
+        computedAddedFields = projectionToReplace( computedAddedFields ) as {[p: string]: any};
 
         const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
