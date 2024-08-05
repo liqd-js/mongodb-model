@@ -103,7 +103,7 @@ export abstract class AbstractPropertyModel<
 
         let props: string[] = []
         computedProperties && ( props = Array.isArray(computedProperties) ? computedProperties : computedProperties() );
-        options.computedProperties && props.concat( Array.isArray( options.computedProperties ) ? options.computedProperties : options.computedProperties() );
+        options.computedProperties && (props = [...props, ...(Array.isArray(options.computedProperties) ? options.computedProperties : options.computedProperties())]);
         const computed = props.length ? await this.resolveComputedProperties( props ) : undefined;
 
         let computedAddedFields = Object.fromEntries(([
@@ -410,9 +410,6 @@ export abstract class AbstractPropertyModel<
                     pipeline: r.pipeline && r.pipeline,
                 }));
 
-            parentFields = parentFields && parentFields.map( (f: any) => addPrefixToFilter( f, this.prefix ) );
-            parentPipeline = parentPipeline && addPrefixToPipeline( parentPipeline, this.prefix );
-
             if ( parentFields )
             {
                 fields = { ...fields, ...parentFields };
@@ -427,11 +424,7 @@ export abstract class AbstractPropertyModel<
             throw new Error( `Custom computed properties contain unsupported properties - ${extraProperties.join(', ')}` );
         }
 
-        return {
-            fields, pipeline
-            // fields: result.fields && Object.keys( result.fields ).length ? result.fields : null,
-            // pipeline: result.pipeline?.length ? result.pipeline : null
-        };
+        return { fields, pipeline };
     }
 
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> )

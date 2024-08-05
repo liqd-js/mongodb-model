@@ -73,7 +73,7 @@ function stringify(value: any, indentation: string = ''): string
 
 export function hasPublicMethod( obj: any, method: string ): boolean
 {
-    return method in obj && typeof (obj as any)[method] === 'function';
+    return obj && method in obj && typeof obj[method] === 'function';
 }
 
 export function DUMP( obj: object )
