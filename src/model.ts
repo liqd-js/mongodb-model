@@ -277,7 +277,7 @@ export abstract class AbstractModel<
         return { filter, pipeline };
     }
 
-    private async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
+    public async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
     {
         const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
 

@@ -373,9 +373,11 @@ export abstract class AbstractPropertyModel<
         return { filter, pipeline };
     }
 
-    private async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
+    public async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
     {
-        const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
+        const pipeline: any[] = [];
+        let fields: any = {};
+        const extraProperties: any = [];
 
         for ( const property of properties )
         {
@@ -385,19 +387,50 @@ export abstract class AbstractPropertyModel<
 
                 for ( const field in properties.fields )
                 {
-                    result.fields![this.prefix + '.' + field] = addPrefixToFilter(properties.fields![field], this.prefix);
+                    fields[this.prefix + '.' + field] = addPrefixToFilter(properties.fields![field], this.prefix);
                 }
 
                 if ( properties.pipeline )
                 {
-                    result.pipeline?.push( ...addPrefixToPipeline(properties.pipeline, this.prefix) );
+                    pipeline.push( ...addPrefixToPipeline(properties.pipeline, this.prefix) );
                 }
+            }
+            else
+            {
+                extraProperties.push( property );
             }
         }
 
+        const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
+        if ( parentModel )
+        {
+            let { fields: parentFields, pipeline: parentPipeline } = await parentModel.resolveComputedProperties( extraProperties )
+                .then(( r: any ) => ({
+                    fields: r.fields && r.fields,
+                    pipeline: r.pipeline && r.pipeline,
+                }));
+
+            parentFields = parentFields && parentFields.map( (f: any) => addPrefixToFilter( f, this.prefix ) );
+            parentPipeline = parentPipeline && addPrefixToPipeline( parentPipeline, this.prefix );
+
+            if ( parentFields )
+            {
+                fields = { ...fields, ...parentFields };
+            }
+            if ( parentPipeline )
+            {
+                pipeline.push( ...parentPipeline );
+            }
+        }
+        else if ( extraProperties.length > 0 )
+        {
+            throw new Error( `Custom computed properties contain unsupported properties - ${extraProperties.join(', ')}` );
+        }
+
         return {
-            fields: result.fields && Object.keys( result.fields ).length ? result.fields : null,
-            pipeline: result.pipeline?.length ? result.pipeline : null
+            fields, pipeline
+            // fields: result.fields && Object.keys( result.fields ).length ? result.fields : null,
+            // pipeline: result.pipeline?.length ? result.pipeline : null
         };
     }
 
