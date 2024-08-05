@@ -297,7 +297,7 @@ export abstract class AbstractModel<
         };
     }
 
-    public async delete( id: DTO['id'] ): Promise<Boolean>
+    public async delete( id: DTO['id'] | DBE['_id'] ): Promise<Boolean>
     {
         return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }/*, { collation: { locale: 'en' } }*/)).deletedCount === 1;
     }
