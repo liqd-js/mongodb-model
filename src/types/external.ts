@@ -1,5 +1,5 @@
-import {Document, Filter, FindOptions} from "mongodb";
-import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, FirstParameter, PublicMethodNames, SmartFilterMethod} from "./internal";
+import {Document, Filter, FindOptions, ObjectId} from "mongodb";
+import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ExpandPaths, FirstParameter, PathValue, PublicMethodNames, SmartFilterMethod} from "./internal";
 
 export type ModelCreateOptions = { duplicateIgnore?: boolean };
 export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean, /* TODO upsert a ine veci */ };
@@ -90,3 +90,21 @@ export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropert
         smartFilters?       : SmartFilters,
         computedProperties? : ComputedProperties,
     }
+
+export type MongoBSONTypes<T> = T extends ObjectId
+    ? ObjectId | { $oid: string }
+    :
+    {
+        [K in keyof T]: T[K] extends ObjectId
+            ? ObjectId | { $oid: string }
+            : T[K] extends (infer U)[]
+                ? MongoBSONTypes<U>[]
+                : T[K] extends object
+                    ? MongoBSONTypes<T[K]>
+                    : T[K]
+    };
+
+export type ModelUpdateDocument<T> =
+{
+    [P in ExpandPaths<T>]?: MongoBSONTypes<PathValue<T, P>>
+};
