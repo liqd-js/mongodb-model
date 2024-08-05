@@ -28,9 +28,9 @@ export type TypeMap<T extends any[]> = T extends [infer U, ...infer Rest]
     ? [AbstractModelSmartFilters<U>, ...TypeMap<Rest>]
     : [];
 
-export type ExpandPaths<T, Prefix extends string = ''> = /*T extends (infer U)[]
+export type ExpandPaths<T, Prefix extends string = ''> = T extends (infer U)[]
     ? `${Prefix}${number}` | ExpandPaths<U, `${Prefix}${number}.`>
-    :*/ T extends object
+    : T extends object
         ? {
             [K in keyof T]: 
             K extends string 
@@ -40,11 +40,18 @@ export type ExpandPaths<T, Prefix extends string = ''> = /*T extends (infer U)[]
                 : never
         }[keyof T]
         : never;
-  
+
 export type PathValue<T, Path extends string> = Path extends `${infer P}.${infer Rest}`
     ? P extends keyof T
-        ? PathValue<T[P], Rest>
+        ? T[P] extends (infer U)[]
+            ? Rest extends `${number}.${infer R}`
+                ? PathValue<U, R>
+                : Rest extends `${number}`
+                    ? U
+                    : PathValue<T[P], Rest>
+            : PathValue<T[P], Rest>
         : never
     : Path extends keyof T
         ? T[Path]
         : never;
+    
