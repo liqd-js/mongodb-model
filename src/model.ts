@@ -72,7 +72,7 @@ export abstract class AbstractModel<
         }
 
         let custom = smartFilter ? await this.resolveSmartFilter( smartFilter ) : undefined;
-        const props = computedProperties ? await this.resolveComputedProperties( computedProperties ) : undefined;
+        const props = computedProperties ? await this.resolveComputedProperties( Array.isArray( computedProperties ) ? computedProperties : computedProperties() ) : undefined;
 
         isSet( filter ) && pipeline.push({ $match: filter});
         isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});

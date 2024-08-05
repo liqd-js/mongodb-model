@@ -90,7 +90,7 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> = {}, conversion?: K ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> & { computedProperties?: ComputedPropertiesParam } = {}, conversion?: K ): Promise<Document[]>
     {
         const { computedProperties } = this.converters[conversion ?? 'dto'];
 
@@ -101,9 +101,10 @@ export abstract class AbstractPropertyModel<
 
         const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
 
-        let props = Array.isArray(computedProperties) ? computedProperties : computedProperties();
-        props.concat( Array.isArray( options.computedProperties ) ? options.computedProperties : options.computedProperties() );
-        const computed = conversion && computedProperties ? await this.resolveComputedProperties( props ) : undefined;
+        let props: string[] = []
+        computedProperties && ( props = Array.isArray(computedProperties) ? computedProperties : computedProperties() );
+        options.computedProperties && props.concat( Array.isArray( options.computedProperties ) ? options.computedProperties : options.computedProperties() );
+        const computed = props.length ? await this.resolveComputedProperties( props ) : undefined;
 
         let computedAddedFields = Object.fromEntries(([
             ...collectAddedFields( [{$addFields: computed?.fields || {}}] ),
