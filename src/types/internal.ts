@@ -21,6 +21,8 @@ export type AbstractConverterOptions<DBE extends Document, ComputedProperties = 
     cache?              : { retention?: string, cap?: string, frequency?: number, list?: boolean, precache?: boolean }, // precache prefetchne dalsiu stranu cez cursor
 }
 
+export type ComputedPropertiesParam = string[] | ( (...args: any) => string[] );
+
 // TODO: dá sa poslať ako druhý parameter funkcia? - napr. AbstractModelSmartFilters
 export type TypeMap<T extends any[]> = T extends [infer U, ...infer Rest]
     ? [AbstractModelSmartFilters<U>, ...TypeMap<Rest>]

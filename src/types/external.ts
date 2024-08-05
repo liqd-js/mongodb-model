@@ -1,5 +1,5 @@
 import {Document, Filter, FindOptions, ObjectId} from "mongodb";
-import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ExpandPaths, FirstParameter, PathValue, PublicMethodNames, SmartFilterMethod} from "./internal";
+import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ComputedPropertiesParam, ExpandPaths, FirstParameter, PathValue, PublicMethodNames, SmartFilterMethod} from "./internal";
 
 export type ModelCreateOptions = { duplicateIgnore?: boolean };
 export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean, /* TODO upsert a ine veci */ };
@@ -42,9 +42,10 @@ export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Docum
 
 export type ModelAggregateOptions<DBE extends Document, Filters = never> =
     {
-        filter?         : Filter<DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
-        projection?     : FindOptions<DBE>['projection']
+        filter?             : Filter<DBE>
+        smartFilter?        : ModelSmartFilter<Filters>
+        computedProperties? : ComputedPropertiesParam
+        projection?         : FindOptions<DBE>['projection']
     };
 
 export type FirstType<T> = T extends [infer U, ...infer Rest] ? U : undefined;
@@ -52,9 +53,10 @@ export type SecondType<T> = T extends [infer U, infer V, ...infer Rest] ? V : un
 
 export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> =
     {
-        filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<Filters>
-        projection?     : FindOptions<DBE & { _root: RootDBE }>['projection']
+        filter?             : PropertyModelFilter<RootDBE, DBE>
+        smartFilter?        : ModelSmartFilter<Filters>
+        computedProperties? : ComputedPropertiesParam
+        projection?         : FindOptions<DBE & { _root: RootDBE }>['projection']
     };
 
 export type AbstractModelConverter<DBE extends Document> = (dbe: DBE ) => unknown | Promise<unknown>;

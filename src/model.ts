@@ -1,7 +1,7 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod} from './helpers';
+import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions} from './types';
+import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam} from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -60,7 +60,7 @@ export abstract class AbstractModel<
 
     protected async pipeline( options: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<Document[]>
     {
-        let { filter, projection, ...rest } = resolveBSONObject( options );
+        let { filter, projection, computedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters']>;
 
         let pipeline: Document[] = [];
 
@@ -71,12 +71,19 @@ export abstract class AbstractModel<
             pipeline.push({ $match: accessFilter!});
         }
 
-        let custom = rest.smartFilter ? await this.resolveSmartFilter( rest.smartFilter ) : undefined;
+        let custom = smartFilter ? await this.resolveSmartFilter( smartFilter ) : undefined;
+        const props = computedProperties ? await this.resolveComputedProperties( computedProperties ) : undefined;
 
         isSet( filter ) && pipeline.push({ $match: filter});
         isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});
+
+        props?.pipeline && isSet( props?.pipeline ) && pipeline.push( ...props.pipeline );
+        props?.fields && isSet( props?.fields ) && pipeline.push({ $addFields: props.fields });
+
+        const addedFields = Object.fromEntries( collectAddedFields(pipeline).map( el => [el, 1]) );
+
         isSet( custom?.pipeline ) && pipeline.push( ...custom?.pipeline! );
-        isSet( projection ) && pipeline.push({ $project: projectionToProject( projection )});
+        isSet( projection ) && pipeline.push({ $project: { ...projectionToProject( projection ), ...addedFields }});
 
         return pipeline;
     }

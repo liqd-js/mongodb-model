@@ -2,7 +2,7 @@ import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, Object
 import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties} from './types';
+import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -100,7 +100,11 @@ export abstract class AbstractPropertyModel<
         let pipeline:  Document[] = [], prefix = '$';
 
         const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
-        const computed = conversion && computedProperties ? await this.resolveComputedProperties( Array.isArray(computedProperties) ? computedProperties : computedProperties() ) : undefined;
+
+        let props = Array.isArray(computedProperties) ? computedProperties : computedProperties();
+        props.concat( Array.isArray( options.computedProperties ) ? options.computedProperties : options.computedProperties() );
+        const computed = conversion && computedProperties ? await this.resolveComputedProperties( props ) : undefined;
+
         let computedAddedFields = Object.fromEntries(([
             ...collectAddedFields( [{$addFields: computed?.fields || {}}] ),
             ...collectAddedFields( computed?.pipeline || [] ),
@@ -302,7 +306,7 @@ export abstract class AbstractPropertyModel<
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> ): Promise<T[]>
     {
-        const aggregationPipeline = [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
+        const aggregationPipeline = [ ...await this.pipeline( options ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
