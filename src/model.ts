@@ -1,7 +1,25 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
 import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields} from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import {ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam} from './types';
+import {
+    ModelAggregateOptions,
+    ModelCreateOptions,
+    ModelListOptions,
+    MongoRootDocument,
+    WithTotal,
+    ModelUpdateResponse,
+    AbstractModelSmartFilters,
+    PublicMethodNames,
+    SmartFilterMethod,
+    ModelExtensions,
+    ModelFindOptions,
+    ModelUpdateOptions,
+    AbstractModelProperties,
+    ComputedPropertyMethod,
+    AbstractConverterOptions,
+    ComputedPropertiesParam,
+    SyncComputedPropertyMethod
+} from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -277,7 +295,7 @@ export abstract class AbstractModel<
         return { filter, pipeline };
     }
 
-    public async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
+    public async resolveComputedProperties( properties: string[] ): Promise<Awaited<ReturnType<SyncComputedPropertyMethod>>>
     {
         const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
 
