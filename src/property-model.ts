@@ -1,8 +1,54 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import {addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages} from './helpers';
+import {
+    addPrefixToFilter,
+    addPrefixToPipeline,
+    addPrefixToUpdate,
+    Arr,
+    collectAddedFields,
+    convert,
+    DUMP,
+    flowGet,
+    generateCursorCondition,
+    GET_PARENT,
+    GET_PREFIX,
+    getCursor,
+    getUsedFields,
+    hasPublicMethod,
+    isExclusionProjection,
+    isSet,
+    isUpdateOperator,
+    LOG,
+    map,
+    optimizeMatch,
+    projectionToReplace,
+    REGISTER_MODEL,
+    resolveBSONObject,
+    reverseSort,
+    splitFilterToStages
+} from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import {SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam} from './types';
+import {
+    SmartFilterMethod,
+    MongoPropertyDocument,
+    MongoRootDocument,
+    PropertyModelAggregateOptions,
+    PropertyModelFilter,
+    PropertyModelListOptions,
+    PublicMethodNames,
+    ModelUpdateResponse,
+    WithTotal,
+    PropertyModelFindOptions,
+    SecondType,
+    AbstractPropertyModelSmartFilters,
+    PropertyModelExtensions,
+    ConstructorExtensions,
+    FirstType,
+    ComputedPropertyMethod,
+    AbstractModelProperties,
+    ComputedPropertiesParam,
+    SyncComputedPropertyMethod
+} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -73,6 +119,8 @@ export abstract class AbstractPropertyModel<
         models[REGISTER_MODEL]( this, collection.collectionName, this.prefix );
     }
 
+    public get [GET_PREFIX](): string { return this.prefix; }
+
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
 
     /**
@@ -106,9 +154,16 @@ export abstract class AbstractPropertyModel<
         options.computedProperties && (props = [...props, ...(Array.isArray(options.computedProperties) ? options.computedProperties : options.computedProperties())]);
         const computed = props.length ? await this.resolveComputedProperties( props ) : undefined;
 
+        const gatheredFields = Object.values( computed || {fields: null, pipeline: null} )
+            .reduce((acc, val) => {
+                const fields = { ...acc?.fields, ...val?.fields };
+                const pipeline = [...acc?.pipeline!, ...(val?.pipeline || [])];
+                return { fields, pipeline };
+            }, {fields: {}, pipeline: []});
+
         let computedAddedFields = Object.fromEntries(([
-            ...collectAddedFields( [{$addFields: computed?.fields || {}}] ),
-            ...collectAddedFields( computed?.pipeline || [] ),
+            ...collectAddedFields( [{$addFields: gatheredFields?.fields || {}}] ),
+            ...collectAddedFields( gatheredFields?.pipeline || [] ),
         ]).map( f => [f.replace( new RegExp('^' + this.prefix + '.'), '' ), 1 ]));
         computedAddedFields = projectionToReplace( computedAddedFields ) as {[p: string]: any};
 
@@ -124,9 +179,15 @@ export abstract class AbstractPropertyModel<
                 pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + this.paths[i - 1].path });
             }
 
+            const tmpPrefix = prefix.replace(/^\$/,'');
+
             needRoot && last && pipeline.push({ $addFields: { _root: '$$ROOT' }});
             pipeline.push( ...await queryBuilder.pipeline(
                 {
+                    pipeline: [
+                        ...(computed && computed[tmpPrefix] && computed[tmpPrefix].fields && [{ $addFields: computed[tmpPrefix].fields }] || []),
+                        ...(computed && computed[tmpPrefix] && computed[tmpPrefix].pipeline && computed[tmpPrefix].pipeline || []),
+                    ],
                     filter: stages[i],
                     smartFilter: last ? {
                         filter: {},
@@ -142,15 +203,6 @@ export abstract class AbstractPropertyModel<
 
         const unsetFieldsRoot = isExclusionProjection( rootProjection ) && getUsedFields( [{$match: rootProjection}] ).used.map(el => ('_root.' + el)) || [];
         const unsetFieldsProperty = isExclusionProjection( propertyProjection ) && getUsedFields( [{$match: propertyProjection}] ).used || [];
-
-        if ( computed?.pipeline )
-        {
-            pipeline.push( ...computed.pipeline );
-        }
-        if ( computed?.fields )
-        {
-            pipeline.push({ $addFields: computed.fields });
-        }
 
         if( isSet( propertyProjection ))
         {
@@ -373,17 +425,18 @@ export abstract class AbstractPropertyModel<
         return { filter, pipeline };
     }
 
-    public async resolveComputedProperties( properties: string[] ): Promise<ReturnType<ComputedPropertyMethod>>
+    public async resolveComputedProperties( properties: string[] ): Promise<{ [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}>
     {
-        const pipeline: any[] = [];
-        let fields: any = {};
-        const extraProperties: any = [];
+        const result: { [path: string]: ReturnType<SyncComputedPropertyMethod>} = {};
+        let pipeline: Document[] = [];
+        let fields: Document = {};
+        const extraProperties: string[] = [];
 
         for ( const property of properties )
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const properties: Awaited<ReturnType<ComputedPropertyMethod>> = await (( this.computedProperties as any )[property])();
+                const properties: Awaited<ReturnType<SyncComputedPropertyMethod>> = await (( this.computedProperties as any )[property])();
 
                 for ( const field in properties.fields )
                 {
@@ -400,23 +453,25 @@ export abstract class AbstractPropertyModel<
                 extraProperties.push( property );
             }
         }
+        result[this.prefix] = { fields, pipeline };
 
         const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
-            let { fields: parentFields, pipeline: parentPipeline } = await parentModel.resolveComputedProperties( extraProperties )
+            let properties = await parentModel.resolveComputedProperties( extraProperties )
                 .then(( r: any ) => ({
                     fields: r.fields && r.fields,
                     pipeline: r.pipeline && r.pipeline,
                 }));
 
-            if ( parentFields )
+            if ( 'fields' in properties )
             {
-                fields = { ...fields, ...parentFields };
+                result[''] = properties;
             }
-            if ( parentPipeline )
+            else
             {
-                pipeline.push( ...parentPipeline );
+                const prefix = Object.keys( result )[0];
+                result[prefix] = properties[prefix];
             }
         }
         else if ( extraProperties.length > 0 )
@@ -424,7 +479,7 @@ export abstract class AbstractPropertyModel<
             throw new Error( `Custom computed properties contain unsupported properties - ${extraProperties.join(', ')}` );
         }
 
-        return { fields, pipeline };
+        return result;
     }
 
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> )
