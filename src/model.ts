@@ -137,7 +137,7 @@ export abstract class AbstractModel<
         throw new Error('Method not implemented.');
     }
 
-    public async update( id: DTO['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
+    public async update( id: DTO['id'] | DBE['_id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
         let matchedCount: number | undefined, modifiedCount: number | undefined, documentBefore: DBE | undefined, documentAfter: DBE | undefined;
 
