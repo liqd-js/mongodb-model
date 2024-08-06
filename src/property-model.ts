@@ -10,7 +10,6 @@ import {
     flowGet,
     generateCursorCondition,
     GET_PARENT,
-    GET_PREFIX,
     getCursor,
     getUsedFields,
     hasPublicMethod,
@@ -119,8 +118,6 @@ export abstract class AbstractPropertyModel<
         models[REGISTER_MODEL]( this, collection.collectionName, this.prefix );
     }
 
-    public get [GET_PREFIX](): string { return this.prefix; }
-
     protected id(): DTO['id'] | Promise<DTO['id']>{ return new ObjectId().toString() as DTO['id']; }
 
     /**
@@ -147,7 +144,7 @@ export abstract class AbstractPropertyModel<
 
         let pipeline:  Document[] = [], prefix = '$';
 
-        const custom = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
+        const smartFilter = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
 
         let props: string[] = []
         computedProperties && ( props = Array.isArray(computedProperties) ? computedProperties : computedProperties() );
@@ -167,7 +164,13 @@ export abstract class AbstractPropertyModel<
         ]).map( f => [f.replace( new RegExp('^' + this.prefix + '.'), '' ), 1 ]));
         computedAddedFields = projectionToReplace( computedAddedFields ) as {[p: string]: any};
 
-        const needRoot = getUsedFields( custom?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
+        const gatheredFilters = Object.values( smartFilter || {} )
+            .reduce((acc, val) => {
+                const filter = { ...acc?.filter, ...val?.filter } as Filter<DBE>;
+                const pipeline = [ ...acc?.pipeline!, ...(val?.pipeline || []) ] as Document[];
+                return { filter, pipeline };
+            }, { filter: {} as Filter<DBE>, pipeline: [] as Document[] })
+        const needRoot = getUsedFields( gatheredFilters?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
         const stages = await this.filterStages( options );
         const subpaths = this.prefix.split('.');
@@ -184,15 +187,12 @@ export abstract class AbstractPropertyModel<
             needRoot && last && pipeline.push({ $addFields: { _root: '$$ROOT' }});
             pipeline.push( ...await queryBuilder.pipeline(
                 {
-                    pipeline: [
-                        ...(computed && computed[tmpPrefix] && computed[tmpPrefix].fields && [{ $addFields: computed[tmpPrefix].fields }] || []),
-                        ...(computed && computed[tmpPrefix] && computed[tmpPrefix].pipeline && computed[tmpPrefix].pipeline || []),
-                    ],
                     filter: stages[i],
                     smartFilter: last ? {
-                        filter: {},
-                        pipeline: custom?.pipeline ?? []
+                        filter: smartFilter?.[tmpPrefix]?.filter as Filter<RootDBE> | undefined,
+                        pipeline: smartFilter?.[tmpPrefix]?.pipeline,
                     } : undefined,
+                    computedProperties: computed?.[tmpPrefix] ? computed[tmpPrefix] : undefined,
                 }));
             needRoot && last && pipeline.push({ $unset: '_root' });
         }
@@ -379,11 +379,12 @@ export abstract class AbstractPropertyModel<
 
     protected async accessFilter(): Promise<PropertyModelFilter<RootDBE,DBE> | void>{}
 
-    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<SecondType<Extensions['smartFilters']>>]: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<SecondType<Extensions['smartFilters']>>]: any} ): Promise<{ [prefix: string]: { filter?: Filter<DBE>, pipeline?: Document[] } }>
     {
-        const pipeline: any[] = [];
-        let filter: any = {};
-        const extraFilters: any = {};
+        const result: { [path: string]: { filter?: Filter<DBE>, pipeline?: Document[] }} = {};
+        const pipeline: Document[] = [];
+        let filter: Filter<DBE> = {};
+        const extraFilters: Document = {};
 
         for ( const [key, value] of Object.entries( smartFilter ) )
         {
@@ -398,23 +399,25 @@ export abstract class AbstractPropertyModel<
                 extraFilters[key] = value;
             }
         }
+        if ( pipeline.length > 0 || Object.keys(filter).length > 0 )
+        {
+            result[this.prefix] = { filter, pipeline };
+        }
 
         const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
-            const { filter: parentFilter, pipeline: parentPipeline } = await parentModel.resolveSmartFilter( extraFilters )
-                .then(( r: any ) => ({
-                    filter: r.filter && r.filter,
-                    pipeline: r.pipeline && r.pipeline,
-                }));
+            const resolved = await parentModel.resolveSmartFilter( extraFilters )
 
-            if ( parentFilter && Object.keys( parentFilter ).length > 0 )
-            {
-                filter = { $and: [ {...filter}, parentFilter ].filter( f => Object.keys( f ).length > 0 ) };
+            if ('filter' in resolved && 'pipeline' in resolved) {
+                result[''] = resolved;
             }
-            if ( parentPipeline && parentPipeline.length > 0 )
+            else if (Object.keys(resolved).length > 0)
             {
-                pipeline.push( ...parentPipeline )
+                for ( const prefix in resolved )
+                {
+                    result[prefix] = (resolved as any)[prefix];
+                }
             }
         }
         else if ( Object.keys( extraFilters ).length > 0 )
@@ -422,7 +425,7 @@ export abstract class AbstractPropertyModel<
             throw new Error( `Custom filter contains unsupported filters - ${JSON.stringify(extraFilters, null, 2)}` );
         }
 
-        return { filter, pipeline };
+        return result;
     }
 
     public async resolveComputedProperties( properties: string[] ): Promise<{ [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}>
@@ -453,25 +456,24 @@ export abstract class AbstractPropertyModel<
                 extraProperties.push( property );
             }
         }
-        result[this.prefix] = { fields, pipeline };
-
+        if ( pipeline.length > 0 || Object.keys(fields).length > 0 )
+        {
+            result[this.prefix] = { fields, pipeline };
+        }
         const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
             let properties = await parentModel.resolveComputedProperties( extraProperties )
-                .then(( r: any ) => ({
-                    fields: r.fields && r.fields,
-                    pipeline: r.pipeline && r.pipeline,
-                }));
 
-            if ( 'fields' in properties )
-            {
-                result[''] = properties;
+            if ('fields' in properties && 'pipeline' in properties) {
+                result[''] = properties as { fields: Document, pipeline: Document[] };
             }
-            else
+            else if (Object.keys(properties).length > 0)
             {
-                const prefix = Object.keys( result )[0];
-                result[prefix] = properties[prefix];
+                for ( const prefix in properties )
+                {
+                    result[prefix] = properties[prefix];
+                }
             }
         }
         else if ( extraProperties.length > 0 )
@@ -487,10 +489,9 @@ export abstract class AbstractPropertyModel<
         const sort = list.sort ?? { id: -1 };
 
         const accessFilter = await this.accessFilter();
-        const custom = list.smartFilter ? await this.resolveSmartFilter( list.smartFilter as any ) : undefined;
         const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
 
-        const stageFilter = optimizeMatch({ $and:  [ addPrefixToFilter( { $and: [ list.filter, accessFilter, cursorFilter ]}, this.prefix ), custom?.filter ]} as MongoFilter<DBE>);
+        const stageFilter = optimizeMatch({ $and:  [ addPrefixToFilter( { $and: [ list.filter, accessFilter, cursorFilter ]}, this.prefix ) ]} as MongoFilter<DBE>);
         return splitFilterToStages( stageFilter as MongoFilter<DBE>, this.prefix ) as Filter<RootDBE>
     }
 

@@ -2,7 +2,6 @@ import {ObjectId} from "mongodb";
 
 export const REGISTER_MODEL = Symbol('REGISTER_MODEL');
 export const GET_PARENT = Symbol('GET_PARENT');
-export const GET_PREFIX = Symbol('GET_PREFIX');
 
 const Flow = require('@liqd-js/flow');
 
