@@ -95,18 +95,28 @@ export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropert
 
 export type MongoBSONTypes<T> = T extends ObjectId
     ? ObjectId | { $oid: string }
-    :
-    {
-        [K in keyof T]: T[K] extends ObjectId
-            ? ObjectId | { $oid: string }
-            : T[K] extends (infer U)[]
-                ? MongoBSONTypes<U>[]
-                : T[K] extends object
-                    ? MongoBSONTypes<T[K]>
-                    : T[K]
-    };
+    : T extends (infer U)[]
+        ? MongoBSONTypes<U>[]
+        :
+        {
+            [K in keyof T]: T[K] extends ObjectId
+                ? ObjectId | { $oid: string }
+                : T[K] extends (infer U)[]
+                    ? MongoBSONTypes<U>[]
+                    : T[K] extends object
+                        ? MongoBSONTypes<T[K]>
+                        : T[K]
+        };
 
 export type ModelUpdateDocument<T> =
 {
     [P in ExpandPaths<T>]?: MongoBSONTypes<PathValue<T, P>>
 };
+
+import { ApplicationBasicDTO, ApplicationDBE, ContractDBE, ContractTimesheetDBE, EngagementDBE, JobDBE } from '@ramp-global/types';
+
+type Y = ModelUpdateDocument<{ id: ObjectId, invoices: Array<{ id: string }>}>;
+
+type X = ExpandPaths<ContractTimesheetDBE>;
+
+const a: X = { 'applicationsky.1.id': 1 }

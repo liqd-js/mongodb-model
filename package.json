@@ -1,7 +1,7 @@
 {
     "name": "@liqd-js/mongodb-model",
     "description": "Mongo model class",
-    "version": "1.0.21",
+    "version": "1.0.22",
     "author": "radixxko",
     "license": "MIT",
     "main": "dist/index.js",
@@ -44,6 +44,7 @@
         "mocha-lcov-reporter": "^1.3.0",
         "nyc": "^17.0.0",
         "ts-node": "^10.9.2",
-        "typescript": "^5.5.4"
+        "typescript": "^5.5.4",
+        "@ramp-global/types": "^1.4.86"
     }
 }

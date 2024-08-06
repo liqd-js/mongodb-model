@@ -28,30 +28,44 @@ export type TypeMap<T extends any[]> = T extends [infer U, ...infer Rest]
     ? [AbstractModelSmartFilters<U>, ...TypeMap<Rest>]
     : [];
 
-export type ExpandPaths<T, Prefix extends string = ''> = T extends (infer U)[]
-    ? `${Prefix}${number}` | ExpandPaths<U, `${Prefix}${number}.`>
-    : T extends object
-        ? {
-            [K in keyof T]: 
-            K extends string 
-                ? T[K] extends object 
-                ? `${Prefix}${K}` | ExpandPaths<T[K], `${Prefix}${K}.`>
-                : `${Prefix}${K}`
-                : never
-        }[keyof T]
-        : never;
+type FilterUndefined<T> = T extends undefined ? never : T;
+
+export type ExpandPaths<T, Prefix extends string = ''> = FilterUndefined<T extends ObjectId
+    ? Prefix extends `${infer P}.`
+        ? P
+        : Prefix
+    :T extends (infer U)[]
+        ? `${Prefix}${number}` | ExpandPaths<U, `${Prefix}${number}.`>
+        : T extends object
+            ? {
+                [K in keyof T]: 
+                K extends string 
+                    ? T[K] extends object 
+                    ? `${Prefix}${K}` | ExpandPaths<T[K], `${Prefix}${K}.`>
+                    : `${Prefix}${K}`
+                    : never
+            }[keyof T]
+            : never>;
 
 export type PathValue<T, Path extends string> = Path extends `${infer P}.${infer Rest}`
-    ? P extends keyof T
-        ? T[P] extends (infer U)[]
-            ? Rest extends `${number}.${infer R}`
-                ? PathValue<U, R>
-                : Rest extends `${number}`
-                    ? U
-                    : PathValue<T[P], Rest>
-            : PathValue<T[P], Rest>
-        : never
-    : Path extends keyof T
-        ? T[Path]
-        : never;
+    ? P extends `${number}`
+        ? T extends (infer U)[]
+            ? PathValue<U, Rest>
+            : never
+        : P extends keyof T
+            ? T[P] extends (infer U)[]
+                ? Rest extends `${number}.${infer R}`
+                    ? PathValue<U, R>
+                    : Rest extends `${number}`
+                        ? U
+                        : PathValue<T[P], Rest>
+                : PathValue<T[P], Rest>
+            : never
+    : Path extends `${number}`
+        ? T extends (infer U)[]
+            ? U
+            : never
+        : Path extends keyof T
+            ? T[Path]
+            : never;
     
