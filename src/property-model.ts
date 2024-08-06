@@ -188,10 +188,7 @@ export abstract class AbstractPropertyModel<
             pipeline.push( ...await queryBuilder.pipeline(
                 {
                     filter: stages[i],
-                    smartFilter: last ? {
-                        filter: smartFilter?.[tmpPrefix]?.filter as Filter<RootDBE> | undefined,
-                        pipeline: smartFilter?.[tmpPrefix]?.pipeline,
-                    } : undefined,
+                    smartFilter: smartFilter?.[tmpPrefix] ? smartFilter?.[tmpPrefix] as { filter?: Filter<RootDBE>, pipeline: Document[] } : undefined,
                     computedProperties: computed?.[tmpPrefix] ? computed[tmpPrefix] : undefined,
                 }));
             needRoot && last && pipeline.push({ $unset: '_root' });
