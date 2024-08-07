@@ -88,10 +88,11 @@ export abstract class AbstractPropertyModel<
         this.smartFilters = params.smartFilters;
         this.computedProperties = params.computedProperties;
 
-        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id'] | DBE['id']>, conversion: keyof Extensions['converters'] ) =>
+        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id'] | DBE['id']>, conversion: keyof Extensions['converters'], accessControl: Filter<DBE> | void ) =>
         {
             try
             {
+                // TODO overit ci spravny access control vezme  v potaz
                 let pipeline = await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: this.converters[conversion].projection });
 
                 flowGet('log') && ( console.log( this.constructor.name + '::get', ids ), DUMP( pipeline ));
@@ -287,7 +288,7 @@ export abstract class AbstractPropertyModel<
     public async get<K extends keyof Extensions['converters']>( id: Array<DTO['id'] | DBE['id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>>;
     public async get<K extends keyof Extensions['converters']>( id: DTO['id'] | DBE['id'] | Array<DTO['id'] | DBE['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
-        const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
+        const documents = await this.abstractFindAggregator.call( Arr( id ), conversion, await this.accessFilter() ) as Array<DBE|null>;
         const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
 
         if( filtered ){ entries.filter( Boolean )}

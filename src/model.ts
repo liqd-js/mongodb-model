@@ -51,11 +51,16 @@ export abstract class AbstractModel<
         this.#models = models;
 
         models[REGISTER_MODEL]( this, collection.collectionName );
-        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'] ) =>
+        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'], accessControl: Filter<DBE> | void ) =>
         {
             try
             {
-                const documents = await this.collection.find({ _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
+                //const filter = accessControl ? { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]} : { _id: { $in: ids.map( id => this.dbeID( id ))}};
+                //const documents = await this.collection.find( filter, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
+                const documents = accessControl
+                    ? await this.collection.aggregate([{ $match: { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]}}]).toArray()
+                    : await this.collection.find( { _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
+                    
                 const index = documents.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
 
                 return ids.map( id => index.get( this.dtoID(id) ) ?? null );
@@ -183,8 +188,7 @@ export abstract class AbstractModel<
         //let find = perf.step();
         //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
 
-
-        const documents = await this.abstractFindAggregator.call( Arr( id ), conversion ) as Array<DBE|null>;
+        const documents = await this.abstractFindAggregator.call( Arr( id ), conversion, await this.accessFilter() ) as Array<DBE|null>;
         const entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
 
         if( filtered ){ entries.filter( Boolean )}
