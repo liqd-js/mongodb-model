@@ -217,10 +217,12 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         {
             prefixed.push({ $lookup: 
             {
+                ...query,
                 from: query.from,
-                localField: prefix + '.' + query.localField, // TODO root?
-                foreignField: query.foreignField,
-                as: prefix + '.' + query.as
+                ...( query.localField ? { localField: prefix + '.' + query.localField } : undefined ), // TODO root?
+                ...( query.foreignField ? { foreignField: query.foreignField } : undefined ),
+                as: prefix + '.' + query.as,
+                ...(query.let ? { let: Object.fromEntries( Object.entries( query.let ).map(([ key, value ]) => [ key, addPrefixToValue( value, prefix )]) ) } : undefined),
             }});
         }
         else if([ '$bucket', '$bucketAuto', '$fill', '$graphLookup', '$replaceRoot', '$replaceWith', '$sample', '$unwind' ].includes( stage ))
