@@ -147,10 +147,28 @@ export abstract class AbstractPropertyModel<
 
         const smartFilter = options.smartFilter ? await this.resolveSmartFilter( options.smartFilter as any ) : undefined;
 
-        let props: string[] = []
-        computedProperties && ( props = Array.isArray(computedProperties) ? computedProperties : computedProperties() );
-        options.computedProperties && (props = [...props, ...(Array.isArray(options.computedProperties) ? options.computedProperties : options.computedProperties())]);
-        const computed = props.length ? await this.resolveComputedProperties( props ) : undefined;
+        const converterProperties = await this.resolveComputedProperties( computedProperties );
+        const optionsProperties = await this.resolveComputedProperties( options.computedProperties );
+        const computed: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>} = {};
+        for ( const prefix in { ...converterProperties, ...optionsProperties } )
+        {
+            computed[prefix] = { fields: {}, pipeline: [] };
+            computed[prefix].fields = { ...converterProperties[prefix]?.fields, ...optionsProperties[prefix]?.fields };
+            computed[prefix].pipeline = [ ...converterProperties[prefix]?.pipeline || [], ...optionsProperties[prefix]?.pipeline || [] ];
+
+            if ( !Object.entries(computed[prefix].fields).length )
+            {
+                computed[prefix].fields = null;
+            }
+            if ( !computed[prefix].pipeline.length )
+            {
+                computed[prefix].pipeline = null;
+            }
+            if ( !computed[prefix].fields && !computed[prefix].pipeline )
+            {
+                delete computed[prefix];
+            }
+        }
 
         const gatheredFields = Object.values( computed || {fields: null, pipeline: null} )
             .reduce((acc, val) => {
@@ -426,51 +444,61 @@ export abstract class AbstractPropertyModel<
         return result;
     }
 
-    public async resolveComputedProperties( properties: string[] ): Promise<{ [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}>
+    public async resolveComputedProperties( properties: any ): Promise<{ [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}>
     {
         const result: { [path: string]: ReturnType<SyncComputedPropertyMethod>} = {};
         let pipeline: Document[] = [];
         let fields: Document = {};
-        const extraProperties: string[] = [];
+        const extraProperties: any = {};
 
-        for ( const property of properties )
+        if ( Array.isArray( properties ) )
+        {
+            properties = properties.reduce(
+                (acc, val) => {acc[val] = null; return acc;},
+                {}
+            );
+        }
+
+        for ( const property in ( properties as { [key in PublicMethodNames<SecondType<Extensions["computedProperties"]>>]?: any } ) )
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const properties: Awaited<ReturnType<SyncComputedPropertyMethod>> = await (( this.computedProperties as any )[property])();
+                const resolvedProperties: Awaited<ReturnType<SyncComputedPropertyMethod>> = await (( this.computedProperties as any )[property])( (properties as any)[property] );
 
-                for ( const field in properties.fields )
+                for ( const field in resolvedProperties.fields )
                 {
-                    fields[this.prefix + '.' + field] = addPrefixToFilter(properties.fields![field], this.prefix);
+                    fields[this.prefix + '.' + field] = addPrefixToFilter(resolvedProperties.fields![field], this.prefix);
                 }
 
-                if ( properties.pipeline )
+                if ( resolvedProperties.pipeline )
                 {
-                    pipeline.push( ...addPrefixToPipeline(properties.pipeline, this.prefix) );
+                    pipeline.push( ...addPrefixToPipeline(resolvedProperties.pipeline, this.prefix) );
                 }
             }
             else
             {
-                extraProperties.push( property );
+                extraProperties[property] = (properties as any)[property];
             }
         }
+
         if ( pipeline.length > 0 || Object.keys(fields).length > 0 )
         {
             result[this.prefix] = { fields, pipeline };
         }
+
         const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
         if ( parentModel )
         {
-            let properties = await parentModel.resolveComputedProperties( extraProperties )
+            let resolvedProperties = await parentModel.resolveComputedProperties( extraProperties )
 
-            if ('fields' in properties && 'pipeline' in properties) {
-                result[''] = properties as { fields: Document, pipeline: Document[] };
+            if ('fields' in resolvedProperties && 'pipeline' in resolvedProperties) {
+                result[''] = resolvedProperties as { fields: Document, pipeline: Document[] };
             }
-            else if (Object.keys(properties).length > 0)
+            else if (Object.keys(resolvedProperties).length > 0)
             {
-                for ( const prefix in properties )
+                for ( const prefix in resolvedProperties )
                 {
-                    result[prefix] = properties[prefix];
+                    result[prefix] = resolvedProperties[prefix];
                 }
             }
         }

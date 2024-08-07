@@ -95,7 +95,7 @@ export abstract class AbstractModel<
         }
 
         let custom = smartFilter ? await this.resolveSmartFilter( smartFilter ) : undefined;
-        const props = computedProperties ? await this.resolveComputedProperties( Array.isArray( computedProperties ) ? computedProperties : computedProperties() ) : undefined;
+        const props = computedProperties ? await this.resolveComputedProperties( computedProperties ) : undefined;
 
         isSet( filter ) && pipeline.push({ $match: filter});
         isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});
@@ -299,24 +299,32 @@ export abstract class AbstractModel<
         return { filter, pipeline };
     }
 
-    public async resolveComputedProperties( properties: string[] ): Promise<Awaited<ReturnType<SyncComputedPropertyMethod>>>
+    public async resolveComputedProperties( properties: any ): Promise<Awaited<ReturnType<SyncComputedPropertyMethod>>>
     {
         const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
 
-        for ( const property of properties )
+        if ( Array.isArray( properties ) )
+        {
+            properties = properties.reduce(
+                (acc, val) => {acc[val] = null; return acc;},
+                {}
+            );
+        }
+
+        for ( const property in (properties as object) )
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const properties: Awaited<ReturnType<ComputedPropertyMethod>> = await ( this.computedProperties as any )[property]();
-                result.fields = { ...result.fields, ...properties.fields };
-                result.pipeline?.push( ...(properties.pipeline || []) );
+                const resolvedProperties: Awaited<ReturnType<ComputedPropertyMethod>> = await ( this.computedProperties as any )[property]( properties[property] );
+                result.fields = { ...result.fields, ...resolvedProperties.fields };
+                result.pipeline?.push( ...(resolvedProperties.pipeline || []) );
             }
         }
 
         return {
             fields: result.fields && Object.keys( result.fields ).length ? result.fields : null,
             pipeline: result.pipeline?.length ? result.pipeline : null
-        };
+        }
     }
 
     public async delete( id: DTO['id'] | DBE['_id'] ): Promise<Boolean>
