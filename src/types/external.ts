@@ -118,5 +118,3 @@ import { ApplicationBasicDTO, ApplicationDBE, ContractDBE, ContractTimesheetDBE,
 type Y = ModelUpdateDocument<{ id: ObjectId, invoices: Array<{ id: string }>}>;
 
 type X = ExpandPaths<ContractTimesheetDBE>;
-
-const a: X = { 'applicationsky.1.id': 1 }
