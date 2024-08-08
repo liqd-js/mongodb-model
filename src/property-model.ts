@@ -46,7 +46,7 @@ import {
     ComputedPropertyMethod,
     AbstractModelProperties,
     ComputedPropertiesParam,
-    SyncComputedPropertyMethod
+    SyncComputedPropertyMethod, ModelUpdateOptions
 } from './types';
 import { AbstractModels } from "./index";
 
@@ -267,11 +267,11 @@ export abstract class AbstractPropertyModel<
         return _id;
     }*/
 
-    public async update( id: DTO['id'] | DBE['id'], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse<DBE>>
+    public async update( id: DTO['id'] | DBE['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
-        let options: UpdateOptions = {};
+        let updateOptions: UpdateOptions = {};
 
         if( this.paths.length === 1 && !this.paths[0].array )
         {
@@ -281,17 +281,49 @@ export abstract class AbstractPropertyModel<
         else if( this.paths[this.paths.length - 1].array )
         {
             operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
-            options = { ...options, arrayFilters: [{ 'entry.id': this.dbeID( id )}]};
+            updateOptions = { ...updateOptions, arrayFilters: [{ 'entry.id': this.dbeID( id )}]};
         }
         else
         {
             operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
-            options = { ...options, arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id )}]};
+            updateOptions = { ...updateOptions, arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: this.dbeID( id )}]};
         }
 
-        flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options });
+        flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options: updateOptions });
 
-        let res = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
+        const documentBefore = options?.documentBefore ? (await this.get( id, 'dbe' ) as DBE) || undefined : undefined;
+        let res = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, updateOptions );
+        const documentAfter = options?.documentAfter ? (await this.get( id, 'dbe' ) as DBE) || undefined : undefined;
+
+        flowGet('log') && LOG({res});
+
+        return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount, documentBefore, documentAfter }
+    }
+
+    async updateMany( ids: DBE['id'][] | DTO['id'][], update: Partial<DBE> | UpdateFilter<DBE> )
+    {
+        let path = this.paths.map( p => p.path ).join('.') + '.id';
+        let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
+        let options: UpdateOptions = {};
+
+        if( this.paths.length === 1 && !this.paths[0].array )
+        {
+            operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths[0].path );
+        }
+        else if( this.paths[this.paths.length - 1].array )
+        {
+            operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.map( p => p.path ).join('.$[].') + '.$[entry]' );
+            options = { ...options, arrayFilters: [{ 'entry.id': { $in: ids.map( id => this.dbeID( id )) }}]};
+        }
+        else
+        {
+            operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths.slice( 0, this.paths.length - 1 ).map( p => p.path ).join('.$[].') + '.$[entry].' + this.paths[this.paths.length - 1].path );
+            options = { ...options, arrayFilters: [{[ 'entry.' + this.paths[this.paths.length - 1].path + '.id' ]: { $in: ids.map( id => this.dbeID( id )) }}]};
+        }
+
+        flowGet( 'log' ) && LOG({ match: {[ path ]: { $in: ids.map( id => this.dbeID( id )) }}, operations, options });
+
+        let res = await this.collection.updateMany({[ path ]: { $in: ids.map( id => this.dbeID( id )) }} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
 
         flowGet('log') && LOG({res});
 

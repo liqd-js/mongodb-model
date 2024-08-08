@@ -144,31 +144,39 @@ export abstract class AbstractModel<
 
     public async update( id: DTO['id'] | DBE['_id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
-        let matchedCount: number | undefined, modifiedCount: number | undefined, documentBefore: DBE | undefined, documentAfter: DBE | undefined;
+        let matchedCount: number | undefined = 0, modifiedCount: number | undefined = 0, documentBefore: DBE | undefined, documentAfter: DBE | undefined;
 
-        if( true )// !options?.documentBefore && !options?.documentAfter )
+        if( options?.documentAfter )
         {
+            await this.#models.transaction( async() =>
+            {
+                documentBefore = options?.documentBefore ? (await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }})) as DBE || undefined : undefined;
+                documentAfter = (await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ )) as DBE || undefined;
+
+                matchedCount = documentAfter ? 1 : 0;
+                modifiedCount = documentAfter ? 1 : 0;
+            });
+        }
+        else
+        {
+            documentBefore = options?.documentBefore ? (await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }})) as DBE || undefined : undefined;
             const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ );
 
             matchedCount = res.matchedCount;
             modifiedCount = res.modifiedCount;
         }
-        else if( options?.documentBefore && options?.documentAfter )
-        {
-            this.#models.transaction( async() =>
-            {
-                let documentBefore = await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }});
-
-                const res = await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ );
-            });
-        }
-        else
-        {
-
-        }
-
 
         return { matchedCount, modifiedCount, documentBefore, documentAfter };
+    }
+
+    public async updateMany( id: DTO['id'][] | DBE['_id'][], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse<DBE>>
+    {
+        const res = await this.collection.updateMany({ _id: { $in: id.map( id => this.dbeID( id ))}}, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+
+        return {
+            matchedCount: res.matchedCount,
+            modifiedCount: res.modifiedCount
+        }
     }
 
     public async updateOne( match: ModelFindOptions<DBE, Extensions['smartFilters']>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
