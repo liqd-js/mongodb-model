@@ -77,6 +77,7 @@ export type AbstractPropertyModelSmartFilters<T extends AbstractModelSmartFilter
 export type AbstractModelProperties<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? ComputedPropertyMethod : T[K] }
 
 export type ModelUpdateResponse<DBE extends Document> = { matchedCount: number, modifiedCount: number, documentBefore?: DBE, documentAfter?: DBE };
+export type PropertyModelUpdateResponse<DBE extends Document> = { matchedRootCount: number, modifiedRootCount: number, documentBefore?: DBE, documentAfter?: DBE };
 
 export type ConstructorExtensions<E extends PropertyModelExtensions<any, any, any>> = Omit<E, 'smartFilters'> & { smartFilters?: FirstType<E['smartFilters']> }
 

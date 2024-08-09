@@ -46,7 +46,7 @@ import {
     ComputedPropertyMethod,
     AbstractModelProperties,
     ComputedPropertiesParam,
-    SyncComputedPropertyMethod, ModelUpdateOptions
+    SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse
 } from './types';
 import { AbstractModels } from "./index";
 
@@ -267,7 +267,7 @@ export abstract class AbstractPropertyModel<
         return _id;
     }*/
 
-    public async update( id: DTO['id'] | DBE['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
+    public async update( id: DTO['id'] | DBE['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<PropertyModelUpdateResponse<DBE>>
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
@@ -297,10 +297,10 @@ export abstract class AbstractPropertyModel<
 
         flowGet('log') && LOG({res});
 
-        return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount, documentBefore, documentAfter }
+        return { matchedRootCount: res.matchedCount, modifiedRootCount: res.modifiedCount, documentBefore, documentAfter }
     }
 
-    async updateMany( ids: DBE['id'][] | DTO['id'][], update: Partial<DBE> | UpdateFilter<DBE> )
+    async updateMany( ids: DBE['id'][] | DTO['id'][], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<PropertyModelUpdateResponse<DBE>>
     {
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
@@ -327,7 +327,7 @@ export abstract class AbstractPropertyModel<
 
         flowGet('log') && LOG({res});
 
-        return { matchedCount: res.matchedCount, modifiedCount: res.modifiedCount }
+        return { matchedRootCount: res.matchedCount, modifiedRootCount: res.modifiedCount }
     }
 
     public async get( id: DTO['id'] | DBE['id'] ): Promise<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
