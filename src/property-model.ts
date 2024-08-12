@@ -1,53 +1,8 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import {
-    addPrefixToFilter,
-    addPrefixToPipeline,
-    addPrefixToUpdate,
-    Arr,
-    collectAddedFields,
-    convert,
-    DUMP,
-    flowGet,
-    generateCursorCondition,
-    GET_PARENT,
-    getCursor,
-    getUsedFields,
-    hasPublicMethod,
-    isExclusionProjection,
-    isSet,
-    isUpdateOperator,
-    LOG,
-    map,
-    optimizeMatch,
-    projectionToReplace,
-    REGISTER_MODEL,
-    resolveBSONObject,
-    reverseSort,
-    splitFilterToStages
-} from './helpers';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import {
-    SmartFilterMethod,
-    MongoPropertyDocument,
-    MongoRootDocument,
-    PropertyModelAggregateOptions,
-    PropertyModelFilter,
-    PropertyModelListOptions,
-    PublicMethodNames,
-    ModelUpdateResponse,
-    WithTotal,
-    PropertyModelFindOptions,
-    SecondType,
-    AbstractPropertyModelSmartFilters,
-    PropertyModelExtensions,
-    ConstructorExtensions,
-    FirstType,
-    ComputedPropertyMethod,
-    AbstractModelProperties,
-    ComputedPropertiesParam,
-    SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse
-} from './types';
+import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse} from './types';
 import { AbstractModels } from "./index";
 
 /**
@@ -149,26 +104,7 @@ export abstract class AbstractPropertyModel<
 
         const converterProperties = await this.resolveComputedProperties( computedProperties );
         const optionsProperties = await this.resolveComputedProperties( options.computedProperties );
-        const computed: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>} = {};
-        for ( const prefix in { ...converterProperties, ...optionsProperties } )
-        {
-            computed[prefix] = { fields: {}, pipeline: [] };
-            computed[prefix].fields = { ...converterProperties[prefix]?.fields, ...optionsProperties[prefix]?.fields };
-            computed[prefix].pipeline = [ ...converterProperties[prefix]?.pipeline || [], ...optionsProperties[prefix]?.pipeline || [] ];
-
-            if ( !Object.entries(computed[prefix].fields).length )
-            {
-                computed[prefix].fields = null;
-            }
-            if ( !computed[prefix].pipeline.length )
-            {
-                computed[prefix].pipeline = null;
-            }
-            if ( !computed[prefix].fields && !computed[prefix].pipeline )
-            {
-                delete computed[prefix];
-            }
-        }
+        const computed = mergeComputedProperties( converterProperties, optionsProperties );
 
         const gatheredFields = Object.values( computed || {fields: null, pipeline: null} )
             .reduce((acc, val) => {

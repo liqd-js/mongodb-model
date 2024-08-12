@@ -1,25 +1,7 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import {flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields} from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties } from './helpers';
 import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import {
-    ModelAggregateOptions,
-    ModelCreateOptions,
-    ModelListOptions,
-    MongoRootDocument,
-    WithTotal,
-    ModelUpdateResponse,
-    AbstractModelSmartFilters,
-    PublicMethodNames,
-    SmartFilterMethod,
-    ModelExtensions,
-    ModelFindOptions,
-    ModelUpdateOptions,
-    AbstractModelProperties,
-    ComputedPropertyMethod,
-    AbstractConverterOptions,
-    ComputedPropertiesParam,
-    SyncComputedPropertyMethod
-} from './types';
+import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
 
@@ -51,15 +33,27 @@ export abstract class AbstractModel<
         this.#models = models;
 
         models[REGISTER_MODEL]( this, collection.collectionName );
-        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'], accessControl: Filter<DBE> | void ) =>
+        this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id']>, conversion: keyof Extensions['converters'], accessControl: Filter<WithId<DBE>> | void ) =>
         {
             try
             {
                 //const filter = accessControl ? { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]} : { _id: { $in: ids.map( id => this.dbeID( id ))}};
                 //const documents = await this.collection.find( filter, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
-                const documents = accessControl
-                    ? await this.collection.aggregate([{ $match: { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]}}]).toArray()
-                    : await this.collection.find( { _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
+                // const documents = accessControl
+                //     ? await this.collection.aggregate([{ $match: { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]}}]).toArray()
+                //     : await this.collection.find( { _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
+
+                const pipeline = await this.pipeline({
+                    filter: {
+                        $and: [
+                            { _id: { $in: ids.map( id => this.dbeID( id ))} },
+                            accessControl || {}
+                        ]
+                    },
+                    projection: this.converters[conversion].projection
+                }, conversion );
+
+                const documents = await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray();
                     
                 const index = documents.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
 
@@ -81,8 +75,10 @@ export abstract class AbstractModel<
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    protected async pipeline( options: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
     {
+        const { computedProperties: converterComputedProperties } = this.converters[conversion ?? 'dto'];
+
         let { filter, projection, computedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters']>;
 
         let pipeline: Document[] = [];
@@ -95,7 +91,9 @@ export abstract class AbstractModel<
         }
 
         let custom = smartFilter ? await this.resolveSmartFilter( smartFilter ) : undefined;
-        const props = computedProperties ? await this.resolveComputedProperties( computedProperties ) : undefined;
+        const converterProperties = { '': await this.resolveComputedProperties( converterComputedProperties )};
+        const optionsProperties = { '': await this.resolveComputedProperties( computedProperties )};
+        const props = mergeComputedProperties( converterProperties, optionsProperties )[''];
 
         isSet( filter ) && pipeline.push({ $match: filter});
         isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});

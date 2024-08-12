@@ -1,7 +1,6 @@
 import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter} from "mongodb";
 import {ModelConverterError, objectGet, objectHash, objectSet} from "../external";
-import {AbstractModelConverter} from "../../types";
-import { LOG } from "./utils";
+import { AbstractModelConverter, SyncComputedPropertyMethod } from "../../types";
 
 type Filter = Record<string, any>;
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
@@ -597,6 +596,43 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
     }
 
     return result;
+}
+
+export function mergeComputedProperties( ...objects: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}[] ): { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}
+{
+    const computed: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>} = {}
+
+    for ( const properties of objects )
+    {
+        for ( const prefix in properties )
+        {
+            if ( !computed[prefix] )
+            {
+                computed[prefix] = { fields: {}, pipeline: [] };
+            }
+
+            computed[prefix].fields = { ...computed[prefix].fields, ...properties[prefix].fields };
+            properties[prefix].pipeline && computed[prefix].pipeline!.push( ...properties[prefix].pipeline );
+        }
+    }
+
+    for ( const prefix in computed )
+    {
+        if ( !Object.entries(computed[prefix].fields || {}).length )
+        {
+            computed[prefix].fields = null;
+        }
+        if ( !computed[prefix].pipeline?.length )
+        {
+            computed[prefix].pipeline = null;
+        }
+        if ( !computed[prefix].fields && !computed[prefix].pipeline )
+        {
+            delete computed[prefix];
+        }
+    }
+
+    return computed;
 }
 
 /**
