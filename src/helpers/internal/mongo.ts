@@ -423,7 +423,7 @@ export function toUpdateOperations<T>( update: Partial<T> | UpdateFilter<T> ): U
     const $set = deleteUndefinedProperties( update ) as Partial<T>;
     const $unset = Object.fromEntries( Object.entries( update ).filter(([ key, value ]) => value === undefined ).map(([ key ]) => [ key, 1 ])) as OnlyFieldsOfType<T, 1>;
 
-    return { $set, $unset: Object.keys( $unset ).length ? $unset : undefined };
+    return Object.keys( $unset ).length ? { $unset, $set } : { $set };
 }
 
 export function getCursor( dbe: Document, sort: Sort ): string
