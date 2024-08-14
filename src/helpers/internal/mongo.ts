@@ -611,6 +611,38 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
     return result;
 }
 
+/**
+ * Builds update parameters for property model update
+ * @param paths
+ * @param parentID
+ // * @param operation - create or update - determines if filtering should be done on parentID or _id
+ */
+export function propertyModelUpdateParams( paths: { path: string, array: boolean }[], parentID: any, /*operation: 'create' | 'update'*/ )
+{
+    let parentPath: string | undefined = paths.slice( 0, paths.length - 1 ).map( p => p.path ).join('.');
+    parentPath = parentPath !== '' ? parentPath + '.' : undefined;
+    const parentIDPath = parentPath ? parentPath + 'id' : '_id';
+
+    const currModelSubPath = paths[paths.length - 1];
+
+    let updatePath = paths.slice(0, paths.length - 1 ).map( (p, i) => p.path + ( p.array ? `.$[path${i}]` : '' ) ).join('.');
+    updatePath = updatePath !== '' ? `${updatePath}.${currModelSubPath.path}` : currModelSubPath.path;
+
+    const arrayFilters: Document[] = [];
+    for ( let i = 0; i < paths.length - 1; i++ )
+    {
+        const path = paths[i];
+        if ( path.array )
+        {
+            let pathRest = paths.slice(i + 1, paths.length - 1).map( p => p.path ).join('.');
+            pathRest = pathRest !== '' ? pathRest + '.' : '';
+            arrayFilters.push({ [`path${i}.${pathRest}id`]: parentID });
+        }
+    }
+
+    return { parentIDPath, updatePath, arrayFilters };
+}
+
 export function mergeComputedProperties( ...objects: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}[] ): { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}
 {
     const computed: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>} = {}

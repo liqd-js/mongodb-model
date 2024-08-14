@@ -1,4 +1,4 @@
-import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
+import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions, WithId} from 'mongodb';
 import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
@@ -192,16 +192,26 @@ export abstract class AbstractPropertyModel<
         return pipeline;
     }
 
-    /*public async create(  parentID<> dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
+    public async create( parentID: any, dbe: Omit<DBE, 'id'>, id?: DTO['id'] ): Promise<DTO['id']>
     {
         const _id: DTO['id'] = id ?? await this.id();
 
+        const parentModel = this.#models[GET_PARENT]( this.collection.collectionName, this.prefix );
 
+        const parent = parentModel ? await parentModel.get( parentID ) : null;
+        if ( !parent || !parentModel )
+        {
+            throw new ModelError( this, `Parent document not found: ${parentID}` );
+        }
 
-        //await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE> );
+        const { parentIDPath, updatePath, arrayFilters } = propertyModelUpdateParams( this.paths, parentModel.dbeID(parentID) );
+
+        const operation = this.paths[this.paths.length - 1].array ? '$push' : '$set';
+
+        await this.collection.updateOne({ [parentIDPath]: parentModel?.dbeID( parentID ) } as any, { [operation]: { [updatePath]: { id: _id, ...dbe } } }, { arrayFilters });
 
         return _id;
-    }*/
+    }
 
     public async update( id: DTO['id'] | DBE['id'], update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<PropertyModelUpdateResponse<DBE>>
     {

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import {addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten, addPrefixToPipeline, LOG} from '../../src/helpers';
+import { addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten, addPrefixToPipeline, LOG, propertyModelUpdateParams } from '../../src/helpers';
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
@@ -1594,5 +1594,141 @@ describe('isExclusionProjection', () =>
     it('should throw error for mixed nested properties', () => {
         const projection = { a: { b: {c: 1, d: {e: 0}}} };
         assert.throws(() => isExclusionProjection(projection));
+    })
+})
+
+describe('propertyModelUpdateParams', () => {
+
+    it('should process a', () => {
+        const paths = [
+            { path: 'a', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: '_id',
+            updatePath: 'a',
+            arrayFilters: []
+        })
+    })
+
+    it('should process a[]', () => {
+        const paths = [
+            { path: 'a', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: '_id',
+            updatePath: 'a',
+            arrayFilters: []
+        })
+    })
+
+    it('should process a.b', () => {
+        const paths = [
+            { path: 'a', array: false },
+            { path: 'b', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.id',
+            updatePath: 'a.b',
+            arrayFilters: []
+        })
+    })
+
+    it('should process a[].b', () => {
+        const paths = [
+            { path: 'a', array: true },
+            { path: 'b', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.id',
+            updatePath: 'a.$[path0].b',
+            arrayFilters: [{ 'path0.id': 1 }]
+        })
+    })
+
+    it('should process a[].b[]', () => {
+        const paths = [
+            { path: 'a', array: true },
+            { path: 'b', array: true },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.id',
+            updatePath: 'a.$[path0].b',
+            arrayFilters: [{ 'path0.id': 1 }]
+        })
+    })
+
+    it('should process a.b.c', () => {
+        const paths = [
+            { path: 'a', array: false },
+            { path: 'b', array: false },
+            { path: 'c', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.b.id',
+            updatePath: 'a.b.c',
+            arrayFilters: []
+        })
+    })
+
+    it('should process a[].b.c', () => {
+        const paths = [
+            { path: 'a', array: true },
+            { path: 'b', array: false },
+            { path: 'c', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.b.id',
+            updatePath: 'a.$[path0].b.c',
+            arrayFilters: [{ 'path0.b.id': 1 }]
+        })
+    })
+
+    it('should process a.b[].c', () => {
+        const paths = [
+            { path: 'a', array: false },
+            { path: 'b', array: true },
+            { path: 'c', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.b.id',
+            updatePath: 'a.b.$[path1].c',
+            arrayFilters: [{ 'path1.id': 1 }]
+        })
+    })
+
+    it('should process a[].b[].c', () => {
+        const paths = [
+            { path: 'a', array: true },
+            { path: 'b', array: true },
+            { path: 'c', array: false },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.b.id',
+            updatePath: 'a.$[path0].b.$[path1].c',
+            arrayFilters: [{ 'path0.b.id': 1 }, { 'path1.id': 1 }]
+        })
+    })
+
+    it('should process a.b.c[]', () => {
+        const paths = [
+            { path: 'a', array: false },
+            { path: 'b', array: false },
+            { path: 'c', array: true },
+        ]
+        const params = propertyModelUpdateParams(paths, 1);
+        assert.deepStrictEqual(params, {
+            parentIDPath: 'a.b.id',
+            updatePath: 'a.b.c',
+            arrayFilters: []
+        })
     })
 })
