@@ -46,38 +46,57 @@ export function multiI18n( i18n: { [key: string]: string } | string ): {[key: st
     return result;
 }
 
-export function deleteNullishProperties(obj: any ): void
+export function deleteNullishProperties<T,R=T>( obj: T ): R
 {
+    if( typeof obj !== 'object' ){ throw new Error('Unsupported type ' + typeof obj ) }
+    else if( obj instanceof Date ){ return obj as R }
+    else if( obj instanceof ObjectId ){ return obj as R }
+    else if( obj instanceof RegExp ){ return obj as R }
+    else if( obj === null || obj === undefined ){ return obj as unknown as R }
+
     if( Array.isArray( obj ))
     {
-        for( var i = obj.length - 1; i >= 0; --i )
-        {
-            if( obj[i] === null || obj[i] === undefined )
-            {
-                obj.splice( i, 1 );
-            }
-            else if( typeof obj[i] === 'object' )
-            {
-                deleteNullishProperties( obj[i] );
-            }
-        }
+        return obj.map( value => value === null || value === undefined ? undefined : typeof value === 'object' ? deleteNullishProperties( value ) : value ).filter( value => value !== undefined ) as R;
     }
-    else if( obj )
+
+    const result: any = {};
+
+    for( var [ key, value ] of Object.entries( obj ))
     {
-        for( var [ key, value ] of Object.entries( obj ))
+        if( value !== null && value !== undefined )
         {
-            if( value === null || value === undefined )
-            {
-                delete obj[key];
-            }
-            else if( typeof obj[key] === 'object' )
-            {
-                deleteNullishProperties( obj[key] );
-            }
+            result[key] = typeof value === 'object' ? deleteNullishProperties( value ) : value;
         }
     }
+
+    return result;
 }
 
+export function deleteUndefinedProperties<T,R=T>( obj: T ): R
+{
+    if( typeof obj !== 'object' ){ throw new Error('Unsupported type ' + typeof obj ) }
+    else if( obj instanceof Date ){ return obj as R }
+    else if( obj instanceof ObjectId ){ return obj as R }
+    else if( obj instanceof RegExp ){ return obj as R }
+    else if( obj === null ){ return obj as unknown as R }
+
+    if( Array.isArray( obj ))
+    {
+        return obj.map( value => value === undefined ? undefined : typeof value === 'object' ? deleteUndefinedProperties( value ) : value ).filter( value => value !== undefined ) as R;
+    }
+
+    const result: any = {};
+
+    for( var [ key, value ] of Object.entries( obj ))
+    {
+        if( value !== undefined )
+        {
+            result[key] = typeof value === 'object' ? deleteUndefinedProperties( value ) : value;
+        }
+    }
+
+    return result;
+}
 
 /**
  * TODO

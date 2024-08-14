@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, isUpdateOperator, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages } from './helpers';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse} from './types';
@@ -228,7 +228,8 @@ export abstract class AbstractPropertyModel<
         flowGet( 'log' ) && LOG({ match: {[ path ]: this.dbeID( id )}, operations, options: updateOptions });
 
         const documentBefore = options?.documentBefore ? (await this.get( id, 'dbe' ) as DBE) || undefined : undefined;
-        let res = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, updateOptions );
+        //TODO remve let res = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, updateOptions );
+        let res = await this.collection.updateOne({[ path ]: this.dbeID( id )} as Filter<RootDBE>, toUpdateOperations( operations ), updateOptions );
         const documentAfter = options?.documentAfter ? (await this.get( id, 'dbe' ) as DBE) || undefined : undefined;
 
         flowGet('log') && LOG({res});
@@ -259,7 +260,8 @@ export abstract class AbstractPropertyModel<
 
         flowGet( 'log' ) && LOG({ match: {[ path ]: { $in: ids.map( id => this.dbeID( id )) }}, operations, options });
 
-        let res = await this.collection.updateMany({[ path ]: { $in: ids.map( id => this.dbeID( id )) }} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
+        //TODO remove let res = await this.collection.updateMany({[ path ]: { $in: ids.map( id => this.dbeID( id )) }} as Filter<RootDBE>, isUpdateOperator( operations ) ? operations : { $set: operations } as UpdateFilter<RootDBE>, options );
+        let res = await this.collection.updateMany({[ path ]: { $in: ids.map( id => this.dbeID( id )) }} as Filter<RootDBE>, toUpdateOperations( operations ), options );
 
         flowGet('log') && LOG({res});
 

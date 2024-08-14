@@ -1,6 +1,6 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties } from './helpers';
-import { projectionToProject, isUpdateOperator, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations } from './helpers';
+import { projectionToProject, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
 export const Aggregator = require('@liqd-js/aggregator');
@@ -149,7 +149,8 @@ export abstract class AbstractModel<
             await this.#models.transaction( async() =>
             {
                 documentBefore = options?.documentBefore ? (await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }})) as DBE || undefined : undefined;
-                documentAfter = (await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ )) as DBE || undefined;
+                // TODO remove documentAfter = (await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ )) as DBE || undefined;
+                documentAfter = (await this.collection.findOneAndUpdate({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, toUpdateOperations( update ))) as DBE || undefined;
 
                 matchedCount = documentAfter ? 1 : 0;
                 modifiedCount = documentAfter ? 1 : 0;
@@ -158,7 +159,8 @@ export abstract class AbstractModel<
         else
         {
             documentBefore = options?.documentBefore ? (await this.collection.findOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }, {collation: { locale: 'en' }})) as DBE || undefined : undefined;
-            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ );
+            // TODO remove const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE>/*, { collation: { locale: 'en' } }*/ );
+            const res = await this.collection.updateOne({ _id: ( this.dbeID ? this.dbeID( id ) : id ) as WithId<DBE>['_id'] }, toUpdateOperations( update ));
 
             matchedCount = res.matchedCount;
             modifiedCount = res.modifiedCount;
@@ -169,7 +171,8 @@ export abstract class AbstractModel<
 
     public async updateMany( id: DTO['id'][] | DBE['_id'][], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse<DBE>>
     {
-        const res = await this.collection.updateMany({ _id: { $in: id.map( id => this.dbeID( id ))}}, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+        //const res = await this.collection.updateMany({ _id: { $in: id.map( id => this.dbeID( id ))}}, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
+        const res = await this.collection.updateMany({ _id: { $in: id.map( id => this.dbeID( id ))}}, toUpdateOperations( update ));
 
         return {
             matchedCount: res.matchedCount,
@@ -179,6 +182,8 @@ export abstract class AbstractModel<
 
     public async updateOne( match: ModelFindOptions<DBE, Extensions['smartFilters']>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
+        throw new Error('Method not implemented.');
+
         return { matchedCount: 1, modifiedCount: 1 };
     }
 

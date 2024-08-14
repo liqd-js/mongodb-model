@@ -1,5 +1,5 @@
-import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter} from "mongodb";
-import {ModelConverterError, objectGet, objectHash, objectSet} from "../external";
+import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter, OnlyFieldsOfType } from "mongodb";
+import {deleteUndefinedProperties, ModelConverterError, objectGet, objectHash, objectSet} from "../external";
 import { AbstractModelConverter, SyncComputedPropertyMethod } from "../../types";
 
 type Filter = Record<string, any>;
@@ -411,6 +411,19 @@ export function bsonValue( value: any )
 export function isUpdateOperator( update: object ): boolean
 {
     return ( typeof update === 'object' && update !== null && Object.keys( update ).every( key => key.startsWith('$')));
+}
+
+export function toUpdateOperations<T>( update: Partial<T> | UpdateFilter<T> ): UpdateFilter<T>
+{
+    if( isUpdateOperator( update ))
+    {
+        return update as UpdateFilter<T>;
+    }
+
+    const $set = deleteUndefinedProperties( update ) as Partial<T>;
+    const $unset = Object.fromEntries( Object.entries( update ).filter(([ key, value ]) => value === undefined ).map(([ key ]) => [ key, 1 ])) as OnlyFieldsOfType<T, 1>;
+
+    return { $set, $unset: Object.keys( $unset ).length ? $unset : undefined };
 }
 
 export function getCursor( dbe: Document, sort: Sort ): string
