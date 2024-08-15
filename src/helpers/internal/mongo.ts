@@ -1068,7 +1068,7 @@ function splitToSubPaths( path: string, fullPath: string ): {prefix: string, pro
     };
 }
 
-const BREAKING_OPERATORS = ['$not', '$in', '$nin', '$expr', '$elemMatch', '$function'];
+const BREAKING_OPERATORS = ['$not', '$ne', '$in', '$nin', '$expr', '$elemMatch', '$function'];
 function shouldBeAddedToStage( key: string, value: any, stage: string, nextStage: string ): boolean
 {
     // if key is in previous stages or current stage
