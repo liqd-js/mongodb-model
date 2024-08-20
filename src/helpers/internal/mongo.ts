@@ -502,7 +502,7 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
 
     for ( const [key, value] of Object.entries(obj) )
     {
-        if ( typeof value !== 'number' && !value )
+        if ( typeof value !== 'number' && typeof value !== 'boolean' && !value )
         {
             continue;
         }
