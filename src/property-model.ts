@@ -208,7 +208,7 @@ export abstract class AbstractPropertyModel<
 
         const operation = this.paths[this.paths.length - 1].array ? '$push' : '$set';
 
-        await this.collection.updateOne({ [parentIDPath]: parentModel?.dbeID( parentID ) } as any, { [operation]: { [updatePath]: { id: _id, ...dbe } } }, { arrayFilters });
+        await this.collection.updateOne({ [parentIDPath]: parentModel?.dbeID( parentID ) } as any, { [operation]: { [updatePath]: { id: this.dbeID( _id ), ...dbe } } }, { arrayFilters });
 
         return _id;
     }
