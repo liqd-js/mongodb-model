@@ -17,7 +17,7 @@ export type ListParams<DBE extends MongoRootDocument> =
     cursor?: string
 }
 
-const COUNT_IGNORE_STAGES = [ '$limit', '$skip', '$sort', '$project', '$addFields', '$unset' ];
+const COUNT_IGNORE_STAGES = [ '$limit', '$skip', '$sample', '$sort', '$project', '$addFields', '$unset' ];
 
 export class QueryBuilder<DBE extends MongoRootDocument>
 {
