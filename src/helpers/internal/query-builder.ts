@@ -13,6 +13,7 @@ export type ListParams<DBE extends MongoRootDocument> =
     skip?: number,
     sort?: Sort
     limit?: number
+    sample?: number
     cursor?: string
 }
 
@@ -60,6 +61,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
             ...( options.sort ? [{ $sort: prev ? reverseSort( options.sort ) : options.sort }] : []),
             ...( options.skip ? [{ $skip: options.skip }] : []),
             ...( options.limit ? [{ $limit: options.limit }] : []),
+            ...( options.sample ? [{ $sample: { size: options.sample }}] : []),
         ]) as Document[];
     }
 

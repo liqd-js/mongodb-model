@@ -18,6 +18,7 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
         cursor?             : string,
         pipeline?           : Document[],
         count?              : boolean,
+        sample?             : number,
     };
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
@@ -26,7 +27,8 @@ export type PropertyModelListOptions<RootDBE extends Document, DBE extends Docum
         cursor?         : string
         projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
         pipeline?       : Document[],
-        count?          : boolean
+        count?          : boolean,
+        sample?         : number,
     };
 
 export type ModelFindOptions<DBE extends Document, Filters = never> =
