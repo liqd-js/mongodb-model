@@ -52,7 +52,7 @@ export class AbstractModels
         {
             parent = parent.replace( /\.[^.]+$/, '' );
 
-            if( this.models.has( parent ) && this.models.get( parent )?.smartFilters )
+            if( this.models.has( parent ) )
             {
                 return this.models.get( parent );
             }
