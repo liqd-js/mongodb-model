@@ -60,14 +60,14 @@ export abstract class AbstractPropertyModel<
                     ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id )
                 );
             }
-            catch( e )
+            catch( e: any )
             {
                 if( e instanceof ModelError )
                 {
                     throw e;
                 }
 
-                throw new ModelError( this, e!.toString() );
+                throw new ModelError( this, e?.toString() );
             }
         });
 

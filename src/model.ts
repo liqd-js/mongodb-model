@@ -59,14 +59,14 @@ export abstract class AbstractModel<
 
                 return ids.map( id => index.get( this.dtoID(id) ) ?? null );
             }
-            catch( e )
+            catch( e: any )
             {
                 if( e instanceof ModelError )
                 {
                     throw e;
                 }
 
-                throw new ModelError( this, e!.toString() );
+                throw new ModelError( this, e?.toString() );
             }
         });
     }
