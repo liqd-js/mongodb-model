@@ -281,7 +281,8 @@ export abstract class AbstractModel<
     {
         if ( !this.smartFilters )
         {
-            throw new Error( 'Custom filter is not supported' );
+            return {}
+            // throw new Error( 'Custom filter is not supported' );
         }
 
         const pipeline: any[] = [];
