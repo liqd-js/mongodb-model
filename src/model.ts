@@ -279,12 +279,6 @@ export abstract class AbstractModel<
 
     public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Extensions['smartFilters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
-        if ( !this.smartFilters )
-        {
-            return {}
-            // throw new Error( 'Custom filter is not supported' );
-        }
-
         const pipeline: any[] = [];
         let filter: any = {};
         const extraFilters: any = {};
