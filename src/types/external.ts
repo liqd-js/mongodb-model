@@ -116,8 +116,8 @@ export type ModelUpdateDocument<T> =
     [P in ExpandPaths<T>]?: MongoBSONTypes<PathValue<T, P>>
 };
 
-import { ApplicationBasicDTO, ApplicationDBE, ContractDBE, ContractTimesheetDBE, EngagementDBE, JobDBE } from '@ramp-global/types';
+/*import { ApplicationBasicDTO, ApplicationDBE, ContractDBE, ContractTimesheetDBE, EngagementDBE, JobDBE } from '@ramp-global/types';
 
 type Y = ModelUpdateDocument<{ id: ObjectId, invoices: Array<{ id: string }>}>;
 
-type X = ExpandPaths<ContractTimesheetDBE>;
+type X = ExpandPaths<ContractTimesheetDBE>;*/
