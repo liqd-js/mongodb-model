@@ -117,7 +117,7 @@ export abstract class AbstractPropertyModel<
             ...collectAddedFields( [{$addFields: gatheredFields?.fields || {}}] ),
             ...collectAddedFields( gatheredFields?.pipeline || [] ),
         ]).map( f => [f.replace( new RegExp('^' + this.prefix + '.'), '' ), 1 ]));
-        computedAddedFields = projectionToReplace( computedAddedFields ) as {[p: string]: any};
+        computedAddedFields = projectionToReplace( computedAddedFields, this.prefix ) as {[p: string]: any};
 
         const gatheredFilters = Object.values( smartFilter || {} )
             .reduce((acc, val) => {
