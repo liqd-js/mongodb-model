@@ -4,19 +4,21 @@ export class Benchmark
 {
     public start = new Date();
     public last = Date.now();
+    
+    public constructor( public name: string ){}
 
     public elapsed()
     {
         return Date.now() - this.start.getTime();
     }
 
-    public step()
+    public step( label: string )
     {
         const now = Date.now(), step = now - this.last;
 
         this.last = now;
 
-        return step;
+        console.log( `[BMARK:${formatter.format( new Date() )}] ${this.name} step ${label} in ${step}ms)` );
     }
 
     public get startTime()
@@ -27,5 +29,10 @@ export class Benchmark
     public get time()
     {
         return formatter.format( new Date() );
+    }
+
+    public end()
+    {
+        console.log( `[BMARK:${formatter.format( new Date() )}] ${this.name} ended in ${this.elapsed()}ms)` );
     }
 }

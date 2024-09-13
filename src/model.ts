@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations } from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark } from './helpers';
 import { projectionToProject, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
@@ -195,12 +195,15 @@ export abstract class AbstractModel<
     public async get<K extends keyof Extensions['converters']>( id: Array<DTO['id'] | DBE['_id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>>;
     public async get<K extends keyof Extensions['converters']>( id: DTO['id'] | DBE['_id'] | Array<DTO['id'] | DBE['_id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
-        //let perf = new Benchmark();
-        //let find = perf.step();
-        //flowGet( 'benchmark' ) && LOG( `${perf.time} ${this.constructor.name} find in ${find} ms` );
+        const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':get(' + ( conversion as string ) + ')' ) : undefined;
 
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion, await this.accessFilter() ) as Array<DBE|null>;
+
+        benchmark?.step('QUERY');
+
         let entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
+
+        benchmark?.step('CONVERTER');
 
         if( filtered ){ entries = entries.filter( Boolean )}
 
@@ -211,9 +214,17 @@ export abstract class AbstractModel<
     {
         const { converter } = this.converters[conversion];
 
+        const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':find(' + ( conversion as string ) + ')' ) : undefined;
+
         const dbe = await this.aggregate<DBE>( [{$limit: 1}], options ).then( r => r[0]);
 
-        return dbe ? await convert( this, converter, dbe, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
+        benchmark?.step('QUERY');
+
+        const data = dbe ? await convert( this, converter, dbe, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
+
+        benchmark?.step('CONVERTER');
+
+        return data;
     }
 
     public async list<K extends keyof Extensions['converters']>( options: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
@@ -221,6 +232,8 @@ export abstract class AbstractModel<
         const { converter, computedProperties: compProps, cache } = this.converters[conversion];
         const { filter = {}, sort = { _id: 1 }, cursor, limit, smartFilter: sFilter, ...rest } = resolveBSONObject(options);
         const prev = cursor?.startsWith('prev:');
+
+        const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
 
         const smartFilter = options.smartFilter && await this.resolveSmartFilter( options.smartFilter );
         const computedProperties = compProps && await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() ) || undefined;
@@ -241,10 +254,12 @@ export abstract class AbstractModel<
         flowGet( 'log' ) && countPipeline && DUMP( countPipeline );
 
         let [ entries, total ] = await Promise.all(
-            [
-                this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray(),
-                options.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
-            ]);
+        [
+            this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray(),
+            options.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
+        ]);
+
+        benchmark?.step('QUERY');
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
@@ -252,6 +267,8 @@ export abstract class AbstractModel<
             dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
         }));
+
+        benchmark?.step('CONVERTER');
 
         if ( options.count )
         {

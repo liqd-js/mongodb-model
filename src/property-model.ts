@@ -286,8 +286,15 @@ export abstract class AbstractPropertyModel<
     public async get<K extends keyof Extensions['converters']>( id: Array<DTO['id'] | DBE['id']>, conversion: K, filtered: false ): Promise<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>>;
     public async get<K extends keyof Extensions['converters']>( id: DTO['id'] | DBE['id'] | Array<DTO['id'] | DBE['id']>, conversion: K = 'dto' as K, filtered: boolean = false )
     {
+        const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':get(' + ( conversion as string ) + ')' ) : undefined;
+
         const documents = await this.abstractFindAggregator.call( Arr( id ), conversion, await this.accessFilter() ) as Array<DBE|null>;
+
+        benchmark?.step( 'QUERY' );
+
         let entries = await Promise.all( documents.map( dbe => dbe ? convert( this, this.converters[conversion].converter, dbe, conversion ) : null )) as Array<Awaited<ReturnType<Extensions['converters']['dto']['converter']>> | null>;
+
+        benchmark?.step( 'CONVERTER' );
 
         if( filtered ){ entries = entries.filter( Boolean )}
 
@@ -298,13 +305,21 @@ export abstract class AbstractPropertyModel<
     {
         const { converter, projection } = this.converters[conversion];
 
+        const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':get(' + ( conversion as string ) + ')' ) : undefined;
+
         const pipeline = await this.pipeline({ filter: options.filter, smartFilter: options.smartFilter, projection, sort, limit: 1 });
 
         flowGet('log') && ( console.log( this.constructor.name + '::find', options.filter ), DUMP( pipeline ));
 
         const dbe = ( await this.collection.aggregate( pipeline ).toArray())[0];
 
-        return dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
+        benchmark?.step( 'QUERY' );
+
+        const data = dbe ? await convert( this, converter, dbe as DBE, conversion ) as Awaited<ReturnType<Extensions['converters'][K]['converter']>> : null;
+
+        benchmark?.step( 'CONVERTER' );
+
+        return data;
     }
 
     public async list<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
@@ -313,13 +328,11 @@ export abstract class AbstractPropertyModel<
         const prev = options.cursor?.startsWith('prev:');
         const queryBuilder = new QueryBuilder();
 
+        const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
+
         const resolvedList = resolveBSONObject( options );
 
         const pipeline = this.pipeline({ ...resolvedList, projection }, conversion);
-
-        let perf = new Benchmark();
-
-        flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list` );
 
         const { cursor, sort = { id: 1 }, limit, skip, ...countOptions } = resolvedList;
 
@@ -328,22 +341,20 @@ export abstract class AbstractPropertyModel<
             resolvedList.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ), { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
+        benchmark?.step( 'QUERY' );
+
         flowGet( 'log' ) && LOG( {
             list: await pipeline,
             total: resolvedList.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) : undefined
         } );
-
-        let find = perf.step();
 
         const result = await Promise.all( entries.map( (async (dbe, i) => {
             const dto = await convert( this, converter, dbe as DBE, conversion ) as ReturnType<Extensions['converters'][K]['converter']> & { $cursor?: string };
             dto.$cursor = getCursor( dbe, sort );
             return dto;
         } )));
-
-        let convetor = perf.step();
-
-        flowGet( 'benchmark' ) && LOG( `${perf.start} ${this.constructor.name} list in ${find} ms, convert in ${convetor} ms = ${find+convetor} ms` );
+        
+        benchmark?.step( 'CONVERTER' );
 
         if( resolvedList.count )
         {
