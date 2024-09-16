@@ -52,6 +52,8 @@ export abstract class AbstractModel<
                 let documents: Document[] = [];
                 const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
 
+                flowGet( 'benchmark' ) && this.cache && console.log( `${this.constructor.name}::aggregator - cached(${ids.length - missingIDs.length}), fetched(${missingIDs.length})` )
+
                 if ( missingIDs.length !== ids.length )
                 {
                     // TODO: cache - vracat clone nie referenciu
