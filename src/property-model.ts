@@ -4,6 +4,8 @@ import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse} from './types';
 import { AbstractModels } from "./index";
+import Cache from "@liqd-js/cache"
+import objectHash from "@liqd-js/fast-object-hash";
 
 /**
  * Abstract class for property models
@@ -26,6 +28,7 @@ export abstract class AbstractPropertyModel<
     public smartFilters?: FirstType<Extensions['smartFilters']>;
     private readonly computedProperties;
     readonly #models: AbstractModels;
+    private readonly cache?: Cache<any>;
 
     /**
      *
@@ -43,20 +46,44 @@ export abstract class AbstractPropertyModel<
         this.smartFilters = params.smartFilters;
         this.computedProperties = params.computedProperties;
 
+        params.cache && ( this.cache = new Cache( params.cache ));
+
         this.abstractFindAggregator = new Aggregator( async( ids: Array<DTO['id'] | DBE['id']>, conversion: keyof Extensions['converters'], accessControl: Filter<DBE> | void ) =>
         {
             try
             {
-                // TODO overit ci spravny access control vezme  v potaz
-                let pipeline = await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: this.converters[conversion].projection });
-
-                flowGet('log') && ( console.log( this.constructor.name + '::get', ids ), DUMP( pipeline ));
-
                 ids = ids.map( id => this.dtoID( id ));
+
+                const cacheKeys = ids.map( id => this.cacheKey( id, conversion, accessControl ));
+                let documents: DBE[] = [];
+                const missingIDs = cacheKeys.filter( key => !this.cache?.get( key ));
+
+                if ( missingIDs.length !== ids.length )
+                {
+                    documents.push(...ids
+                        .filter( id => !missingIDs.includes(id))
+                        .map( id => this.cache?.get( this.cacheKey( id, conversion, accessControl ) ) )
+                    )
+                }
+
+                if ( missingIDs.length )
+                {
+                    let pipeline = await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: this.converters[conversion].projection });
+
+                    documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray() as DBE[]);
+
+                    if ( this.cache )
+                    {
+                        for ( const doc of documents )
+                        {
+                            this.cache.set( this.cacheKey( doc.id, conversion, accessControl ), doc );
+                        }
+                    }
+                }
 
                 return map(
                     ids.map( id => this.dtoID( id ) ),
-                    await this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray() as DBE[],
+                    documents,
                     ( dbe: DBE ) => this.dtoID( dbe._id ?? dbe.id )
                 );
             }
@@ -533,5 +560,10 @@ export abstract class AbstractPropertyModel<
         }
 
         return { rootProjection, propertyProjection };
+    }
+
+    private cacheKey( id: DTO['id'] | DBE['_id'], conversion: keyof Extensions['converters'], accessControl: Filter<DBE> | void ): string
+    {
+        return objectHash({ id: this.dtoID( id ), accessControl, projection: this.converters[conversion].projection });
     }
 }

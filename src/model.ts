@@ -3,6 +3,8 @@ import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, co
 import { projectionToProject, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
+import Cache from "@liqd-js/cache";
+import objectHash from "@liqd-js/fast-object-hash";
 export const Aggregator = require('@liqd-js/aggregator');
 
 /**
@@ -23,12 +25,15 @@ export abstract class AbstractModel<
     public smartFilters?: Extensions['smartFilters'];
     private readonly computedProperties: Extensions['computedProperties'];
     readonly #models: AbstractModels;
+    private readonly cache?: Cache<any>;
 
     protected constructor( models: AbstractModels, public collection: Collection<DBE>, params: Extensions )
     {
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
         this.smartFilters = params.smartFilters;
         this.computedProperties = params.computedProperties;
+
+        params.cache && ( this.cache = new Cache( params.cache ));
 
         this.#models = models;
 
@@ -43,19 +48,42 @@ export abstract class AbstractModel<
                 //     ? await this.collection.aggregate([{ $match: { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]}}]).toArray()
                 //     : await this.collection.find( { _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
 
-                const pipeline = await this.pipeline({
-                    filter: {
-                        $and: [
-                            { _id: { $in: ids.map( id => this.dbeID( id ))} },
-                            accessControl || {}
-                        ]
-                    },
-                    projection: this.converters[conversion].projection
-                }, conversion );
+                const cacheKeys = ids.map( id => this.cacheKey( id, conversion, accessControl ));
+                let documents: Document[] = [];
+                const missingIDs = cacheKeys.filter( key => !this.cache?.get( key ));
 
-                const documents = await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray();
-                    
-                const index = documents.reduce(( i, dbe ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
+                if ( missingIDs.length !== ids.length )
+                {
+                    documents.push(...ids
+                        .filter( id => !missingIDs.includes(id))
+                        .map( id => this.cache?.get( this.cacheKey( id, conversion, accessControl ) ) )
+                    );
+                }
+
+                if ( missingIDs.length )
+                {
+                    const pipeline = await this.pipeline({
+                        filter: {
+                            $and: [
+                                { _id: { $in: missingIDs.map( id => this.dbeID( id ))} },
+                                accessControl || {}
+                            ]
+                        },
+                        projection: this.converters[conversion].projection
+                    }, conversion );
+
+                    documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray());
+
+                    if ( this.cache )
+                    {
+                        for ( const doc of documents )
+                        {
+                            this.cache.set( this.cacheKey( doc._id, conversion, accessControl ), doc );
+                        }
+                    }
+                }
+
+                const index = documents.reduce(( i: any, dbe: any ) => ( i.set( this.dtoID( dbe._id ?? dbe.id ), dbe ), i ), new Map());
 
                 return ids.map( id => index.get( this.dtoID(id) ) ?? null );
             }
@@ -353,5 +381,10 @@ export abstract class AbstractModel<
     public async delete( id: DTO['id'] | DBE['_id'] ): Promise<Boolean>
     {
         return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }/*, { collation: { locale: 'en' } }*/)).deletedCount === 1;
+    }
+
+    private cacheKey( id: DTO['id'] | DBE['_id'], conversion: keyof Extensions['converters'], accessControl: Filter<WithId<DBE>> | void ): string
+    {
+        return objectHash({ id: this.dtoID( id ), accessControl, projection: this.converters[conversion].projection });
     }
 }

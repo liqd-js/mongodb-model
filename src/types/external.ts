@@ -1,5 +1,6 @@
 import {Document, Filter, FindOptions, ObjectId} from "mongodb";
 import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ComputedPropertiesParam, ExpandPaths, FirstParameter, PathValue, PublicMethodNames, SmartFilterMethod} from "./internal";
+import { CacheOptions } from "@liqd-js/cache";
 
 export type ModelCreateOptions = { duplicateIgnore?: boolean };
 export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean, /* TODO upsert a ine veci */ };
@@ -13,33 +14,33 @@ export type PropertyModelFilter<RootDBE extends Document, DBE extends Document> 
 
 export type ModelListOptions<DBE extends Document, Filters = never> = FindOptions<DBE> &
     {
-        filter?             : Filter<DBE>,
-        smartFilter?        : ModelSmartFilter<Filters>,
-        cursor?             : string,
-        pipeline?           : Document[],
-        count?              : boolean,
-        sample?             : number,
+        filter?             : Filter<DBE>
+        smartFilter?        : ModelSmartFilter<Filters>
+        cursor?             : string
+        pipeline?           : Document[]
+        count?              : boolean
+        sample?             : number
     };
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>
         cursor?         : string
-        projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] },
-        pipeline?       : Document[],
-        count?          : boolean,
-        sample?         : number,
+        projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] }
+        pipeline?       : Document[]
+        count?          : boolean
+        sample?         : number
     };
 
 export type ModelFindOptions<DBE extends Document, Filters = never> =
     {
         filter?         : Filter<DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>
     }
 export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : ModelSmartFilter<Filters>,
+        smartFilter?    : ModelSmartFilter<Filters>
     }
 
 export type ModelAggregateOptions<DBE extends Document, Filters = never> =
@@ -85,15 +86,17 @@ export type ConstructorExtensions<E extends PropertyModelExtensions<any, any, an
 
 export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never, ComputedProperties extends AbstractModelProperties<any> = never> =
     {
-        converters      : AbstractModelConverters<DBE>,
-        smartFilters?   : SmartFilters,
-        computedProperties?: ComputedProperties,
+        cache?              : CacheOptions
+        converters          : AbstractModelConverters<DBE>
+        smartFilters?       : SmartFilters
+        computedProperties? : ComputedProperties
     }
 export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never, ComputedProperties extends AbstractModelProperties<any> = never> =
     {
-        converters          : AbstractModelConverters<DBE>,
-        smartFilters?       : SmartFilters,
-        computedProperties? : ComputedProperties,
+        cache?              : CacheOptions
+        converters          : AbstractModelConverters<DBE>
+        smartFilters?       : SmartFilters
+        computedProperties? : ComputedProperties
     }
 
 export type MongoBSONTypes<T> = T extends ObjectId
