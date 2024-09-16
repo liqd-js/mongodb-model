@@ -14,7 +14,7 @@
         "test": "mocha --require ts-node/register test/helpers/*.ts",
         "coverage": "nyc npm run test",
         "build": "npm i && rm -rf ./dist/* && tsc",
-        "version": "npm i && rm -rf ./dist/* && tsc && npm publish",
+        "version": "npm i && rm -rf ./dist/* && tsc && npm publish"
     },
     "repository": {
         "type": "git",
