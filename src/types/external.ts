@@ -2,6 +2,8 @@ import {Document, Filter, FindOptions, ObjectId} from "mongodb";
 import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ComputedPropertiesParam, ExpandPaths, FirstParameter, PathValue, PublicMethodNames, SmartFilterMethod} from "./internal";
 import { CacheOptions } from "@liqd-js/cache";
 
+export { CacheOptions };
+
 export type ModelCreateOptions = { duplicateIgnore?: boolean };
 export type ModelUpdateOptions = { documentBefore?: boolean, documentAfter?: boolean, /* TODO upsert a ine veci */ };
 export type MongoRootDocument = Document & { _id: any };

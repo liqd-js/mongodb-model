@@ -54,6 +54,7 @@ export abstract class AbstractModel<
 
                 if ( missingIDs.length !== ids.length )
                 {
+                    // TODO: cache - vracat clone nie referenciu
                     documents.push(...ids
                         .filter( id => !missingIDs.includes(id))
                         .map( id => this.cache?.get( this.cacheKey( id, conversion, accessControl ) ) )
