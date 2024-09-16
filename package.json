@@ -1,7 +1,7 @@
 {
     "name": "@liqd-js/mongodb-model",
     "description": "Mongo model class",
-    "version": "1.0.44-sigma.2",
+    "version": "1.0.44-sigma.3",
     "author": "radixxko",
     "license": "MIT",
     "main": "dist/index.js",
@@ -15,7 +15,6 @@
         "coverage": "nyc npm run test",
         "build": "npm i && rm -rf ./dist/* && tsc",
         "version": "npm i && rm -rf ./dist/* && tsc && npm publish",
-        "tmp": "ts-node test/test-model"
     },
     "repository": {
         "type": "git",

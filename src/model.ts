@@ -48,9 +48,9 @@ export abstract class AbstractModel<
                 //     ? await this.collection.aggregate([{ $match: { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]}}]).toArray()
                 //     : await this.collection.find( { _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
 
-                const cacheKeys = ids.map( id => this.cacheKey( id, conversion, accessControl ));
+                const cacheKeys = ids.map( id => [id, this.cacheKey( id, conversion, accessControl )]);
                 let documents: Document[] = [];
-                const missingIDs = cacheKeys.filter( key => !this.cache?.get( key ));
+                const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
 
                 if ( missingIDs.length !== ids.length )
                 {

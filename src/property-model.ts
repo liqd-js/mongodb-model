@@ -54,9 +54,9 @@ export abstract class AbstractPropertyModel<
             {
                 ids = ids.map( id => this.dtoID( id ));
 
-                const cacheKeys = ids.map( id => this.cacheKey( id, conversion, accessControl ));
+                const cacheKeys = ids.map( id => [id, this.cacheKey( id, conversion, accessControl )]);
                 let documents: DBE[] = [];
-                const missingIDs = cacheKeys.filter( key => !this.cache?.get( key ));
+                const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
 
                 if ( missingIDs.length !== ids.length )
                 {
