@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions, WithId} from 'mongodb';
-import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse} from './types';
@@ -58,7 +58,7 @@ export abstract class AbstractPropertyModel<
                 let documents: DBE[] = [];
                 const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
 
-                flowGet( 'benchmark' ) && this.cache && console.log( `${this.constructor.name}::aggregator - cached(${ids.length - missingIDs.length}), fetched(${missingIDs.length})` )
+                flowGet( 'benchmark' ) && this.cache && console.log( `${formatter.format( new Date() )} ${this.constructor.name}::aggregator - cached(${ids.length - missingIDs.length}), fetched(${missingIDs.length})`);
 
                 if ( missingIDs.length !== ids.length )
                 {

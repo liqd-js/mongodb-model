@@ -1,4 +1,4 @@
-const formatter = new Intl.DateTimeFormat( 'en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', fractionalSecondDigits: 3, hour12: false });
+export const formatter = new Intl.DateTimeFormat( 'en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', fractionalSecondDigits: 3, hour12: false });
 
 export class Benchmark
 {

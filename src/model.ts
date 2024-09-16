@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark } from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark, formatter } from './helpers';
 import { projectionToProject, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
@@ -52,7 +52,7 @@ export abstract class AbstractModel<
                 let documents: Document[] = [];
                 const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
 
-                flowGet( 'benchmark' ) && this.cache && console.log( `${this.constructor.name}::aggregator - cached(${ids.length - missingIDs.length}), fetched(${missingIDs.length})` )
+                flowGet( 'benchmark' ) && this.cache && console.log( `${formatter.format( new Date() )} ${this.constructor.name}::aggregator - cached(${ids.length - missingIDs.length}), fetched(${missingIDs.length})`);
 
                 if ( missingIDs.length !== ids.length )
                 {
