@@ -1,5 +1,5 @@
 import { MongoClient, MongoClientOptions, WithTransactionCallback } from 'mongodb';
-import { flowStart, flowGet, flowSet, GET_PARENT, REGISTER_MODEL } from './helpers';
+import { flowStart, flowGet, flowSet, GET_PARENT, REGISTER_MODEL, flowExecute } from './helpers';
 import { AbstractPropertyModel } from "./property-model";
 import { AbstractModel } from "./model";
 
@@ -21,7 +21,8 @@ export class AbstractModels
         start   : flowStart,
         assign  : ( scope: object ) => { Object.entries( scope ).forEach(([ key, value ]) => flowSet( key, value ))},
         set     : flowSet, 
-        get     : flowGet
+        get     : flowGet,
+        execute : flowExecute
     });
 
     protected constructor( connectionString: string, options: MongoClientOptions = {} )

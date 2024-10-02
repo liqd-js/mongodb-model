@@ -20,6 +20,11 @@ export function flowSet( key: string, value: any )
     Flow.set( key, value );
 }
 
+export function flowExecute<T>( callback: () => T | Promise<T>, scope: object ): Promise<T>
+{
+    return Flow.execute( callback, scope );
+}
+
 export function map<T,E>(ids: T[], entries: E[], getID: (e: E ) => T ): Array<E | null>
 {
     const index = new Map<T | string,E>( entries.map( e => [ idToIndexKey(getID( e )), e ] ));
