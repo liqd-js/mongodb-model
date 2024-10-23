@@ -20,9 +20,9 @@ export function flowSet( key: string, value: any )
     Flow.set( key, value );
 }
 
-export function flowExecute<T>( callback: () => T | Promise<T>, scope: object ): Promise<T>
+export function flowExecute<T>( callback: () => T | Promise<T>, scope: object, freeze: boolean | { exit?: boolean, freeze?: boolean } = true ): Promise<T>
 {
-    return Flow.execute( callback, scope );
+    return  Flow.execute( callback, scope, freeze );
 }
 
 export function map<T,E>(ids: T[], entries: E[], getID: (e: E ) => T ): Array<E | null>
