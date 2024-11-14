@@ -106,43 +106,7 @@ export abstract class AbstractModel<
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    // TODO: remove
-    public async oldPipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
-    {
-        const { computedProperties: converterComputedProperties } = this.converters[conversion ?? 'dto'];
-
-        let { filter, projection, computedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters']>;
-
-        let pipeline: Document[] = [];
-
-        let accessFilter = await this.accessFilter();
-
-        if( accessFilter )
-        {
-            pipeline.push({ $match: accessFilter!});
-        }
-
-        let custom = smartFilter ? await this.resolveSmartFilter( smartFilter ) : undefined;
-        const converterProperties = { '': await this.resolveComputedProperties( converterComputedProperties )};
-        const optionsProperties = { '': await this.resolveComputedProperties( computedProperties )};
-        const props = mergeComputedProperties( converterProperties, optionsProperties )[''];
-
-        isSet( filter ) && pipeline.push({ $match: filter});
-        isSet( custom?.filter ) && pipeline.push({ $match: custom?.filter});
-
-        props?.pipeline && isSet( props?.pipeline ) && pipeline.push( ...props.pipeline );
-        props?.fields && isSet( props?.fields ) && pipeline.push({ $addFields: props.fields });
-
-        const addedFields = Object.fromEntries( collectAddedFields(pipeline).map( el => [el, 1]) );
-
-        isSet( custom?.pipeline ) && pipeline.push( ...custom?.pipeline! );
-        isSet( projection ) && pipeline.push({ $project: { ...projectionToProject( projection ), ...addedFields }});
-
-        return pipeline;
-    }
-
-    // TODO: protected
-    public async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
     {
         const { computedProperties: converterComputedProperties } = conversion ? this.converters[conversion] : {};
 
