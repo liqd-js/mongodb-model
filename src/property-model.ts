@@ -414,6 +414,7 @@ export abstract class AbstractPropertyModel<
         return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
     }
 
+    // TODO pridat podporu ze ked vrati false tak nerobi ani query ale throwne error
     protected async accessFilter(): Promise<PropertyModelFilter<RootDBE,DBE> | void>{}
 
     public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<SecondType<Extensions['smartFilters']>>]: any} ): Promise<{ [prefix: string]: { filter?: Filter<DBE>, pipeline?: Document[] } }>
