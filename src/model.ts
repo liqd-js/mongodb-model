@@ -106,7 +106,8 @@ export abstract class AbstractModel<
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    protected async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
+    // TODO: remove
+    public async oldPipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
     {
         const { computedProperties: converterComputedProperties } = this.converters[conversion ?? 'dto'];
 
@@ -138,6 +139,26 @@ export abstract class AbstractModel<
         isSet( projection ) && pipeline.push({ $project: { ...projectionToProject( projection ), ...addedFields }});
 
         return pipeline;
+    }
+
+    // TODO: protected
+    public async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
+    {
+        const { computedProperties: converterComputedProperties } = conversion ? this.converters[conversion] : {};
+
+        const { filter, projection, computedProperties: optionsComputedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters']>;
+
+        const converterProperties = { '': await this.resolveComputedProperties( converterComputedProperties )};
+        const optionsProperties = { '': await this.resolveComputedProperties( optionsComputedProperties )};
+        const computedProperties = mergeComputedProperties( converterProperties, optionsProperties )[''];
+
+        const params = {
+            filter, projection, computedProperties,
+            smartFilter: smartFilter && await this.resolveSmartFilter( smartFilter ) || undefined,
+            accessFilter: await this.accessFilter() || undefined,
+        };
+        const queryBuilder = new QueryBuilder<DBE>();
+        return await queryBuilder.pipeline( params );
     }
 
     public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: ModelCreateOptions ): Promise<DTO['id']>
