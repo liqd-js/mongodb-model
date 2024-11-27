@@ -1207,7 +1207,7 @@ describe('optimizeMatch', () =>
             c: { $not: { $in: [5] } },
         }
         const optimized = optimizeMatch(match);
-        assert.deepStrictEqual(optimized, { a: 1, b: { $ne: 3 }, c: { $ne: 5 } });
+        assert.deepStrictEqual(optimized, { a: { $eq: 1 }, b: { $ne: 3 }, c: { $ne: 5 } });
     })
 
     it('should not optimize $in, $nin, $not $in with multiple conditions', () => {
@@ -1219,6 +1219,26 @@ describe('optimizeMatch', () =>
         const optimized = optimizeMatch(match);
         assert.deepStrictEqual(optimized, match);
     })
+
+    it('should keep both $in and $nin and other properties within filter', () => {
+        const match = {
+            _id: {
+                $in: [
+                    new ObjectId('5422be7f4cf5e2bf05a4a784'),
+                    new ObjectId('705502204ab43648d4a66126')
+                ],
+                $nin: [ new ObjectId('5ab8c015f7c1696f450a8dfc') ]
+            }
+        }
+
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, {
+            _id: {
+                $in: match['_id']['$in'],
+                $ne: match['_id']['$nin'][0]
+            }
+        });
+    });
 })
 
 describe('mergeProperties', () =>
