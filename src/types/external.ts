@@ -1,4 +1,4 @@
-import {Document, Filter, FindOptions, ObjectId} from "mongodb";
+import {Document, Filter, FindOptions, ObjectId } from "mongodb";
 import {AbstractConverterOptions, AbstractModelFromConverter, ComputedPropertyMethod, ComputedPropertiesParam, ExpandPaths, FirstParameter, PathValue, PublicMethodNames, SmartFilterMethod} from "./internal";
 import { CacheOptions } from "@liqd-js/cache";
 
