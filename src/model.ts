@@ -75,6 +75,8 @@ export abstract class AbstractModel<
                         projection: this.converters[conversion].projection
                     }, conversion );
 
+                    flowGet( 'log' ) && DUMP( pipeline );
+
                     documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray());
 
                     if ( this.cache )

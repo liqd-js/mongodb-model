@@ -726,7 +726,7 @@ export function mergeProperties( ...objects: object[] ): object | false
                 return false;
             }
 
-            if ( isEq( result[key] ) )
+            if ( isEq( result[key] ) && !result[key]['$eq'] )
             {
                 result[key] = { $eq: result[key] };
             }
