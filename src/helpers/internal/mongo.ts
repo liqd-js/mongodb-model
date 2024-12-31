@@ -132,7 +132,7 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
         return filter.map(( item ) => addPrefixToValue( item, prefix, prefixKeys ));
     }
 
-    const newFilter: Filter = {};
+    let newFilter: Filter = {};
 
     for( const key in filter )
     {
@@ -145,6 +145,11 @@ export function addPrefixToFilter( filter: Filter, prefix: string, prefixKeys: b
             else if( key.startsWith('_root.') )
             {
                 newFilter[key.substring('_root.'.length)] = addPrefixToValue( filter[key], prefix, false );
+            }
+            else if ( key === '$function' )
+            {
+                newFilter = addPrefixToValue( filter, prefix, prefixKeys );
+                break;
             }
             else if( !prefixKeys || key.startsWith('$') )
             {
