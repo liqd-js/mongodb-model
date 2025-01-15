@@ -334,10 +334,17 @@ function projectionToProjectInternal<DBE extends Document>( projection: FindOpti
         {
             if( item )
             {
-                switch ( typeof item )
+                if ( item instanceof ObjectId || item instanceof Date || item instanceof RegExp )
                 {
-                    case 'string': return addPrefixToValue( item, prefix, false );
-                    case 'object': return projectionToProjectInternal( item, prefix, false, fullPath );
+                    return item;
+                }
+                else if( typeof item === 'string' )
+                {
+                    return addPrefixToValue( item, prefix, false );
+                }
+                else if( typeof item === 'object' )
+                {
+                    return projectionToProjectInternal( item, prefix, false, fullPath );
                 }
             }
 
