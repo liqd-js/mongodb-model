@@ -1116,7 +1116,7 @@ function shouldBeAddedToStage( key: string, value: any, stage: string, nextStage
     // if key is in next stages, add it has non-breaking operator
     if ( key.startsWith(nextStage) )
     {
-        if ( typeof value !== 'object' || ( typeof value === 'object' && allOperationsAllowed( value ) ) )
+        if ( typeof value !== 'object' || ( typeof value === 'object' && ( value === null || allOperationsAllowed( value ) ) ) )
         {
             return true;
         }
