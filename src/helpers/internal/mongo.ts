@@ -588,7 +588,7 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
         }
         else
         {
-            if ( typeof value === 'object' && !Array.isArray(value) )
+            if ( typeof value === 'object' && !Array.isArray(value) && value !== null )
             {
                 if ( (value instanceof ObjectId) || (value instanceof Date)  || (value instanceof RegExp) )
                 {
