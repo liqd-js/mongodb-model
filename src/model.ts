@@ -162,6 +162,16 @@ export abstract class AbstractModel<
     {
         let matchedCount: number | undefined = 0, modifiedCount: number | undefined = 0, documentBefore: DBE | undefined, documentAfter: DBE | undefined;
 
+        // TODO: do properly
+        const canUpdate = await this.get( id, 'dbe' );
+        if ( !canUpdate )
+        {
+            return {
+                matchedCount: 0,
+                modifiedCount: 0,
+            }
+        }
+
         if( options?.documentAfter )
         {
             await this.#models.transaction( async() =>
@@ -189,6 +199,16 @@ export abstract class AbstractModel<
 
     public async updateMany( id: DTO['id'][] | DBE['_id'][], update: Partial<DBE> | UpdateFilter<DBE> ): Promise<ModelUpdateResponse<DBE>>
     {
+        // TODO: do properly
+        const canUpdate = await this.get( id, 'dbe' );
+        if ( !canUpdate || canUpdate.length !== id.length )
+        {
+            return {
+                matchedCount: 0,
+                modifiedCount: 0,
+            }
+        }
+
         //const res = await this.collection.updateMany({ _id: { $in: id.map( id => this.dbeID( id ))}}, isUpdateOperator( update ) ? update : { $set: update } as UpdateFilter<DBE> );
         const res = await this.collection.updateMany({ _id: { $in: id.map( id => this.dbeID( id ))}}, toUpdateOperations( update ));
 
@@ -371,6 +391,13 @@ export abstract class AbstractModel<
 
     public async delete( id: DTO['id'] | DBE['_id'] ): Promise<Boolean>
     {
+        // TODO: do properly
+        const canUpdate = await this.get( id, 'dbe' );
+        if ( !canUpdate )
+        {
+            return false;
+        }
+
         return ( await this.collection.deleteOne({ _id: this.dbeID( id ) as WithId<DBE>['_id'] }/*, { collation: { locale: 'en' } }*/)).deletedCount === 1;
     }
 

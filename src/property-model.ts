@@ -249,6 +249,16 @@ export abstract class AbstractPropertyModel<
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
         let updateOptions: UpdateOptions = {};
 
+        // TODO: do properly
+        const canUpdate = await this.get( id, 'dbe' );
+        if ( !canUpdate )
+        {
+            return {
+                matchedRootCount: 0,
+                modifiedRootCount: 0,
+            }
+        }
+
         if( this.paths.length === 1 && !this.paths[0].array )
         {
             operations = addPrefixToUpdate<RootDBE,DBE>( update, this.paths[0].path );
@@ -282,6 +292,16 @@ export abstract class AbstractPropertyModel<
         let path = this.paths.map( p => p.path ).join('.') + '.id';
         let operations: Partial<RootDBE> | UpdateFilter<RootDBE> = {};
         let options: UpdateOptions = {};
+
+        // TODO: do properly
+        const canUpdate = await this.get( ids, 'dbe' );
+        if ( !canUpdate || canUpdate.length !== ids.length )
+        {
+            return {
+                matchedRootCount: 0,
+                modifiedRootCount: 0,
+            }
+        }
 
         if( this.paths.length === 1 && !this.paths[0].array )
         {
