@@ -416,7 +416,7 @@ export abstract class AbstractPropertyModel<
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> ): Promise<T[]>
     {
-        const aggregationPipeline = [ ...await this.pipeline( options ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
+        const aggregationPipeline = [ ...await this.pipeline( options, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 

@@ -110,7 +110,7 @@ export abstract class AbstractModel<
 
     protected async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
     {
-        const { computedProperties: converterComputedProperties } = conversion ? this.converters[conversion] : {};
+        const { computedProperties: converterComputedProperties } = this.converters[conversion ?? 'dto'];
 
         const { filter, projection, computedProperties: optionsComputedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters']>;
 
@@ -318,7 +318,7 @@ export abstract class AbstractModel<
 
     public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<T[]>
     {
-        const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options! ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
+        const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options!, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
