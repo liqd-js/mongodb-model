@@ -614,16 +614,17 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
                     }
                     else if ( operator === '$elemMatch' )
                     {
-                        const elemMatch = optimizeMatch(value.$elemMatch);
-                        if ( elemMatch && Object.keys(elemMatch).length === 1 && !Object.keys(elemMatch).every( key => key.startsWith('$')) )
-                        {
-                            const [elemMatchKey, elemMatchValue] = Object.entries(elemMatch)[0];
-                            result[key + '.' + elemMatchKey] = elemMatchValue;
-                        }
-                        else
-                        {
+                        // not possible in negative cases - $exists: false, $nin, $not, $ne...
+                        // const elemMatch = optimizeMatch(value.$elemMatch);
+                        // if ( elemMatch && Object.keys(elemMatch).length === 1 && !Object.keys(elemMatch).every( key => key.startsWith('$')) )
+                        // {
+                        //     const [elemMatchKey, elemMatchValue] = Object.entries(elemMatch)[0];
+                        //     result[key + '.' + elemMatchKey] = elemMatchValue;
+                        // }
+                        // else
+                        // {
                             result[key] = value;
-                        }
+                        // }
                     }
                     else
                     {
