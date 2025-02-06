@@ -481,9 +481,10 @@ export function collectAddedFields( pipeline: any[] ): string[]
 
     for( const stage of pipeline )
     {
-        if( stage.$addFields )
+        const addedFields = stage.$addFields || stage.$set;
+        if ( addedFields )
         {
-            Object.keys(stage.$addFields).forEach(prop => fields.add(prop));
+            Object.keys( addedFields ).forEach(prop => fields.add(prop));
         }
         else if( stage.$lookup )
         {
@@ -834,6 +835,7 @@ export function getUsedFields( pipeline: Document[] ): {used: string[], ignored:
                 break;
             case '$project':
             case '$addFields':
+            case '$set':
             case '$group':
                 for ( const [key, value] of Object.entries(el[stage]) )
                 {

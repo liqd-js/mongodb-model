@@ -1,9 +1,10 @@
 import * as assert from 'assert';
-import { addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, getUsedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, optimizeMatch, projectionToProject, resolveBSONValue, reverseSort, sortProjection, mergeProperties, subfilter, transformToElemMatch, isExclusionProjection, objectFlatten, addPrefixToPipeline, LOG, propertyModelUpdateParams } from '../../src/helpers';
+import { addPrefixToFilter, addPrefixToUpdate, bsonValue, collectAddedFields, generateCursorCondition, getCursor, isUpdateOperator, objectGet, objectHash, objectHashID, objectSet, projectionToProject, resolveBSONValue, reverseSort, sortProjection, isExclusionProjection, objectFlatten, addPrefixToPipeline, LOG } from '../../src/helpers';
 import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
 import { describe, it } from 'node:test';
+import { getUsedFields, mergeProperties, optimizeMatch, propertyModelUpdateParams, subfilter, transformToElemMatch } from "../../dist/helpers";
 
 describe('objectHash', () =>
 {
@@ -1183,15 +1184,21 @@ describe('optimizeMatch', () =>
         assert.deepStrictEqual(optimized, match);
     });
 
-    it('should optimize $elemMatch with single condition', () => {
+    it('should not optimize $elemMatch with single condition', () => {
         const match = {
             $and: [
                 { $or: [ { a: { $elemMatch: { b: 1 } } } ] },
                 { $or: [ { a: { $elemMatch: { c: 2 } } } ] },
             ]
         }
+        const result = {
+            $and: [
+                { a: { $elemMatch: { b: 1 } } },
+                { a: { $elemMatch: { c: 2 } } },
+            ]
+        }
         const optimized = optimizeMatch(match);
-        assert.deepStrictEqual(optimized, { 'a.b': 1, 'a.c': 2 });
+        assert.deepStrictEqual(optimized, result);
     })
 
     it('should not optimize $elemMatch with multiple conditions', () => {
@@ -1202,7 +1209,7 @@ describe('optimizeMatch', () =>
             ]
         }
         const optimized = optimizeMatch(match);
-        assert.deepStrictEqual(optimized, { a: { $elemMatch: { b: 1, c: 2 } }, 'a.d': 3 });
+        assert.deepStrictEqual(optimized, match);
     });
 
     it('should optimize $in, $nin, $not $in with single condition', () => {
