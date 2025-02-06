@@ -54,7 +54,6 @@ export class QueryBuilder<DBE extends MongoRootDocument>
             ...( computedFields ? [{ $addFields: computedFields }] : [] ),
             ...( options.smartFilter?.pipeline || [] ),
             ...( addedFieldsSmartFilter.length ? [{ $unset: addedFieldsSmartFilter }] : []),
-            ...( !options.projection && computedFields ? [{ $addFields: computedFields }] : [] ),
             ...( options.projection ? [{ $project: {...options.projection, ...computedFields }}] : []),
             ...( options.pipeline || [] ),
             ...( addedFieldsPipeline.length ? [{ $unset: addedFieldsPipeline }] : []),
