@@ -127,16 +127,18 @@ export abstract class AbstractModel<
         return await queryBuilder.pipeline( params );
     }
 
-public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: ModelCreateOptions ): Promise<DTO['id']>
-{
-    let _id: DTO['id'] = id ?? await this.id();
-
-    for ( let i = 0; i < 10; i++ )
+    public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: ModelCreateOptions ): Promise<DTO['id']>
     {
+        /*if( options?.converter )
+        {
+            dbe = await options.converter( dbe as T );
+        }*/
+
+        const _id: DTO['id'] = id ?? await this.id();
+
         try
         {
             await this.collection.insertOne({ ...dbe, _id: this.dbeID( _id ) } as OptionalUnlessRequiredId<DBE>/*, { collation: { locale: 'en' } }*/ );
-            return _id;
         }
         catch( e: any )
         {
@@ -145,17 +147,11 @@ public async create( dbe: Omit<DBE, '_id'>, id?: DTO['id'], options?: ModelCreat
                 return this.dtoID( await this.collection.findOne( e.keyValue, { projection: { _id: 1 }, collation: { locale: 'en' } }).then( r => r?._id ));
             }
 
-            if( id || e.code !== 11000 || e.keyPattern?._id !== 1 )
-            {
-                throw e;
-            }
-
-            _id = await this.id();
+            throw e;
         }
-    }
 
-    throw new Error('Failed to generate unique id');
-}
+        return _id;
+    }
 
     public async createFrom( data: any, id?: DTO['id'], options?: ModelCreateOptions ): Promise<DTO['id']>
     {
