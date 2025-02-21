@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import {Filter, ObjectId, Sort} from "mongodb";
 import {objectStringify} from "@liqd-js/fast-object-hash";
 import { describe, it } from 'node:test';
-import { getUsedFields, mergeProperties, optimizeMatch, propertyModelUpdateParams, subfilter, transformToElemMatch } from "../../dist/helpers";
+import { getUsedFields, mergeProperties, optimizeMatch, propertyModelUpdateParams, subfilter, transformToElemMatch } from "../../src/helpers";
 
 describe('objectHash', () =>
 {
@@ -1220,6 +1220,16 @@ describe('optimizeMatch', () =>
         }
         const optimized = optimizeMatch(match);
         assert.deepStrictEqual(optimized, { a: { $eq: 1 }, b: { $ne: 3 }, c: { $ne: 5 } });
+    })
+
+    it('should not optimize $in, $nin, $not $in with single RegExp condition', () => {
+        const match = {
+            a: { $in: [new RegExp('test')] },
+            b: { $nin: [new RegExp('test')] },
+            c: { $not: { $in: [new RegExp('test')] } },
+        }
+        const optimized = optimizeMatch(match);
+        assert.deepStrictEqual(optimized, match);
     })
 
     it('should not optimize $in, $nin, $not $in with multiple conditions', () => {

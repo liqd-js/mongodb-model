@@ -600,15 +600,15 @@ export function optimizeMatch( obj: MongoFilter<any> ): MongoFilter<any> | undef
                 // iterate all keys and optimize them
                 for ( const operator in value )
                 {
-                    if ( operator === '$in' && value.$in && value.$in.length === 1 )
+                    if ( operator === '$in' && value.$in && value.$in.length === 1 && !(value.$in[0] instanceof RegExp) )
                     {
                         result[key] = { ...result[key], $eq: value.$in[0] };
                     }
-                    else if ( operator === '$nin' && value.$nin && value.$nin.length === 1 )
+                    else if ( operator === '$nin' && value.$nin && value.$nin.length === 1 && !(value.$nin[0] instanceof RegExp) )
                     {
                         result[key] = { ...result[key], $ne: value.$nin[0] };
                     }
-                    else if ( operator === '$not' && value.$not && value.$not.$in && value.$not.$in.length === 1 )
+                    else if ( operator === '$not' && value.$not && value.$not.$in && value.$not.$in.length === 1 && !(value.$not.$in[0] instanceof RegExp) )
                     {
                         result[key] = { ...result[key], $ne: value.$not.$in[0] };
                     }
