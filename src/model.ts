@@ -5,6 +5,7 @@ import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootD
 import { AbstractModels } from "./index";
 import Cache from "@liqd-js/cache";
 import objectHash from "@liqd-js/fast-object-hash";
+import QueryOptimizer from "@liqd-js/mongodb-query-optimizer";
 export const Aggregator = require('@liqd-js/aggregator');
 
 /**
@@ -283,13 +284,20 @@ export abstract class AbstractModel<
             computedProperties
         };
         const queryBuilder = new QueryBuilder<DBE>();
-        const [pipeline, countPipeline] = await Promise.all ([
+        let [pipeline, countPipeline] = await Promise.all ([
             queryBuilder.pipeline( params ),
             options.count ? queryBuilder.count( params ) : undefined
         ]);
 
         flowGet( 'log' ) && DUMP( pipeline );
         flowGet( 'log' ) && countPipeline && DUMP( countPipeline );
+
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            let optimizer = new QueryOptimizer();
+            pipeline = optimizer.optimizePipeline( pipeline );
+            countPipeline && (countPipeline = optimizer.optimizePipeline( countPipeline ));
+        }
 
         let [ entries, total ] = await Promise.all(
         [
@@ -318,16 +326,28 @@ export abstract class AbstractModel<
 
     public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<T[]>
     {
-        const aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options!, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
+        let aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options!, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
-        return this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as Promise<T[]>;
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            aggregationPipeline = new QueryOptimizer().optimizePipeline( aggregationPipeline );
+        }
+
+        return await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
     }
 
     public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<number>
     {
-        return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
+        let countPipeline = [ ...pipeline, { $count: 'count' }];
+
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            countPipeline = new QueryOptimizer().optimizePipeline( countPipeline );
+        }
+
+        return this.aggregate<{ count: number }>(countPipeline, options ).then( r => r[0]?.count ?? 0 );
     }
 
     // TODO pridat podporu ze ked vrati false tak nerobi ani query ale throwne error

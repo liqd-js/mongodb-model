@@ -6,6 +6,7 @@ import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyMo
 import { AbstractModels } from "./index";
 import Cache from "@liqd-js/cache"
 import objectHash from "@liqd-js/fast-object-hash";
+import QueryOptimizer from "@liqd-js/mongodb-query-optimizer";
 
 /**
  * Abstract class for property models
@@ -357,7 +358,12 @@ export abstract class AbstractPropertyModel<
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':get(' + ( conversion as string ) + ')' ) : undefined;
 
-        const pipeline = await this.pipeline({ filter: options.filter, smartFilter: options.smartFilter, projection, sort, limit: 1 });
+        let pipeline = await this.pipeline({ filter: options.filter, smartFilter: options.smartFilter, projection, sort, limit: 1 });
+
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            pipeline = new QueryOptimizer().optimizePipeline( pipeline );
+        }
 
         flowGet('log') && ( console.log( this.constructor.name + '::find', options.filter ), DUMP( pipeline ));
 
@@ -381,21 +387,27 @@ export abstract class AbstractPropertyModel<
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
 
         const resolvedList = resolveBSONObject( options );
-
-        const pipeline = this.pipeline({ ...resolvedList, projection }, conversion);
-
         const { cursor, sort = { id: 1 }, limit, skip, ...countOptions } = resolvedList;
 
+        let pipeline = await this.pipeline({ ...resolvedList, projection }, conversion);
+        let countPipeline = queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) );
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            const optimizer = new QueryOptimizer();
+            pipeline = optimizer.optimizePipeline( pipeline );
+            countPipeline = optimizer.optimizePipeline( countPipeline );
+        }
+
         const [ entries, total ] = await Promise.all([
-            this.collection.aggregate( await pipeline, { collation: { locale: 'en' } } ).toArray(),
-            resolvedList.count ? this.collection.aggregate( queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ), { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : 0
+            this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray(),
+            resolvedList.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : 0
         ])
 
         benchmark?.step( 'QUERY' );
 
         flowGet( 'log' ) && LOG( {
-            list: await pipeline,
-            total: resolvedList.count ? queryBuilder.buildCountPipeline( await this.pipeline({ ...countOptions, projection }) ) : undefined
+            list: pipeline,
+            total: resolvedList.count ? countPipeline : undefined
         } );
 
         const result = await Promise.all( entries.map( (async (dbe, i) => {
@@ -403,7 +415,7 @@ export abstract class AbstractPropertyModel<
             dto.$cursor = getCursor( dbe, sort );
             return dto;
         } )));
-        
+
         benchmark?.step( 'CONVERTER' );
 
         if( resolvedList.count )
@@ -416,11 +428,16 @@ export abstract class AbstractPropertyModel<
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> ): Promise<T[]>
     {
-        const aggregationPipeline = [ ...await this.pipeline( options, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
+        let aggregationPipeline = [ ...await this.pipeline( options, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ];
+
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            aggregationPipeline = new QueryOptimizer().optimizePipeline( aggregationPipeline );
+        }
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
-        return this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as Promise<T[]>;
+        return await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
 
         /* WHY THE HELL WAS IT LIKE THAT
 
@@ -431,7 +448,13 @@ export abstract class AbstractPropertyModel<
 
     public async count( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>> ): Promise<number>
     {
-        return this.aggregate<{ count: number }>([ ...pipeline, { $count: 'count' }], options ).then( r => r[0]?.count ?? 0 );
+        let countPipeline = [ ...pipeline, { $count: 'count' }];
+        if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
+        {
+            countPipeline = new QueryOptimizer().optimizePipeline( countPipeline );
+        }
+
+        return await this.aggregate<{ count: number }>(countPipeline, options ).then( r => r[0]?.count ?? 0 );
     }
 
     // TODO pridat podporu ze ked vrati false tak nerobi ani query ale throwne error
