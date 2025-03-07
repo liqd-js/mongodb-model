@@ -305,10 +305,21 @@ export abstract class AbstractModel<
             countPipeline && (countPipeline = optimizer.optimizePipeline( countPipeline ));
         }
 
+        const start = Date.now();
         let [ entries, total ] = await Promise.all(
         [
-            this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray(),
-            options.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : undefined
+            this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray().then( r => {
+                LOG_FILE( `Collection: ${this.collection.collectionName}` );
+                LOG_FILE( `TIME: ${Date.now() - start} ms` );
+                LOG_FILE( pipeline, true );
+                return r;
+            }),
+            options.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => {
+                LOG_FILE( `Collection: ${this.collection.collectionName}` );
+                LOG_FILE( `TIME: ${Date.now() - start} ms` );
+                LOG_FILE( countPipeline, true );
+                return r[0]?.count ?? 0
+            } ) : undefined
         ]);
 
         benchmark?.step('QUERY');
