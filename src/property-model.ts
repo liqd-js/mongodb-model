@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions, WithId} from 'mongodb';
-import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse} from './types';
@@ -74,7 +74,12 @@ export abstract class AbstractPropertyModel<
                 {
                     let pipeline = await this.pipeline({ filter: { id: { $in: ids.map( id => this.dbeID( id ))}}, projection: this.converters[conversion].projection });
 
+                    const start = Date.now();
+
                     documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray() as DBE[]);
+
+                    LOG_FILE( `TIME: ${Date.now() - start} ms` );
+                    LOG_FILE( pipeline, true );
 
                     if ( this.cache )
                     {
@@ -367,7 +372,12 @@ export abstract class AbstractPropertyModel<
 
         flowGet('log') && ( console.log( this.constructor.name + '::find', options.filter ), DUMP( pipeline ));
 
+        const start = Date.now();
+
         const dbe = ( await this.collection.aggregate( pipeline ).toArray())[0];
+
+        LOG_FILE( `TIME: ${Date.now() - start} ms` );
+        LOG_FILE( pipeline, true );
 
         benchmark?.step( 'QUERY' );
 
@@ -398,9 +408,22 @@ export abstract class AbstractPropertyModel<
             countPipeline = optimizer.optimizePipeline( countPipeline );
         }
 
+
+        const start = Date.now();
+
         const [ entries, total ] = await Promise.all([
-            this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray(),
-            resolvedList.count ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => r[0]?.count ?? 0 ) : 0
+            this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray().then( r => {
+                LOG_FILE( `TIME: ${Date.now() - start} ms` );
+                LOG_FILE( pipeline, true );
+                return r;
+            }),
+            resolvedList.count
+                ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => {
+                    LOG_FILE( `TIME: ${Date.now() - start} ms` );
+                    LOG_FILE( pipeline, true );
+                    return r[0]?.count ?? 0
+                } )
+                : 0
         ])
 
         benchmark?.step( 'QUERY' );
@@ -437,7 +460,14 @@ export abstract class AbstractPropertyModel<
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
-        return await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
+        const start = Date.now();
+
+        const res = await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
+
+        LOG_FILE( `TIME: ${Date.now() - start} ms` );
+        LOG_FILE( pipeline, true );
+
+        return res;
 
         /* WHY THE HELL WAS IT LIKE THAT
 

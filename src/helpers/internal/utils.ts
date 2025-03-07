@@ -2,6 +2,7 @@ import {ObjectId} from "mongodb";
 
 export const REGISTER_MODEL = Symbol('REGISTER_MODEL');
 export const GET_PARENT = Symbol('GET_PARENT');
+const fs = require('fs');
 
 const Flow = require('@liqd-js/flow');
 
@@ -84,4 +85,21 @@ export function hasPublicMethod( obj: any, method: string ): boolean
 export function DUMP( obj: object )
 {
     console.log( stringify( obj ));
+}
+
+export function LOG_FILE( query: any, separator: boolean = false )
+{
+    const path = (flowGet( 'experimentalFlags' ) as any)?.['logQueries'];
+    const traceID = flowGet( 'traceID' );
+
+    if ( !path || !traceID )
+    {
+        return;
+    }
+
+    fs.writeFileSync(
+        path + '/' + traceID + '.txt',
+        stringify( query ) + (separator ? '\n===============================\n\n' : '\n'),
+        { flag: 'a' }
+    );
 }

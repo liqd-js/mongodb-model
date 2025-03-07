@@ -1,6 +1,6 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark, formatter } from './helpers';
-import { projectionToProject, getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark, formatter, LOG_FILE } from './helpers';
+import { getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
 import { AbstractModels } from "./index";
 import Cache from "@liqd-js/cache";
@@ -78,7 +78,12 @@ export abstract class AbstractModel<
 
                     flowGet( 'log' ) && DUMP( pipeline );
 
+                    const start = Date.now();
+
                     documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray());
+
+                    LOG_FILE( `TIME: ${Date.now() - start} ms` );
+                    LOG_FILE( pipeline, true );
 
                     if ( this.cache )
                     {
@@ -330,12 +335,21 @@ export abstract class AbstractModel<
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
+        LOG_FILE( aggregationPipeline );
+
         if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
         {
             aggregationPipeline = new QueryOptimizer().optimizePipeline( aggregationPipeline );
         }
 
-        return await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
+        const start = Date.now();
+
+        const res = await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
+
+        LOG_FILE( `TIME: ${Date.now() - start} ms` );
+        LOG_FILE( pipeline, true );
+
+        return res;
     }
 
     public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<number>
