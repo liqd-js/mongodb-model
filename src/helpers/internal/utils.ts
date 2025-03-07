@@ -1,4 +1,5 @@
 import {ObjectId} from "mongodb";
+import { Log } from "./log";
 
 export const REGISTER_MODEL = Symbol('REGISTER_MODEL');
 export const GET_PARENT = Symbol('GET_PARENT');
@@ -97,9 +98,5 @@ export function LOG_FILE( query: any, separator: boolean = false )
         return;
     }
 
-    fs.writeFileSync(
-        path + '/' + traceID + '.txt',
-        stringify( query ) + (separator ? '\n===============================\n\n' : '\n'),
-        { flag: 'a' }
-    );
+    Log.append( path + '/' + traceID + '.txt', stringify( query ) + ( separator ? '\n===============================\n\n' : '\n' ));
 }
