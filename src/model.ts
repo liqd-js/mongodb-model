@@ -82,6 +82,7 @@ export abstract class AbstractModel<
 
                     documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray());
 
+                    LOG_FILE( `Collection: ${this.collection.collectionName}` );
                     LOG_FILE( `TIME: ${Date.now() - start} ms` );
                     LOG_FILE( pipeline, true );
 
@@ -335,8 +336,6 @@ export abstract class AbstractModel<
 
         flowGet( 'log' ) && DUMP( aggregationPipeline );
 
-        LOG_FILE( aggregationPipeline );
-
         if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
         {
             aggregationPipeline = new QueryOptimizer().optimizePipeline( aggregationPipeline );
@@ -346,6 +345,7 @@ export abstract class AbstractModel<
 
         const res = await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
 
+        LOG_FILE( `Collection: ${this.collection.collectionName}` );
         LOG_FILE( `TIME: ${Date.now() - start} ms` );
         LOG_FILE( pipeline, true );
 

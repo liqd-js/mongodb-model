@@ -78,6 +78,7 @@ export abstract class AbstractPropertyModel<
 
                     documents.push(...await this.collection.aggregate( pipeline, { collation: { locale: 'en' } }).toArray() as DBE[]);
 
+                    LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
                     LOG_FILE( `TIME: ${Date.now() - start} ms` );
                     LOG_FILE( pipeline, true );
 
@@ -376,6 +377,7 @@ export abstract class AbstractPropertyModel<
 
         const dbe = ( await this.collection.aggregate( pipeline ).toArray())[0];
 
+        LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
         LOG_FILE( `TIME: ${Date.now() - start} ms` );
         LOG_FILE( pipeline, true );
 
@@ -413,12 +415,14 @@ export abstract class AbstractPropertyModel<
 
         const [ entries, total ] = await Promise.all([
             this.collection.aggregate( pipeline, { collation: { locale: 'en' } } ).toArray().then( r => {
+                LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
                 LOG_FILE( `TIME: ${Date.now() - start} ms` );
                 LOG_FILE( pipeline, true );
                 return r;
             }),
             resolvedList.count
                 ? this.collection.aggregate( countPipeline, { collation: { locale: 'en' } } ).toArray().then( r => {
+                    LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
                     LOG_FILE( `TIME: ${Date.now() - start} ms` );
                     LOG_FILE( pipeline, true );
                     return r[0]?.count ?? 0
@@ -464,6 +468,7 @@ export abstract class AbstractPropertyModel<
 
         const res = await this.collection.aggregate( aggregationPipeline, { collation: { locale: 'en' } } ).toArray() as T[];
 
+        LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
         LOG_FILE( `TIME: ${Date.now() - start} ms` );
         LOG_FILE( pipeline, true );
 
