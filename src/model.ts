@@ -49,7 +49,7 @@ export abstract class AbstractModel<
                 //     ? await this.collection.aggregate([{ $match: { $and: [ { _id: { $in: ids.map( id => this.dbeID( id ))}}, accessControl ]}}]).toArray()
                 //     : await this.collection.find( { _id: { $in: ids.map( id => this.dbeID( id ))}}, { projection: this.converters[conversion].projection, collation: { locale: 'en' } }).toArray();
 
-                const cacheKeys = ids.map( id => [id, this.cacheKey( id, conversion, accessControl )]);
+                const cacheKeys = ids.map( id => [id, this.cacheKey( id, 'dbe', accessControl )]);
                 let documents: Document[] = [];
                 const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
 
@@ -60,7 +60,7 @@ export abstract class AbstractModel<
                     // TODO: cache - vracat clone nie referenciu
                     documents.push(...ids
                         .filter( id => !missingIDs.includes(id))
-                        .map( id => this.cache?.get( this.cacheKey( id, conversion, accessControl ) ) )
+                        .map( id => this.cache?.get( this.cacheKey( id, 'dbe', accessControl ) ) )
                     );
                 }
 
@@ -90,7 +90,7 @@ export abstract class AbstractModel<
                     {
                         for ( const doc of documents )
                         {
-                            this.cache.set( this.cacheKey( doc._id, conversion, accessControl ), doc );
+                            this.cache.set( this.cacheKey( doc._id, 'dbe', accessControl ), doc );
                         }
                     }
                 }
@@ -280,12 +280,14 @@ export abstract class AbstractModel<
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
 
+        const accessFilter = await this.accessFilter() || undefined;
+
         const smartFilter = options.smartFilter && await this.resolveSmartFilter( options.smartFilter );
         const computedProperties = compProps && await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() ) || undefined;
 
         const params = {
             filter, sort, smartFilter, cursor, limit, ...rest,
-            accessFilter: await this.accessFilter() || undefined,
+            accessFilter,
             pipeline: options.pipeline,
             computedProperties
         };
@@ -326,7 +328,11 @@ export abstract class AbstractModel<
 
         const result = await Promise.all( entries.map( async( dbe, i ) =>
         {
-            const dto = await ( cache?.list ? this.get( this.dtoID( dbe._id ), conversion ) : convert( this, converter, dbe as DBE, conversion )) as ReturnType<Extensions['converters'][K]['converter']> & { $cursor?: string };
+            const dto = await convert( this, converter, dbe as DBE, conversion ) as ReturnType<Extensions['converters'][K]['converter']> & { $cursor?: string };
+            if ( this.cache && !options.projection )
+            {
+                this.cache.set( this.cacheKey( dbe._id, 'dbe', await this.accessFilter() as Filter<WithId<DBE>> | void ), dbe );
+            }
             dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
         }));

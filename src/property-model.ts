@@ -410,7 +410,6 @@ export abstract class AbstractPropertyModel<
             countPipeline = optimizer.optimizePipeline( countPipeline );
         }
 
-
         const start = Date.now();
 
         const [ entries, total ] = await Promise.all([
@@ -437,11 +436,16 @@ export abstract class AbstractPropertyModel<
             total: resolvedList.count ? countPipeline : undefined
         } );
 
-        const result = await Promise.all( entries.map( (async (dbe, i) => {
+        const result = await Promise.all( entries.map( async( dbe, i ) =>
+        {
             const dto = await convert( this, converter, dbe as DBE, conversion ) as ReturnType<Extensions['converters'][K]['converter']> & { $cursor?: string };
-            dto.$cursor = getCursor( dbe, sort );
+            if ( this.cache && !options.projection )
+            {
+                this.cache.set( this.cacheKey( dbe._id, 'dbe', await this.accessFilter() as Filter<DBE> | void ), dbe );
+            }
+            dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
-        } )));
+        }));
 
         benchmark?.step( 'CONVERTER' );
 
