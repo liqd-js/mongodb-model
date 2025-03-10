@@ -52,6 +52,13 @@ export abstract class AbstractModel<
                 const cacheKeys = ids.map( id => [id, this.cacheKey( id, 'dbe', accessControl )]);
                 let documents: Document[] = [];
                 const missingIDs = cacheKeys.filter( ([_, key]) => !this.cache?.get( key ) ).map( ([id, _]) => id );
+                const cachedIDs = ids.filter( id => !missingIDs.includes( id ));
+
+                if ( cachedIDs.length )
+                {
+                    LOG_FILE( `FROM CACHE - Collection: ${this.collection.collectionName}` );
+                    LOG_FILE( `Count: ${ids.length}, IDs: ${ids}`, true );
+                }
 
                 flowGet( 'benchmark' ) && this.cache && console.log( `${formatter.format( new Date() )} ${this.constructor.name}::aggregator - cached(${ids.length - missingIDs.length}), fetched(${missingIDs.length})`);
 
