@@ -448,7 +448,7 @@ export abstract class AbstractPropertyModel<
             const dto = await convert( this, converter, dbe as DBE, conversion ) as ReturnType<Extensions['converters'][K]['converter']> & { $cursor?: string };
             if ( this.cache && !options.projection )
             {
-                this.cache.set( this.cacheKey( dbe._id, 'dbe', await this.accessFilter() as Filter<DBE> | void ), dbe );
+                this.cache.set( this.cacheKey( dbe._id ?? dbe.id, 'dbe', await this.accessFilter() as Filter<DBE> | void ), dbe );
             }
             dto.$cursor = getCursor( dbe, sort ); // TODO pozor valka klonu
             return dto;
