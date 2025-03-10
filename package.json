@@ -1,7 +1,7 @@
 {
     "name": "@liqd-js/mongodb-model",
     "description": "Mongo model class",
-    "version": "1.0.69",
+    "version": "1.0.70",
     "author": "radixxko",
     "license": "MIT",
     "main": "dist/index.js",
