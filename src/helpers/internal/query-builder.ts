@@ -15,6 +15,7 @@ export type ListParams<DBE extends MongoRootDocument> =
     limit?: number
     sample?: number
     cursor?: string
+    countLimit?: number
 }
 
 const COUNT_IGNORE_STAGES = [ '$limit', '$skip', '$sample', '$sort', '$project', '$addFields', '$set', '$unset' ];
@@ -66,8 +67,11 @@ export class QueryBuilder<DBE extends MongoRootDocument>
 
     async count( params: ListParams<DBE> )
     {
-        const { cursor, computedProperties, ...options } = params;
-        return this.buildCountPipeline(await this.pipeline({ ...options }));
+        const { cursor, computedProperties, countLimit, ...options } = params;
+        return this.buildCountPipeline(await this.pipeline({
+            ...( countLimit ? { limit: countLimit + 1 } : {} ),
+            ...options,
+        }));
     }
 
     /**

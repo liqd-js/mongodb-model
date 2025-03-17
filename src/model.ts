@@ -282,7 +282,7 @@ export abstract class AbstractModel<
     public async list<K extends keyof Extensions['converters']>( options: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, computedProperties: compProps, cache } = this.converters[conversion];
-        const { filter = {}, sort = { _id: 1 }, cursor, limit, smartFilter: sFilter, ...rest } = resolveBSONObject(options);
+        const { filter = {}, sort = { _id: 1 }, cursor, limit, smartFilter: sFilter, countLimit, ...rest } = resolveBSONObject(options);
         const prev = cursor?.startsWith('prev:');
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
@@ -293,7 +293,7 @@ export abstract class AbstractModel<
         const computedProperties = compProps && await this.resolveComputedProperties( Array.isArray( compProps ) ? compProps : compProps() ) || undefined;
 
         const params = {
-            filter, sort, smartFilter, cursor, limit, ...rest,
+            filter, sort, smartFilter, cursor, limit, countLimit, ...rest,
             accessFilter,
             pipeline: options.pipeline,
             computedProperties
