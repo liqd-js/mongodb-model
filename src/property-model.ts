@@ -411,9 +411,8 @@ export abstract class AbstractPropertyModel<
         let pipeline = await this.pipeline({ ...resolvedList, projection }, conversion);
         let countPipeline = queryBuilder.buildCountPipeline( await this.pipeline({
             ...countOptions,
-            ...( countLimit ? { limit: countLimit + 1 } : {} ),
             projection
-        }) );
+        }), countLimit );
         if ( (flowGet( 'experimentalFlags' ) as any)?.['query-optimizer'] )
         {
             const optimizer = new QueryOptimizer();

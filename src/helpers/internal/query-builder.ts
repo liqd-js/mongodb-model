@@ -69,19 +69,23 @@ export class QueryBuilder<DBE extends MongoRootDocument>
     {
         const { cursor, computedProperties, countLimit, ...options } = params;
         return this.buildCountPipeline(await this.pipeline({
-            ...( countLimit ? { limit: countLimit + 1 } : {} ),
             ...options,
-        }));
+        }), countLimit);
     }
 
     /**
      * Removes stages from the end of the pipeline that don't affect the count, adds $count stage
      */
-    buildCountPipeline( pipeline: Document[] )
+    buildCountPipeline( pipeline: Document[], countLimit?: number )
     {
         while ( pipeline.length > 0 && COUNT_IGNORE_STAGES.includes( Object.keys( pipeline[pipeline.length - 1] )[0] ))
         {
             pipeline = pipeline.slice( 0, -1 );
+        }
+
+        if ( countLimit )
+        {
+            pipeline.push({ $limit: countLimit + 1 });
         }
 
         pipeline.push({ $count: 'count' })
