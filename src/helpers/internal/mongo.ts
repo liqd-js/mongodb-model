@@ -1134,27 +1134,9 @@ function splitToSubPaths( path: string, paths: { path: string, array: boolean }[
     }
 
     return {
-        prefix: splitPath.slice(0, splitPath.length - furthestArrayIndex).reverse().join('.'),
+        prefix: splitPath.slice(0, splitPath.length - furthestArrayIndex).join('.'),
         property: splitPath.slice(splitPath.length - furthestArrayIndex).join('.')
     }
-
-    // let prefix = '';
-    // let property = '';
-    // for ( const subpath of path.split('.') )
-    // {
-    //     if ( fullPath.startsWith(prefix + subpath) )
-    //     {
-    //         prefix += subpath + '.';
-    //     }
-    //     else {
-    //         property += subpath + '.';
-    //     }
-    // }
-    //
-    // return {
-    //     prefix: prefix.endsWith('.') ? prefix.substring(0, prefix.length - 1) : prefix,
-    //     property: property.endsWith('.') ? property.substring(0, property.length - 1) : property
-    // };
 }
 
 const BREAKING_OPERATORS = ['$not', '$ne', '$in', '$nin', '$expr', '$elemMatch', '$function'];
