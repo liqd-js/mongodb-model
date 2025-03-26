@@ -998,7 +998,7 @@ export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, paths: { pat
 
 /**
  * Create subPaths for unwinds
- * a[].b.c[].d[].e.f  =>  a.b, c, d.e.f
+ * a[].b.c[].d[].e.f  =>  a, b.c, d, e.f
  * @param paths
  */
 export function getSubPaths( paths: { path: string, array: boolean }[] ): string[]
@@ -1008,18 +1008,22 @@ export function getSubPaths( paths: { path: string, array: boolean }[] ): string
 
     for ( const el of paths )
     {
-        if ( el.array && current !== '' )
+        if ( !el.array )
         {
-            subPaths.push(current);
-            current = el.path;
+            current += ( current ? '.' : '' ) + el.path;
         }
         else
         {
-            current += ( current !== '' ? '.' : '' ) + el.path;
+            current += ( current ? '.' : '' ) + el.path;
+            subPaths.push( current );
+            current=''
         }
     }
 
-    subPaths.push(current)
+    if ( current !== '' )
+    {
+        subPaths.push(current)
+    }
 
     return subPaths;
 }
@@ -1029,9 +1033,9 @@ export function getSubPaths( paths: { path: string, array: boolean }[] ): string
  * @param filter
  * @param stage
  * @param nextStage
- * @param fullPath
+ * @param paths
  */
-export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string, stages: { path: string, array: boolean }[] )
+export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string, paths: { path: string, array: boolean }[] )
 {
     const result: MongoFilter<any> = {};
 
@@ -1040,8 +1044,8 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
         return filter;
     }
 
-    const currentStageIndex = stages.findIndex( s => s.path === stage.split('.').reverse()[0] ) || -1;
-    const lastArrayStageIndex = [...stages].reverse().findIndex( s => s.array ) || -1;
+    const currentStageIndex = paths.findIndex( s => s.path === stage.split('.').reverse()[0] ) || -1;
+    const lastArrayStageIndex = [...paths].reverse().findIndex( s => s.array ) || -1;
     const isAfterLastArrayStage = currentStageIndex >= lastArrayStageIndex;
 
     for ( const [key, value] of Object.entries(filter) )
@@ -1050,7 +1054,7 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
         {
             for ( const andCondition of value as any[] )
             {
-                const sub = subfilter( andCondition, stage, nextStage, stages );
+                const sub = subfilter( andCondition, stage, nextStage, paths );
                 if ( Object.keys(sub).length )
                 {
                     if ( !result.$and )
@@ -1067,7 +1071,7 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
             for ( const orCondition of value as any[] )
             {
                 // try to extract, if they're equal, add, otherwise skip
-                const sub = subfilter( orCondition, stage, nextStage, stages );
+                const sub = subfilter( orCondition, stage, nextStage, paths );
                 if ( !tmpFilter.$or )
                 {
                     tmpFilter.$or = [];
@@ -1092,7 +1096,7 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
 
             if ( operator && !isAfterLastArrayStage )
             {
-                const elemMatch = transformToElemMatch( key, value.$in || value.$nin || value.$not.$in, operator, stages );
+                const elemMatch = transformToElemMatch( key, value.$in || value.$nin || value.$not.$in, operator, paths );
                 if ( elemMatch )
                 {
                     result[elemMatch.key] = elemMatch.value;
@@ -1108,9 +1112,9 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
     return result;
 }
 
-export function transformToElemMatch( key: string, value: any[], operator: '$in' | '$nin', stages: { path: string, array: boolean }[] ): {key: string, value: {$elemMatch: object}} | false
+export function transformToElemMatch( key: string, value: any[], operator: '$in' | '$nin', paths: { path: string, array: boolean }[] ): {key: string, value: {$elemMatch: object}} | false
 {
-    const path = splitToSubPaths( key, stages );
+    const path = splitToSubPaths( key, paths );
     return {
         key: path.prefix,
         value: { $elemMatch: { [path.property]: {[operator]: value} } }
