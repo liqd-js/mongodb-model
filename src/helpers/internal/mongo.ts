@@ -978,22 +978,54 @@ function isPrefixedField( field: any, prefix: string ): boolean
 /**
  * Splits filter into stages to be put between unwinds based on the path
  * @param filter
- * @param path
+ * @param paths
  * @returns {MongoFilter[]} - array of optimized filters for each stage
  */
-export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, path: string ): MongoFilter<DBE>[]
+export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, paths: { path: string, array: boolean }[] ): MongoFilter<DBE>[]
 {
-    const stages = path.split('.');
     const result: MongoFilter<DBE>[] = [];
+    const subPaths = getSubPaths( paths );
 
-    for ( let i = 0; i <= stages.length; i++ )
+    for ( let i = 0; i <= subPaths.length; i++ )
     {
-        const stage = stages.slice(0, i).join('.');
-        const nextStage = stages.slice(0, i + 1).join('.');
-        result.push( optimizeMatch( subfilter( filter, stage, nextStage, path ) ) as MongoFilter<DBE> );
+        const stage = subPaths.slice(0, i).join('.');
+        const nextStage = subPaths.slice(0, i + 1).join('.');
+        result.push( optimizeMatch( subfilter( filter, stage, nextStage, paths ) ) as MongoFilter<DBE> );
     }
 
     return result;
+}
+
+/**
+ * Create subPaths for unwinds
+ * a[].b.c[].d[].e.f  =>  a, b.c, d, e.f
+ * @param paths
+ */
+export function getSubPaths( paths: { path: string, array: boolean }[] ): string[]
+{
+    const subPaths: string[] = [];
+    let current = '';
+
+    for ( const el of paths )
+    {
+        if ( !el.array )
+        {
+            current += ( current ? '.' : '' ) + el.path;
+        }
+        else
+        {
+            current += ( current ? '.' : '' ) + el.path;
+            subPaths.push( current );
+            current=''
+        }
+    }
+
+    if ( current !== '' )
+    {
+        subPaths.push(current)
+    }
+
+    return subPaths;
 }
 
 /**
@@ -1003,7 +1035,7 @@ export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, path: string
  * @param nextStage
  * @param fullPath
  */
-export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string, fullPath: string )
+export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: string, stages: { path: string, array: boolean }[] )
 {
     const result: MongoFilter<any> = {};
 
@@ -1012,13 +1044,16 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
         return filter;
     }
 
+    const currentStage = stages.find( s => s.path === stage.split('.').reverse()[0] );
+    const fullPath = stages.map( s => s.path ).join('.');
+
     for ( const [key, value] of Object.entries(filter) )
     {
         if ( key === '$and' )
         {
             for ( const andCondition of value as any[] )
             {
-                const sub = subfilter( andCondition, stage, nextStage, fullPath );
+                const sub = subfilter( andCondition, stage, nextStage, stages );
                 if ( Object.keys(sub).length )
                 {
                     if ( !result.$and )
@@ -1035,7 +1070,7 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
             for ( const orCondition of value as any[] )
             {
                 // try to extract, if they're equal, add, otherwise skip
-                const sub = subfilter( orCondition, stage, nextStage, fullPath );
+                const sub = subfilter( orCondition, stage, nextStage, stages );
                 if ( !tmpFilter.$or )
                 {
                     tmpFilter.$or = [];

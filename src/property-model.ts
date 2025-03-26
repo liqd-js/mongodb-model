@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions, WithId} from 'mongodb';
-import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getSubPaths, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, SecondType, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, FirstType, ComputedPropertyMethod, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse} from './types';
@@ -172,13 +172,13 @@ export abstract class AbstractPropertyModel<
         const needRoot = getUsedFields( gatheredFilters?.pipeline ?? [] ).used.some(el => el.startsWith('_root.'));
 
         const stages = await this.filterStages( options );
-        const subpaths = this.prefix.split('.');
-        for ( let i = 0; i <= subpaths.length; i++ )
+        const subPaths = getSubPaths( this.paths );
+        for ( let i = 0; i <= subPaths.length; i++ )
         {
-            const last = i === subpaths.length;
-            if ( i !== 0 )
+            const last = i === subPaths.length;
+            if ( i !== 0 || !last || ( last && !this.paths[ this.paths.length - 1 ].array ) )
             {
-                pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + this.paths[i - 1].path });
+                pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + subPaths[i - 1] });
             }
 
             const tmpPrefix = prefix.replace(/^\$/,'');
@@ -632,7 +632,7 @@ export abstract class AbstractPropertyModel<
         const cursorFilter = list.cursor ? generateCursorCondition( list.cursor, sort ) : undefined;
 
         const stageFilter = optimizeMatch({ $and:  [ addPrefixToFilter( { $and: [ list.filter, accessFilter, cursorFilter ]}, this.prefix ) ]} as MongoFilter<DBE>);
-        return splitFilterToStages( stageFilter as MongoFilter<DBE>, this.prefix ) as Filter<RootDBE>
+        return splitFilterToStages( stageFilter as MongoFilter<DBE>, this.paths ) as Filter<RootDBE>
     }
 
     private splitProjection( projection: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>>['projection'] ): {rootProjection?: any, propertyProjection?: any}

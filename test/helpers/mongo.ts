@@ -1559,9 +1559,13 @@ describe('subfilter', () =>
             'engagements.x': 2,
             'engagements.applications.x': 3,
         }
-        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', stages), input);
     })
 
     it('should extract filters from simple $and - root', () => {
@@ -1573,9 +1577,13 @@ describe('subfilter', () =>
             ]
         }
 
-        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', stages), input);
     })
 
     it('should extract filters from nested $and - root', () => {
@@ -1590,9 +1598,13 @@ describe('subfilter', () =>
             ]
         }
 
-        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', stages), input);
     });
 
     it('should extract partial filters from basic $or - root', () => {
@@ -1604,9 +1616,13 @@ describe('subfilter', () =>
             ]
         }
 
-        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', stages), input);
     })
 
     it('should extract filter from combination of $and and $or - root', () => {
@@ -1625,19 +1641,27 @@ describe('subfilter', () =>
             ]
         }
 
-        assert.deepStrictEqual(subfilter(input, '', 'engagements', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', 'engagements.applications'), input);
-        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', 'engagements.applications'), input);
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        assert.deepStrictEqual(subfilter(input, '', 'engagements', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements', 'engagements.applications', stages), input);
+        assert.deepStrictEqual(subfilter(input, 'engagements.applications', 'engagements.applications', stages), input);
     })
 
     it('should skip unsupported operator', () => {
         // $nor
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
         const filter = subfilter({
             $unsupported: [
                 { x: 1 },
                 { y: 2 }
             ]
-        }, '', 'engagements', 'engagements.applications');
+        }, '', 'engagements', stages);
 
         assert.deepStrictEqual(filter, {});
     })
@@ -1647,8 +1671,12 @@ describe('subfilter', () =>
             'engagements.applications.events.submitted': {$exists: false}
         };
 
-        assert.deepStrictEqual(subfilter(filter, '', 'engagements', 'engagements.applications'), {});
-        assert.deepStrictEqual(subfilter(filter, 'engagements.applications', 'engagements.applications', 'engagements.applications'), filter);
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        assert.deepStrictEqual(subfilter(filter, '', 'engagements', stages), {});
+        assert.deepStrictEqual(subfilter(filter, 'engagements.applications', 'engagements.applications', stages), filter);
     })
 
     it('should add unsupported operators at the last level', () => {
@@ -1658,7 +1686,11 @@ describe('subfilter', () =>
                 { y: 2 }
             ]
         }
-        const sub = subfilter( filter, 'engagements', 'engagements', 'engagements.applications');
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        const sub = subfilter( filter, 'engagements', 'engagements', stages);
         assert.deepStrictEqual( sub, filter );
     })
 
@@ -1666,7 +1698,11 @@ describe('subfilter', () =>
         const filter = {
             'engagements.applications.x': { $in: [1, 2, 3]}
         }
-        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        const sub = subfilter(filter, '', 'engagements', stages);
         assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $in: [1, 2, 3] } } } });
     })
 
@@ -1674,7 +1710,11 @@ describe('subfilter', () =>
         const filter = {
             'engagements.applications.x': { $nin: [1, 2, 3]}
         }
-        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        const sub = subfilter(filter, '', 'engagements', stages);
         assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $nin: [1, 2, 3] } } } });
     })
 
@@ -1682,7 +1722,12 @@ describe('subfilter', () =>
         const filter = {
             'engagements.applications.x': { $not: {$in: [1, 2, 3]}}
         }
-        const sub = subfilter(filter, '', 'engagements', 'engagements.applications');
+
+        const stages = [
+            { path: 'engagements', array: true },
+            { path: 'applications', array: true },
+        ]
+        const sub = subfilter(filter, '', 'engagements', stages);
         assert.deepStrictEqual(sub, { 'engagements.applications': { $elemMatch: { x: { $nin: [1, 2, 3] } } } });
     })
 })
