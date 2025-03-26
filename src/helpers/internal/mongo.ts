@@ -998,7 +998,7 @@ export function splitFilterToStages<DBE>( filter: MongoFilter<DBE>, paths: { pat
 
 /**
  * Create subPaths for unwinds
- * a[].b.c[].d[].e.f  =>  a, b.c, d, e.f
+ * a[].b.c[].d[].e.f  =>  a.b, c, d.e.f
  * @param paths
  */
 export function getSubPaths( paths: { path: string, array: boolean }[] ): string[]
@@ -1008,22 +1008,18 @@ export function getSubPaths( paths: { path: string, array: boolean }[] ): string
 
     for ( const el of paths )
     {
-        if ( !el.array )
+        if ( el.array && current !== '' )
         {
-            current += ( current ? '.' : '' ) + el.path;
+            subPaths.push(current);
+            current = el.path;
         }
         else
         {
-            current += ( current ? '.' : '' ) + el.path;
-            subPaths.push( current );
-            current=''
+            current += ( current !== '' ? '.' : '' ) + el.path;
         }
     }
 
-    if ( current !== '' )
-    {
-        subPaths.push(current)
-    }
+    subPaths.push(current)
 
     return subPaths;
 }
@@ -1044,8 +1040,9 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
         return filter;
     }
 
-    const currentStage = stages.find( s => s.path === stage.split('.').reverse()[0] );
-    const fullPath = stages.map( s => s.path ).join('.');
+    const currentStageIndex = stages.findIndex( s => s.path === stage.split('.').reverse()[0] ) || -1;
+    const lastArrayStageIndex = [...stages].reverse().findIndex( s => s.array ) || -1;
+    const isAfterLastArrayStage = currentStageIndex >= lastArrayStageIndex;
 
     for ( const [key, value] of Object.entries(filter) )
     {
@@ -1093,13 +1090,17 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
                 ? '$in'
                 : (value.$nin || value.$not?.$in ? '$nin' : undefined);
 
-            if ( operator )
+            if ( operator && !isAfterLastArrayStage )
             {
-                const elemMatch = transformToElemMatch( key, value.$in || value.$nin || value.$not.$in, operator, fullPath );
+                const elemMatch = transformToElemMatch( key, value.$in || value.$nin || value.$not.$in, operator, stages );
                 if ( elemMatch )
                 {
                     result[elemMatch.key] = elemMatch.value;
                 }
+            }
+            else if ( isAfterLastArrayStage )
+            {
+                result[key] = value;
             }
         }
     }
@@ -1107,9 +1108,9 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
     return result;
 }
 
-export function transformToElemMatch( key: string, value: any[], operator: '$in' | '$nin', fullPath: string ): {key: string, value: {$elemMatch: object}} | false
+export function transformToElemMatch( key: string, value: any[], operator: '$in' | '$nin', stages: { path: string, array: boolean }[] ): {key: string, value: {$elemMatch: object}} | false
 {
-    const path = splitToSubPaths( key, fullPath );
+    const path = splitToSubPaths( key, stages );
     return {
         key: path.prefix,
         value: { $elemMatch: { [path.property]: {[operator]: value} } }
@@ -1117,29 +1118,43 @@ export function transformToElemMatch( key: string, value: any[], operator: '$in'
 }
 
 /**
- * Splits given path into prefix that is part of the full model path and the rest
+ * Splits given path into prefix that is part of the full model path and the rest. Prefix is the furthest path that is leads to an array, property is the rest.
  * @param path - path to split
- * @param fullPath - reference full path
+ * @param paths - reference full path
  */
-function splitToSubPaths( path: string, fullPath: string ): {prefix: string, property: string}
+function splitToSubPaths( path: string, paths: { path: string, array: boolean }[] ): {prefix: string, property: string}
 {
-    let prefix = '';
-    let property = '';
-    for ( const subpath of path.split('.') )
+    const splitPath = path.split('.');
+
+    const furthestArrayIndex = [...splitPath].reverse().findIndex( p => paths.find( s => s.path === p && s.array ) );
+
+    if ( furthestArrayIndex === -1 )
     {
-        if ( fullPath.startsWith(prefix + subpath) )
-        {
-            prefix += subpath + '.';
-        }
-        else {
-            property += subpath + '.';
-        }
+        return { prefix: '', property: path };
     }
 
     return {
-        prefix: prefix.endsWith('.') ? prefix.substring(0, prefix.length - 1) : prefix,
-        property: property.endsWith('.') ? property.substring(0, property.length - 1) : property
-    };
+        prefix: splitPath.slice(0, splitPath.length - furthestArrayIndex).reverse().join('.'),
+        property: splitPath.slice(splitPath.length - furthestArrayIndex).join('.')
+    }
+
+    // let prefix = '';
+    // let property = '';
+    // for ( const subpath of path.split('.') )
+    // {
+    //     if ( fullPath.startsWith(prefix + subpath) )
+    //     {
+    //         prefix += subpath + '.';
+    //     }
+    //     else {
+    //         property += subpath + '.';
+    //     }
+    // }
+    //
+    // return {
+    //     prefix: prefix.endsWith('.') ? prefix.substring(0, prefix.length - 1) : prefix,
+    //     property: property.endsWith('.') ? property.substring(0, property.length - 1) : property
+    // };
 }
 
 const BREAKING_OPERATORS = ['$not', '$ne', '$in', '$nin', '$expr', '$elemMatch', '$function'];
