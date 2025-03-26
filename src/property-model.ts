@@ -176,7 +176,7 @@ export abstract class AbstractPropertyModel<
         for ( let i = 0; i <= subPaths.length; i++ )
         {
             const last = i === subPaths.length;
-            if ( i !== 0 || !last || ( last && !this.paths[ this.paths.length - 1 ].array ) )
+            if ( i !== 0 && ( !last || this.paths[this.paths.length - 1].array ) )
             {
                 pipeline.push({ $unwind: prefix = ( prefix === '$' ? prefix : prefix + '.' ) + subPaths[i - 1] });
             }
