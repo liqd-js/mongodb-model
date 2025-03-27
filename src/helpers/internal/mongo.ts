@@ -1044,8 +1044,8 @@ export function subfilter( filter: MongoFilter<any>, stage: string, nextStage: s
         return filter;
     }
 
-    const currentStageIndex = paths.findIndex( s => s.path === stage.split('.').reverse()[0] ) || -1;
-    const lastArrayStageIndex = [...paths].reverse().findIndex( s => s.array ) || -1;
+    const currentStageIndex = paths.findIndex( s => s.path === stage.split('.').reverse()[0] );
+    const lastArrayStageIndex = [...paths].reverse().findIndex( s => s.array );
     const isAfterLastArrayStage = currentStageIndex >= lastArrayStageIndex;
 
     for ( const [key, value] of Object.entries(filter) )
