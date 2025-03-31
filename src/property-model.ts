@@ -160,7 +160,14 @@ export abstract class AbstractPropertyModel<
         let computedAddedFields = Object.fromEntries(([
             ...collectAddedFields( [{$addFields: gatheredFields?.fields || {}}] ),
             ...collectAddedFields( gatheredFields?.pipeline || [] ),
-        ]).map( f => [f.replace( new RegExp('^' + this.prefix + '.'), '' ), 1 ]));
+        ]).map( f => {
+            if ( f.startsWith(this.prefix + '.') )
+            {
+                return [f.replace(new RegExp('^' + this.prefix + '.'), ''), 1];
+            }
+
+            return [f.split('.').reverse()[0], '$_root.' + f];
+        }));
         computedAddedFields = projectionToReplace( computedAddedFields, this.prefix ) as {[p: string]: any};
 
         const gatheredFilters = Object.values( smartFilter || {} )
