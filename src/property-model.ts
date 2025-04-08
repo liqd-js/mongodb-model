@@ -2,7 +2,7 @@ import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, Object
 import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getSubPaths, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, AbstractModelProperties, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse, ExtractSmartFilters, ExtractComputedProperties, FirstType, AbstractPropertyModelProperties } from './types';
+import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse, ExtractSmartFilters, ExtractComputedProperties, FirstType, AbstractPropertyModelComputedProperties, SecondType } from './types';
 import { AbstractModels } from "./index";
 import Cache from "@liqd-js/cache"
 import objectHash from "@liqd-js/fast-object-hash";
@@ -19,7 +19,7 @@ export abstract class AbstractPropertyModel<
     RootDBE extends MongoRootDocument,
     DBE extends MongoPropertyDocument,
     DTO extends Document,
-    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<any, any>, AbstractPropertyModelProperties<any, any>>
+    Extensions extends PropertyModelExtensions<DBE, AbstractPropertyModelSmartFilters<any, any>, AbstractPropertyModelComputedProperties<any, any>>
 >
 {
     private abstractFindAggregator;
@@ -27,7 +27,7 @@ export abstract class AbstractPropertyModel<
     private prefix;
     public converters: Extensions['converters'];
     public smartFilters?: FirstType<ExtractSmartFilters<Extensions>>;
-    private readonly computedProperties?: ExtractComputedProperties<Extensions>;
+    private readonly computedProperties?: FirstType<ExtractComputedProperties<Extensions>>;
     readonly #models: AbstractModels;
     private readonly cache?: Cache<any>;
 
@@ -135,7 +135,7 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>> & { computedProperties?: ComputedPropertiesParam<ExtractComputedProperties<Extensions>> } = {}, conversion?: K ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>> & { computedProperties?: ComputedPropertiesParam<SecondType<ExtractComputedProperties<Extensions>>> } = {}, conversion?: K ): Promise<Document[]>
     {
         const { computedProperties } = this.converters[conversion ?? 'dto'];
 

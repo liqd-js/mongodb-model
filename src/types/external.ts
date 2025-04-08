@@ -27,7 +27,7 @@ export type ModelListOptions<DBE extends Document, Filters = never> = FindOption
 export type PropertyModelListOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> = Omit<FindOptions<DBE>, 'projection'> &
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : SecondType<ModelSmartFilter<Filters>>
+        smartFilter?    : ModelSmartFilter<FirstType<Filters>>
         cursor?         : string
         projection?     : FindOptions<DBE>['projection'] & { _root?: FindOptions<RootDBE>['projection'] }
         pipeline?       : Document[]
@@ -44,7 +44,7 @@ export type ModelFindOptions<DBE extends Document, Filters = never> =
 export type PropertyModelFindOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never> =
     {
         filter?         : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?    : SecondType<ModelSmartFilter<Filters>>
+        smartFilter?    : ModelSmartFilter<SecondType<Filters>>
     }
 
 export type ModelAggregateOptions<DBE extends Document, Filters extends AbstractModelSmartFilters<any> = never, Properties extends AbstractModelProperties<any> = never> =
@@ -54,19 +54,19 @@ export type ModelAggregateOptions<DBE extends Document, Filters extends Abstract
         computedProperties? : ComputedPropertiesParam<Properties>
         projection?         : FindOptions<DBE>['projection']
     };
+export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractPropertyModelSmartFilters<any, any> = never, Properties extends AbstractPropertyModelComputedProperties<any, any> = never> =
+    {
+        filter?             : PropertyModelFilter<RootDBE, DBE>
+        smartFilter?        : ModelSmartFilter<SecondType<Filters>>
+        computedProperties? : ComputedPropertiesParam<SecondType<Properties>>
+        projection?         : FindOptions<DBE & { _root: RootDBE }>['projection']
+    };
 
 export type FirstType<T> = T extends [infer U, ...infer Rest] ? U : undefined;
 export type SecondType<T> = T extends [infer U, infer V, ...infer Rest] ? V : undefined;
 export type ExtractSmartFilters<T extends PropertyModelExtensions<any, any, any> | ModelExtensions<any,  any, any>> = T['smartFilters'];
 export type ExtractComputedProperties<T extends PropertyModelExtensions<any, any, any> | ModelExtensions<any,  any, any>> = T['computedProperties'];
 
-export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractPropertyModelSmartFilters<any, any> = never, Properties extends AbstractPropertyModelProperties<any, any> = never> =
-    {
-        filter?             : PropertyModelFilter<RootDBE, DBE>
-        smartFilter?        : SecondType<ModelSmartFilter<Filters>>
-        computedProperties? : ComputedPropertiesParam<Properties>
-        projection?         : FindOptions<DBE & { _root: RootDBE }>['projection']
-    };
 
 export type AbstractModelConverter<DBE extends Document> = (dbe: DBE ) => unknown | Promise<unknown>;
 
@@ -84,12 +84,12 @@ export type AbstractModelSmartFilters<T> = T extends never ? undefined : { [K in
 export type AbstractPropertyModelSmartFilters<T extends AbstractModelSmartFilters<any>, P extends AbstractModelSmartFilters<any>> = T extends never ? undefined : [T, P]
 
 export type AbstractModelProperties<T> = T extends never ? undefined : { [K in keyof T]: T[K] extends Function ? ComputedPropertyMethod : T[K] }
-export type AbstractPropertyModelProperties<T extends AbstractModelProperties<any>, P extends AbstractModelProperties<any>> = T extends never ? undefined : [T, P]
+export type AbstractPropertyModelComputedProperties<T extends AbstractModelProperties<any>, P extends AbstractModelProperties<any>> = T extends never ? undefined : [T, P]
 
 export type ModelUpdateResponse<DBE extends Document> = { matchedCount: number, modifiedCount: number, documentBefore?: DBE, documentAfter?: DBE };
 export type PropertyModelUpdateResponse<DBE extends Document> = { matchedRootCount: number, modifiedRootCount: number, documentBefore?: DBE, documentAfter?: DBE };
 
-export type ConstructorExtensions<E extends PropertyModelExtensions<any, any, any>> = Omit<E, 'smartFilters'> & { smartFilters?: FirstType<ExtractSmartFilters<E>> }
+export type ConstructorExtensions<E extends PropertyModelExtensions<any, any, any>> = Omit<E, 'smartFilters' | 'computedProperties'> & { smartFilters?: FirstType<ExtractSmartFilters<E>>, computedProperties?: FirstType<ExtractComputedProperties<E>> }
 
 export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never, ComputedProperties extends AbstractModelProperties<any> = never> =
     {
@@ -98,7 +98,7 @@ export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocumen
         smartFilters?       : SmartFilters
         computedProperties? : ComputedProperties
     }
-export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never, ComputedProperties extends AbstractPropertyModelProperties<any, any> = never> =
+export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never, ComputedProperties extends AbstractPropertyModelComputedProperties<any, any> = never> =
     {
         cache?              : CacheOptions
         converters          : AbstractModelConverters<DBE>
