@@ -25,6 +25,7 @@ export abstract class AbstractModel<
     public converters: Extensions['converters'];
     public smartFilters?: ExtractSmartFilters<Extensions>;
     private readonly computedProperties: ExtractComputedProperties<Extensions>;
+    private readonly searchFilter?: (query: string) => Filter<DBE>;
     readonly #models: AbstractModels;
     private readonly cache?: Cache<any>;
 
@@ -33,6 +34,7 @@ export abstract class AbstractModel<
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
         this.smartFilters = params.smartFilters;
         this.computedProperties = params.computedProperties;
+        this.searchFilter = params.searchFilter;
 
         params.cache && ( this.cache = new Cache( params.cache ));
 
@@ -352,6 +354,38 @@ export abstract class AbstractModel<
         }
 
         return prev ? result.reverse() : result;
+    }
+
+    public async search<K extends keyof Extensions['converters']>( query: string, options: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
+    {
+        if ( query.trim() === '' || !this.searchFilter )
+        {
+            return this.list( options, conversion );
+        }
+
+        const searchResult = await this.collection.aggregate([
+            { $search: this.searchFilter(query) },
+        ]).toArray() as {_id: DBE['_id'], highlights: any}[];
+
+        const list = await this.list({
+            ...options,
+            filter: {
+                $and: [
+                    options.filter,
+                    { _id: { $in: searchResult.map( el => el._id ) } } as any,
+                ]
+            }
+        }, conversion );
+
+        const result: WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>> = [];
+
+        for ( const item of searchResult )
+        {
+            const listItem = list.find( el => this.dtoID( (el as any)._id || (el as any).id ) === this.dtoID(item._id ) );
+            listItem && result.push( listItem );
+        }
+
+        return result;
     }
 
     public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']> ): Promise<T[]>

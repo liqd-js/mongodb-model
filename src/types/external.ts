@@ -89,7 +89,10 @@ export type AbstractPropertyModelComputedProperties<T extends AbstractModelPrope
 export type ModelUpdateResponse<DBE extends Document> = { matchedCount: number, modifiedCount: number, documentBefore?: DBE, documentAfter?: DBE };
 export type PropertyModelUpdateResponse<DBE extends Document> = { matchedRootCount: number, modifiedRootCount: number, documentBefore?: DBE, documentAfter?: DBE };
 
-export type ConstructorExtensions<E extends PropertyModelExtensions<any, any, any>> = Omit<E, 'smartFilters' | 'computedProperties'> & { smartFilters?: FirstType<ExtractSmartFilters<E>>, computedProperties?: FirstType<ExtractComputedProperties<E>> }
+export type ConstructorExtensions<E extends PropertyModelExtensions<any, any, any>> = Omit<E, 'smartFilters' | 'computedProperties'> & {
+    smartFilters?: FirstType<ExtractSmartFilters<E>>,
+    computedProperties?: FirstType<ExtractComputedProperties<E>>,
+}
 
 export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractModelSmartFilters<any> = never, ComputedProperties extends AbstractModelProperties<any> = never> =
     {
@@ -97,6 +100,7 @@ export type ModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocumen
         converters          : AbstractModelConverters<DBE>
         smartFilters?       : SmartFilters
         computedProperties? : ComputedProperties
+        searchFilter?       : (query: string) => Filter<DBE>
     }
 export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropertyDocument, SmartFilters extends AbstractPropertyModelSmartFilters<any, any> = never, ComputedProperties extends AbstractPropertyModelComputedProperties<any, any> = never> =
     {
@@ -104,6 +108,7 @@ export type PropertyModelExtensions<DBE extends MongoRootDocument | MongoPropert
         converters          : AbstractModelConverters<DBE>
         smartFilters?       : SmartFilters
         computedProperties? : ComputedProperties
+        searchFilter?       : (query: string) => Filter<DBE>
     }
 
 export type MongoBSONTypes<T> = T extends ObjectId
