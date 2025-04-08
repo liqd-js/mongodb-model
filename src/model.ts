@@ -1,7 +1,7 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
 import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark, formatter, LOG_FILE } from './helpers';
 import { getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
-import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod} from './types';
+import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod, ExtractSmartFilters, ExtractComputedProperties } from './types';
 import { AbstractModels } from "./index";
 import Cache from "@liqd-js/cache";
 import objectHash from "@liqd-js/fast-object-hash";
@@ -18,13 +18,13 @@ export const Aggregator = require('@liqd-js/aggregator');
 export abstract class AbstractModel<
     DBE extends MongoRootDocument,
     DTO extends Document,
-    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<Extensions['smartFilters']>, AbstractModelProperties<Extensions['computedProperties']>>
+    Extensions extends ModelExtensions<DBE, AbstractModelSmartFilters<ExtractSmartFilters<Extensions>>, AbstractModelProperties<ExtractComputedProperties<Extensions>>>
 >
 {
     private abstractFindAggregator;
     public converters: Extensions['converters'];
-    public smartFilters?: Extensions['smartFilters'];
-    private readonly computedProperties: Extensions['computedProperties'];
+    public smartFilters?: ExtractSmartFilters<Extensions>;
+    private readonly computedProperties: ExtractComputedProperties<Extensions>;
     readonly #models: AbstractModels;
     private readonly cache?: Cache<any>;
 
@@ -122,11 +122,11 @@ export abstract class AbstractModel<
     public dbeID( id: DTO['id'] | DBE['_id'] ): DBE['_id']{ return id as DBE['_id']; }
     public dtoID( dbeID: DBE['_id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
-    protected async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters']>, conversion?: K ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']>, conversion?: K ): Promise<Document[]>
     {
         const { computedProperties: converterComputedProperties } = this.converters[conversion ?? 'dto'];
 
-        const { filter, projection, computedProperties: optionsComputedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters']>;
+        const { filter, projection, computedProperties: optionsComputedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']>;
 
         const converterProperties = { '': await this.resolveComputedProperties( converterComputedProperties )};
         const optionsProperties = { '': await this.resolveComputedProperties( optionsComputedProperties )};
@@ -232,7 +232,7 @@ export abstract class AbstractModel<
         }
     }
 
-    public async updateOne( match: ModelFindOptions<DBE, Extensions['smartFilters']>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
+    public async updateOne( match: ModelFindOptions<DBE, ExtractSmartFilters<Extensions>>, update: Partial<DBE> | UpdateFilter<DBE>, options?: ModelUpdateOptions ): Promise<ModelUpdateResponse<DBE>>
     {
         throw new Error('Method not implemented.');
 
@@ -262,7 +262,7 @@ export abstract class AbstractModel<
         return Array.isArray( id ) ? entries : entries[0] ?? null as any;
     }
 
-    public async find<K extends keyof Extensions['converters']>( options: ModelFindOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
+    public async find<K extends keyof Extensions['converters']>( options: ModelFindOptions<DBE, ExtractSmartFilters<Extensions>>, conversion: K = 'dto' as K, sort?: FindOptions<DBE>['sort'] ): Promise<Awaited<ReturnType<Extensions['converters'][K]['converter']>> | null>
     {
         const { converter } = this.converters[conversion];
 
@@ -279,7 +279,7 @@ export abstract class AbstractModel<
         return data;
     }
 
-    public async list<K extends keyof Extensions['converters']>( options: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
+    public async list<K extends keyof Extensions['converters']>( options: ModelListOptions<DBE, ExtractSmartFilters<Extensions>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, computedProperties: compProps, cache } = this.converters[conversion];
         const { filter = {}, sort = { _id: 1 }, cursor, limit, smartFilter: sFilter, countLimit, ...rest } = resolveBSONObject(options);
@@ -354,7 +354,7 @@ export abstract class AbstractModel<
         return prev ? result.reverse() : result;
     }
 
-    public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<T[]>
+    public async aggregate<T>( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']> ): Promise<T[]>
     {
         let aggregationPipeline = isSet( options ) ? [ ...await this.pipeline( options!, 'dbe' ), ...( resolveBSONObject( pipeline ) as Document[] ) ] : resolveBSONObject( pipeline ) as Document[];
 
@@ -376,7 +376,7 @@ export abstract class AbstractModel<
         return res;
     }
 
-    public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters']> ): Promise<number>
+    public async count( pipeline: Document[], options?: ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']> ): Promise<number>
     {
         let countPipeline = [ ...pipeline, { $count: 'count' }];
 
@@ -391,7 +391,7 @@ export abstract class AbstractModel<
     // TODO pridat podporu ze ked vrati false tak nerobi ani query ale throwne error
     protected async accessFilter(): Promise<Filter<DBE> | void> {}
 
-    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<Extensions['smartFilters']>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
+    public async resolveSmartFilter( smartFilter: {[key in PublicMethodNames<ExtractSmartFilters<Extensions>>]?: any} ): Promise<{ filter?: Filter<DBE>, pipeline?: Document[] }>
     {
         const pipeline: any[] = [];
         let filter: any = {};
@@ -419,7 +419,7 @@ export abstract class AbstractModel<
         return { filter, pipeline };
     }
 
-    public async resolveComputedProperties( properties: any ): Promise<Awaited<ReturnType<SyncComputedPropertyMethod>>>
+    public async resolveComputedProperties( properties?: ComputedPropertiesParam<any> ): Promise<Awaited<ReturnType<SyncComputedPropertyMethod>>>
     {
         const result: ReturnType<ComputedPropertyMethod> = { fields: {}, pipeline: [] };
 
@@ -427,7 +427,7 @@ export abstract class AbstractModel<
         {
             properties = properties.reduce(
                 (acc, val) => {acc[val] = null; return acc;},
-                {}
+                {} as any
             );
         }
 
@@ -435,7 +435,7 @@ export abstract class AbstractModel<
         {
             if ( hasPublicMethod( this.computedProperties, property ) )
             {
-                const resolvedProperties: Awaited<ReturnType<ComputedPropertyMethod>> = await ( this.computedProperties as any )[property]( properties[property] );
+                const resolvedProperties: Awaited<ReturnType<ComputedPropertyMethod>> = await ( this.computedProperties as any )[property]( (properties as any)[property] );
                 result.fields = { ...result.fields, ...resolvedProperties.fields };
                 result.pipeline?.push( ...(resolvedProperties.pipeline || []) );
             }
