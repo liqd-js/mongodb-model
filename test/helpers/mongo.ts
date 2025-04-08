@@ -1736,13 +1736,13 @@ describe('transformToElemMatch', () =>
 {
     it('should transform $in', () =>
     {
-        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$in", 'engagements.applications');
+        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$in", [{path: 'engagements', array: true}, {path: 'applications',  array: true}]);
         assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$in: [1, 2, 3]}}}});
     })
 
     it('should transform $nin', () =>
     {
-        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$nin", 'engagements.applications');
+        const elemMatch = transformToElemMatch('engagements.applications.x', [1, 2, 3], "$nin", [{path: 'engagements', array: true}, {path: 'applications',  array: true}]);
         assert.deepStrictEqual(elemMatch, {key: 'engagements.applications', value: {$elemMatch: {x: {$nin: [1, 2, 3]}}}});
     })
 })
