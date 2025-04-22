@@ -1,6 +1,6 @@
 import {Document, Filter as MongoFilter, FindOptions, ObjectId, Sort, UpdateFilter, OnlyFieldsOfType } from "mongodb";
 import {deleteUndefinedProperties, ModelConverterError, objectGet, objectHash, objectSet} from "../external";
-import { AbstractModelConverter, MongoRootDocument, SyncComputedPropertyMethod } from "../../types";
+import { AbstractModelConverter, SyncComputedPropertyMethod } from "../../types";
 
 type Filter = Record<string, any>;
 const SORT_DESC = [ -1, '-1', 'desc', 'descending' ];
@@ -33,59 +33,6 @@ export function reverseSort( sort: Sort ): Sort
 export function sortProjection( sort: Sort, id: string ): Record<string, 1>
 {
     return Object.fromEntries([ ...Object.keys( sort ).map(( key => [ key, 1 ]) ), [ id, 1 ]]);
-}
-
-/**
- * Calculates search score for nested documents.
- * @param rootElement - root element of the document after necessary unwinds
- * @param searchResult - array of matched root documents with highlights
- */
-export function searchScore<DBE extends MongoRootDocument>( rootElement: DBE, searchResult: {_id: DBE['_id'], highlights: { score: number, path: string, texts: { value: string, type: 'hit' | 'text' }[] }[]}[] )
-{
-    /**
-     * Recursively searches for a match in the object.
-     * @param obj - object to search in
-     * @param path - path to search for joined with '.'
-     * @param values - array of values to search for - element must match all for the given path
-     */
-    function findMatch( obj: any, path: string, values: string[] ): boolean
-    {
-        const keys = path.split('.');
-        const key = keys.shift();
-
-        if ( key && keys.length === 0 )
-        {
-            const objValue = obj[key];
-
-            return values.every( el => new RegExp(el).test( objValue ))
-        }
-
-        if( key && obj[key] )
-        {
-            if ( Array.isArray( obj[key] ))
-            {
-                return obj[key].some( item => findMatch( item, keys.join('.'), values ));
-            }
-
-            return findMatch( obj[key], keys.join('.'), values );
-        }
-
-        return false;
-    }
-
-    let score = 0;
-
-    const result = searchResult.find( el => el._id.toString() === rootElement._id.toString() );
-
-    for ( const highlight of result?.highlights || [] )
-    {
-        if ( findMatch( rootElement, highlight.path, highlight.texts.map( el => el.value )))
-        {
-            score += highlight.score;
-        }
-    }
-
-    return score;
 }
 
 function addPrefixToValue( filter: Filter | any, prefix: string, prefixKeys: boolean = true ): Filter | any
@@ -727,11 +674,11 @@ export function propertyModelUpdateParams( paths: { path: string, array: boolean
     return { parentIDPath, updatePath, arrayFilters };
 }
 
-export function mergeComputedProperties( ...objects: ({ [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>} | undefined)[] ): { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}
+export function mergeComputedProperties( ...objects: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}[] ): { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}
 {
     const computed: { [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>} = {}
 
-    for ( const properties of objects.filter( Boolean ) )
+    for ( const properties of objects )
     {
         for ( const prefix in properties )
         {

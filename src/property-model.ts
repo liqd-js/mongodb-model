@@ -1,8 +1,8 @@
-import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getSubPaths, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, searchScore, splitFilterToStages, toUpdateOperations } from './helpers';
+import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions, WithId} from 'mongodb';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getSubPaths, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
-import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, WithTotal, PropertyModelFindOptions, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse, ExtractSmartFilters, ExtractComputedProperties, FirstType, AbstractPropertyModelComputedProperties, SecondType } from './types';
+import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, ModelUpdateResponse, WithTotal, PropertyModelFindOptions, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse, ExtractSmartFilters, ExtractComputedProperties, FirstType, AbstractPropertyModelComputedProperties, SecondType } from './types';
 import { AbstractModels } from "./index";
 import Cache from "@liqd-js/cache"
 import objectHash from "@liqd-js/fast-object-hash";
@@ -27,7 +27,6 @@ export abstract class AbstractPropertyModel<
     private prefix;
     public converters: Extensions['converters'];
     public smartFilters?: FirstType<ExtractSmartFilters<Extensions>>;
-    private readonly searchFilter?: (query: string) => Filter<DBE>;
     private readonly computedProperties?: FirstType<ExtractComputedProperties<Extensions>>;
     readonly #models: AbstractModels;
     private readonly cache?: Cache<any>;
@@ -47,7 +46,6 @@ export abstract class AbstractPropertyModel<
         this.converters = params.converters ?? { dbe: { converter: ( dbe: DBE ) => dbe } };
         this.smartFilters = params.smartFilters;
         this.computedProperties = params.computedProperties;
-        this.searchFilter = params.searchFilter;
 
         params.cache && ( this.cache = new Cache( params.cache ));
 
@@ -137,7 +135,7 @@ export abstract class AbstractPropertyModel<
     public dtoID( dbeID: DBE['id'] | DTO['id'] ): DTO['id']{ return dbeID as DTO['id']; }
 
     //private pipeline( rootFilter: Filter<RootDBE>, filter: Filter<DBE>, projection?: Document ): Document[]
-    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>> & { computedProperties?: ComputedPropertiesParam<SecondType<ExtractComputedProperties<Extensions>>>, extraProperties?: Document } = {}, conversion?: K ): Promise<Document[]>
+    protected async pipeline<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>> & { computedProperties?: ComputedPropertiesParam<SecondType<ExtractComputedProperties<Extensions>>> } = {}, conversion?: K ): Promise<Document[]>
     {
         const { computedProperties } = this.converters[conversion ?? 'dto'];
 
@@ -150,8 +148,7 @@ export abstract class AbstractPropertyModel<
 
         const converterProperties = await this.resolveComputedProperties( computedProperties );
         const optionsProperties = await this.resolveComputedProperties( options.computedProperties );
-        const extraProperties = await this.resolveExtraProperties( options.extraProperties );
-        const computed = mergeComputedProperties( converterProperties, optionsProperties, extraProperties );
+        const computed = mergeComputedProperties( converterProperties, optionsProperties );
 
         const gatheredFields = Object.values( computed || {fields: null, pipeline: null} )
             .reduce((acc, val) => {
@@ -407,7 +404,7 @@ export abstract class AbstractPropertyModel<
         return data;
     }
 
-    public async list<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>> & { extraProperties?: Document }, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
+    public async list<K extends keyof Extensions['converters']>( options: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, projection } = this.converters[conversion];
         const prev = options.cursor?.startsWith('prev:');
@@ -475,71 +472,6 @@ export abstract class AbstractPropertyModel<
         }
 
         return prev ? result.reverse() : result;
-    }
-
-    public async search<K extends keyof Extensions['converters']>( query: string, options: PropertyModelListOptions<RootDBE, DBE, SecondType<Extensions['smartFilters']>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
-    {
-        if ( query.trim() === '' || !this.searchFilter )
-        {
-            return this.list( options, conversion );
-        }
-
-        const searchPipeline = [
-            { $search: this.searchFilter(query) },
-            { $project: { highlights: { $meta: "searchHighlights" } } },
-        ]
-        const start = Date.now();
-        flowGet('log') && DUMP( searchPipeline );
-        const searchResult = await this.collection.aggregate( searchPipeline ).toArray().then( res => {
-            LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
-            LOG_FILE( `TIME: ${Date.now() - start} ms` );
-            LOG_FILE( searchPipeline, true );
-            return res;
-        }) as {_id: DBE['_id'], highlights: any}[];
-
-
-        const filter: any = {'_root._id': { $in: [] }, $or: []};
-
-        for  ( const el of searchResult )
-        {
-            filter['_root._id'].$in.push( el._id );
-
-            for ( const highlight of el.highlights )
-            {
-                const key = highlight.path.startsWith( this.prefix )
-                    ? highlight.path.replace( `${this.prefix}.`, '' )
-                    : '_root.' + highlight.path;
-
-                const and: any = [];
-                for ( const text of highlight.texts )
-                {
-                    and.push( { [key]: { $regex: text.value } } );
-                }
-                filter.$or.push( { $and: and } );
-            }
-        }
-
-        const list = await this.list({
-            ...options,
-            filter: {
-                $and: [
-                    options.filter,
-                    filter
-                ]
-            },
-            extraProperties: {
-                _searchScore: {
-                    $function: {
-                        body: searchScore.toString(),
-                        args: ['$$ROOT', searchResult],
-                        lang: "js"
-                    }
-                }
-            },
-            sort: { _searchScore: -1 },
-        }, conversion );
-
-        return list;
     }
 
     public async aggregate<T>( pipeline: Document[], options?: PropertyModelAggregateOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>, ExtractComputedProperties<Extensions>> ): Promise<T[]>
@@ -697,11 +629,6 @@ export abstract class AbstractPropertyModel<
         }
 
         return result;
-    }
-
-    public async resolveExtraProperties( extraProperties?: Document ): Promise<{ [path: string]: Awaited<ReturnType<SyncComputedPropertyMethod>>}>
-    {
-        return { [this.prefix]: { fields: extraProperties || null, pipeline: null } }
     }
 
     private async filterStages( list: PropertyModelListOptions<RootDBE, DBE, ExtractSmartFilters<Extensions>> )
