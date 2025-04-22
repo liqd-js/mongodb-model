@@ -83,6 +83,10 @@ export function hasPublicMethod( obj: any, method: string ): boolean
     return obj && method in obj && typeof obj[method] === 'function';
 }
 
+export function escapeRegex( str: string ) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function DUMP( obj: object )
 {
     console.log( stringify( obj ));

@@ -42,6 +42,8 @@ export function sortProjection( sort: Sort, id: string ): Record<string, 1>
  */
 export function searchScore<DBE extends MongoRootDocument>( rootElement: DBE, searchResult: {_id: DBE['_id'], highlights: { score: number, path: string, texts: { value: string, type: 'hit' | 'text' }[] }[]}[] )
 {
+    const escapeRegex = ( str: string ) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     /**
      * Recursively searches for a match in the object.
      * @param obj - object to search in
@@ -57,7 +59,7 @@ export function searchScore<DBE extends MongoRootDocument>( rootElement: DBE, se
         {
             const objValue = obj[key];
 
-            return values.every( el => new RegExp(el).test( objValue ))
+            return values.every( el => new RegExp(escapeRegex(el)).test( objValue ))
         }
 
         if( key && obj[key] )
