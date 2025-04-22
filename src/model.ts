@@ -1,5 +1,5 @@
 import { Collection, Document, FindOptions, Filter, WithId, ObjectId, OptionalUnlessRequiredId, UpdateFilter } from 'mongodb';
-import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, mergeComputedProperties, toUpdateOperations, Benchmark, formatter, LOG_FILE } from './helpers';
+import { flowGet, DUMP, Arr, isSet, convert, REGISTER_MODEL, hasPublicMethod, collectAddedFields, mergeComputedProperties, toUpdateOperations, Benchmark, formatter, LOG_FILE } from './helpers';
 import { getCursor, resolveBSONObject, ModelError, QueryBuilder } from './helpers';
 import { ModelAggregateOptions, ModelCreateOptions, ModelListOptions, MongoRootDocument, WithTotal, ModelUpdateResponse, AbstractModelSmartFilters, PublicMethodNames, SmartFilterMethod, ModelExtensions, ModelFindOptions, ModelUpdateOptions, AbstractModelProperties, ComputedPropertyMethod, AbstractConverterOptions, ComputedPropertiesParam, SyncComputedPropertyMethod, ExtractSmartFilters, ExtractComputedProperties } from './types';
 import { AbstractModels } from "./index";
@@ -356,7 +356,7 @@ export abstract class AbstractModel<
         return prev ? result.reverse() : result;
     }
 
-    public async search<K extends keyof Extensions['converters']>( query: string, options: ModelListOptions<DBE, ExtractSmartFilters<Extensions>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
+    public async search<K extends keyof Extensions['converters']>( query: string, options: ModelListOptions<DBE, Extensions['smartFilters']>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         if ( query.trim() === '' || !this.searchFilter )
         {

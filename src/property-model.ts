@@ -1,5 +1,5 @@
 import {Collection, Document, Filter as MongoFilter, Filter, FindOptions, ObjectId, UpdateFilter, UpdateOptions} from 'mongodb';
-import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, escapeRegex, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getSubPaths, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, searchScore, splitFilterToStages, toUpdateOperations } from './helpers';
+import { addPrefixToFilter, addPrefixToPipeline, addPrefixToUpdate, Arr, collectAddedFields, convert, DUMP, flowGet, formatter, generateCursorCondition, GET_PARENT, getCursor, getSubPaths, getUsedFields, hasPublicMethod, isExclusionProjection, isSet, LOG, LOG_FILE, map, mergeComputedProperties, optimizeMatch, projectionToReplace, propertyModelUpdateParams, REGISTER_MODEL, resolveBSONObject, reverseSort, searchScore, splitFilterToStages, toUpdateOperations } from './helpers';
 import { ModelError, QueryBuilder, Benchmark } from './helpers';
 import { Aggregator } from './model'
 import { SmartFilterMethod, MongoPropertyDocument, MongoRootDocument, PropertyModelAggregateOptions, PropertyModelFilter, PropertyModelListOptions, PublicMethodNames, WithTotal, PropertyModelFindOptions, AbstractPropertyModelSmartFilters, PropertyModelExtensions, ConstructorExtensions, ComputedPropertiesParam, SyncComputedPropertyMethod, ModelUpdateOptions, PropertyModelUpdateResponse, ExtractSmartFilters, ExtractComputedProperties, FirstType, AbstractPropertyModelComputedProperties, SecondType } from './types';
@@ -513,7 +513,7 @@ export abstract class AbstractPropertyModel<
                 const and: any = [];
                 for ( const text of highlight.texts )
                 {
-                    and.push( { [key]: { $regex: escapeRegex(text.value) } } );
+                    and.push( { [key]: { $regex: text.value } } );
                 }
                 filter.$or.push( { $and: and } );
             }
