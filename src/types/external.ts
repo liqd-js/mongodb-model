@@ -53,6 +53,7 @@ export type ModelAggregateOptions<DBE extends Document, Filters extends Abstract
         smartFilter?        : ModelSmartFilter<Filters>
         computedProperties? : ComputedPropertiesParam<Properties>
         projection?         : FindOptions<DBE>['projection']
+        sort?               : FindOptions<DBE>['sort']
     };
 export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends Document, Filters extends AbstractPropertyModelSmartFilters<any, any> = never, Properties extends AbstractPropertyModelComputedProperties<any, any> = never> =
     {
@@ -60,6 +61,7 @@ export type PropertyModelAggregateOptions<RootDBE extends Document, DBE extends 
         smartFilter?        : ModelSmartFilter<SecondType<Filters>>
         computedProperties? : ComputedPropertiesParam<SecondType<Properties>>
         projection?         : FindOptions<DBE & { _root: RootDBE }>['projection']
+        sort?               : FindOptions<DBE>['sort']
     };
 
 export type FirstType<T> = T extends [infer U, ...infer Rest] ? U : undefined;

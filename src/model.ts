@@ -126,14 +126,14 @@ export abstract class AbstractModel<
     {
         const { computedProperties: converterComputedProperties } = this.converters[conversion ?? 'dto'];
 
-        const { filter, projection, computedProperties: optionsComputedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']>;
+        const { filter, sort, projection, computedProperties: optionsComputedProperties, smartFilter } = resolveBSONObject( options ) as ModelAggregateOptions<DBE, Extensions['smartFilters'], Extensions['computedProperties']>;
 
         const converterProperties = { '': await this.resolveComputedProperties( converterComputedProperties )};
         const optionsProperties = { '': await this.resolveComputedProperties( optionsComputedProperties )};
         const computedProperties = mergeComputedProperties( converterProperties, optionsProperties )[''];
 
         const params = {
-            filter, projection, computedProperties,
+            filter, projection, computedProperties, sort,
             smartFilter: smartFilter && await this.resolveSmartFilter( smartFilter ) || undefined,
             accessFilter: await this.accessFilter() || undefined,
         };
@@ -268,7 +268,7 @@ export abstract class AbstractModel<
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':find(' + ( conversion as string ) + ')' ) : undefined;
 
-        const dbe = await this.aggregate<DBE>( [{$limit: 1}], options ).then( r => r[0]);
+        const dbe = await this.aggregate<DBE>( [{$limit: 1}], { ...options, sort } ).then( r => r[0]);
 
         benchmark?.step('QUERY');
 
