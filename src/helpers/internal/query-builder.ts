@@ -32,7 +32,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
             options.filter,
             options.smartFilter?.filter,
             accessFilter,
-            options.cursor ? generateCursorCondition( options.cursor, options.sort || {} ) : undefined
+            // TODO rozdelit options.cursor ? generateCursorCondition( options.cursor, options.sort || {} ) : undefined
         ]};
 
         let prev = options.cursor?.startsWith('prev:')
@@ -58,6 +58,7 @@ export class QueryBuilder<DBE extends MongoRootDocument>
             ...( options.projection ? [{ $project: {...options.projection, ...computedFields }}] : []),
             ...( options.pipeline || [] ),
             ...( addedFieldsPipeline.length ? [{ $unset: addedFieldsPipeline }] : []),
+            ...( options.cursor ? [{ $match: generateCursorCondition( options.cursor, options.sort || {})}] : []),
             ...( options.sort ? [{ $sort: prev ? reverseSort( options.sort ) : options.sort }] : []),
             ...( options.skip ? [{ $skip: options.skip }] : []),
             ...( options.limit ? [{ $limit: options.limit }] : []),
