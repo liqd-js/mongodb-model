@@ -491,7 +491,7 @@ export abstract class AbstractPropertyModel<
 
         LOG_FILE( `Collection: ${this.collection.collectionName}.${this.paths.map(el => el.path).join('.')}` );
         LOG_FILE( `TIME: ${Date.now() - start} ms` );
-        LOG_FILE( pipeline, true );
+        LOG_FILE( aggregationPipeline, true );
 
         return res;
 

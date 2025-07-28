@@ -371,7 +371,7 @@ export abstract class AbstractModel<
 
         LOG_FILE( `Collection: ${this.collection.collectionName}` );
         LOG_FILE( `TIME: ${Date.now() - start} ms` );
-        LOG_FILE( pipeline, true );
+        LOG_FILE( aggregationPipeline, true );
 
         return res;
     }
