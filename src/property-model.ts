@@ -420,7 +420,7 @@ export abstract class AbstractPropertyModel<
             sort = { ...sort, id: 1 };
         }
 
-        let pipeline = await this.pipeline({ ...resolvedList, projection }, conversion);
+        let pipeline = await this.pipeline({ ...resolvedList, sort, projection }, conversion);
         let countPipeline = queryBuilder.buildCountPipeline( await this.pipeline({
             ...countOptions,
             projection
