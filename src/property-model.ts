@@ -412,8 +412,13 @@ export abstract class AbstractPropertyModel<
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
 
-        const resolvedList: typeof options = resolveBSONObject( options );
-        const { cursor, sort = { id: 1 }, limit, skip, countLimit, ...countOptions } = resolvedList;
+        const resolvedList = resolveBSONObject( options );
+        let { cursor, sort = { id: 1 }, limit, skip, countLimit, ...countOptions } = resolvedList;
+
+        if ( !sort.id )
+        {
+            sort = { ...sort, id: -1 };
+        }
 
         let pipeline = await this.pipeline({ ...resolvedList, projection }, conversion);
         let countPipeline = queryBuilder.buildCountPipeline( await this.pipeline({

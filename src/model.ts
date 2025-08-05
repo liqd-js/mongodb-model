@@ -282,8 +282,12 @@ export abstract class AbstractModel<
     public async list<K extends keyof Extensions['converters']>( options: ModelListOptions<DBE, ExtractSmartFilters<Extensions>>, conversion: K = 'dto' as K ): Promise<WithTotal<Array<Awaited<ReturnType<Extensions['converters'][K]['converter']>> & { $cursor?: string }>>>
     {
         const { converter, computedProperties: compProps, cache } = this.converters[conversion];
-        const { filter = {}, sort = { _id: 1 }, cursor, limit, smartFilter: sFilter, countLimit, ...rest } = resolveBSONObject(options);
+        let { filter = {}, sort = { _id: 1 }, cursor, limit, smartFilter: sFilter, countLimit, ...rest } = resolveBSONObject(options);
         const prev = cursor?.startsWith('prev:');
+        if ( !sort._id )
+        {
+            sort = { ...sort, _id: -1 };
+        }
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;
 
