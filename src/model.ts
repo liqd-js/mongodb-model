@@ -286,7 +286,7 @@ export abstract class AbstractModel<
         const prev = cursor?.startsWith('prev:');
         if ( !sort._id )
         {
-            sort = { ...sort, _id: -1 };
+            sort = { ...sort, _id: 1 };
         }
 
         const benchmark = flowGet( 'benchmark' ) ? new Benchmark( this.constructor.name + ':list(' + ( conversion as string ) + ')' ) : undefined;

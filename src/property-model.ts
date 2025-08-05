@@ -417,7 +417,7 @@ export abstract class AbstractPropertyModel<
 
         if ( !sort.id )
         {
-            sort = { ...sort, id: -1 };
+            sort = { ...sort, id: 1 };
         }
 
         let pipeline = await this.pipeline({ ...resolvedList, projection }, conversion);
